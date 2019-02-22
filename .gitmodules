@@ -1,0 +1,6 @@
+[submodule "lib/libpll"]
+	path = lib/libpll
+	url = https://github.com/xflouris/libpll-2.git
+[submodule "test/lib/catch2"]
+	path = test/lib/catch2
+	url = https://github.com/catchorg/Catch2.git
