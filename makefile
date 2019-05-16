@@ -1,12 +1,5 @@
-BINDIR=bin
-
-all: $(BINDIR)/rd
-
-$(BINDIR)/rd: src/main.cpp | $(BINDIR)
-	$(CXX) src/main.cpp -o $(BINDIR)/rd
-
-$(BINDIR):
-	mkdir -p $(BINDIR)
+all:
+	@cmake -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_ENABLE_LTO=true -Bbuild -H. && cd build && make
 
 clean:
-	rm -rf $(BINDIR)
+	trash build bin
