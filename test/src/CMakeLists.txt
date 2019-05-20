@@ -5,7 +5,9 @@ add_executable(rd_test
     ${RD_SOURCES}
 )
 
-set(TEST_LINK_LIBS ${LINK_LIBS} Catch2::Catch2)
+set(TEST_LINK_LIBS ${LINK_LIBS} Catch2::Catch2 pll_static)
+target_compile_definitions(rd_test PRIVATE
+    DATA_DIRECTORY_ABS=${CMAKE_CURRENT_SOURCE_DIR}/../data/)
 
 target_compile_options(rd_test PRIVATE -Wall -Wextra -pedantic
     -fno-omit-frame-pointer
