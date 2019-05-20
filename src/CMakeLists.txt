@@ -1,5 +1,8 @@
 add_executable(rd
     main.cpp
+    model.cpp
+    msa.cpp
+    tree.cpp
 )
 
 set_target_properties(rd PROPERTIES
