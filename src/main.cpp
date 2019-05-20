@@ -20,12 +20,12 @@ int main(int argv, char **argc) {
       {0, 0, 0, 0},
   };
 
-  char c;
+  int c;
   int index = 0;
   std::string msa_filename;
   std::string tree_filename;
   std::string model_filename;
-  while ((c = getopt_long_only(argv, argc, "", long_opts, &index))) {
+  while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
     switch (index) {
     case 0:
       msa_filename = optarg;
