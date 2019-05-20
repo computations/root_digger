@@ -1,6 +1,10 @@
 file(GLOB RD_SOURCES *.cpp)
+list(REMOVE_ITEM RD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
+
+set(RD_SOURCES ${RD_SOURCES} PARENT_SCOPE)
 
 add_executable(rd
+    main.cpp
     ${RD_SOURCES}
 )
 

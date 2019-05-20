@@ -2,13 +2,6 @@
 #include <stdexcept>
 #include <vector>
 
-pll_msa_t *parse_compress_msa_file(const std::string &msa_filename) {
-  pll_msa_t *msa = parse_msa_file(msa_filename);
-  pll_compress_site_patterns(msa->sequence, pll_map_nt, msa->count,
-                             &(msa->length));
-  return msa;
-}
-
 pll_msa_t *parse_msa_file(const std::string &msa_filename) {
 
   if (pll_phylip_t *fd =
