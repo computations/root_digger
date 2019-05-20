@@ -32,14 +32,14 @@ contain a metric tree in newick format. The model file should be a comma
 separated list of numbers which specifies the subsitution model. For example, if
 you have some DNA data, and your substitution rate matrix looks like this:
 
-$$
-\begin{bmatrix}
-* & a & b & c\\
-d & * & e & f\\
-g & h & * & i\\
-j & k & l & *\\
-\end{bmatrix}
-$$
+
+```
+*, a, b, c,
+d, *, e, f,
+g, h, *, i,
+j, k, l, *,
+```
+
 
 then the file should have the contents
 
