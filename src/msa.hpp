@@ -7,6 +7,7 @@ extern "C" {
 
 #include <string>
 
+pll_msa_t *parse_compress_msa_file(const std::string &msa_filename);
 pll_msa_t *parse_msa_file(const std::string &msa_filename);
 
 #endif

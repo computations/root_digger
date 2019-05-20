@@ -1,8 +1,7 @@
+file(GLOB RD_SOURCES *.cpp)
+
 add_executable(rd
-    main.cpp
-    model.cpp
-    msa.cpp
-    tree.cpp
+    ${RD_SOURCES}
 )
 
 set_target_properties(rd PROPERTIES

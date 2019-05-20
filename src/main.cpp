@@ -39,9 +39,5 @@ int main(int argv, char **argc) {
     }
   }
 
-  auto pll_msa = parse_msa_file(msa_filename);
-  auto pll_tree = parse_tree_file(tree_filename);
-  auto model_params = parse_model_file(model_filename);
-
   return 0;
 }
