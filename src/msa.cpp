@@ -51,3 +51,44 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
   }
   throw std::invalid_argument("Could not parse msa file");
 }
+
+char* msa_t::sequence(int index) const{
+  if(index < _msa->count && !(index<0))
+    return _msa->sequence[index];
+  throw std::out_of_range("Requested sequence does not exist");
+}
+
+char* msa_t::label(int index) const{
+  if(index < _msa->count && !(index<0))
+    return _msa->label[index];
+  throw std::out_of_range("Requested label does not exist");
+}
+
+unsigned int* msa_t::weights() const{
+  if (_weights)
+    return _weights;
+  throw std::runtime_error("msa_t has no weights");
+}
+
+const pll_state_t* msa_t::map() const{
+  return _map;
+}
+
+unsigned int msa_t::states() const{
+  return _states;
+}
+
+int msa_t::count() const{
+  return _msa->count;
+}
+
+int msa_t::length() const{
+  return _msa->length;
+}
+
+msa_t::~msa_t(){
+  if(_msa)
+    pll_msa_destroy(_msa);
+  if (_weights)
+    free(_weights);
+}

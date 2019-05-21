@@ -5,6 +5,7 @@ extern "C" {
 #include <libpll/pll.h>
 }
 #include "tree.hpp"
+#include "msa.hpp"
 #include <string>
 #include <vector>
 
@@ -21,7 +22,7 @@ model_params_t parse_model_file(const std::string &model_filename);
 
 class model_t {
   model_t(const model_params_t &rate_parameters, pll_utree_t *tree,
-          pll_msa_t *msa, unsigned int states);
+          const msa_t &msa);
   ~model_t();
 
 private:

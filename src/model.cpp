@@ -49,9 +49,8 @@ model_params_t parse_model_file(const std::string &model_filename) {
   return parse_model_params(read_file_contents(model_file));
 }
 
-// TODO: compress msa
 model_t::model_t(const model_params_t &rate_parameters, pll_utree_t *tree,
-                 pll_msa_t *msa, unsigned int states) {
+                 const msa_t &msa) {
 
   _tree = pll_utree_clone(tree);
   /*
@@ -64,7 +63,8 @@ model_t::model_t(const model_params_t &rate_parameters, pll_utree_t *tree,
   unsigned int branches = _tree->tip_count * 2 - 3 + 2;
 
   /*
-   * Only one submodel will be used for the time being.
+   * Only one submodel will be used for the time being. If there is desire for
+   * more, we can add support for more models..
    */
   constexpr unsigned int submodels = 1;
 
@@ -77,8 +77,8 @@ model_t::model_t(const model_params_t &rate_parameters, pll_utree_t *tree,
   attributes |= PLL_ATTRIB_ARCH_CPU;
   // attributes |= PLL_ATTRIB_NONREV;
 
-  _partition = pll_partition_create(_tree->tip_count, branches, states,
-                                    msa->length, submodels, branches, submodels,
+  _partition = pll_partition_create(_tree->tip_count, branches, msa.states(),
+                                    msa.length(), submodels, branches, submodels,
                                     branches, attributes);
   pll_set_subst_params(_partition, 0, rate_parameters.data());
 
@@ -88,6 +88,7 @@ model_t::model_t(const model_params_t &rate_parameters, pll_utree_t *tree,
   pll_unode_t **trav_buffer = (pll_unode_t **)malloc(
       sizeof(pll_unode_t *) * (_tree->tip_count + _tree->inner_count));
   unsigned int trav_size = 0;
+
   pll_utree_traverse(_tree->vroot, PLL_TREE_TRAVERSE_POSTORDER, full_trav_cb,
                      trav_buffer, &trav_size);
 
@@ -100,10 +101,12 @@ model_t::model_t(const model_params_t &rate_parameters, pll_utree_t *tree,
   }
 
   /* use the label map to assign tip states in the partition */
-  for (int i = 0; i < msa->count; ++i) {
-    pll_set_tip_states(_partition, label_map.at(msa->label[i]), pll_map_nt,
-                       msa->sequence[i]);
+  for (int i = 0; i < msa.count(); ++i) {
+    pll_set_tip_states(_partition, label_map.at(msa.label(i)), msa.map(),
+                       msa.sequence(i));
   }
+
+  free(trav_buffer);
 }
 
 model_t::~model_t() {
