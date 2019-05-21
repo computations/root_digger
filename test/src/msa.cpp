@@ -6,9 +6,9 @@ extern "C" {
 #include <msa.hpp>
 
 TEST_CASE("parse msa", "[msa]") {
-  for (auto &&ds : data_files) {
-    auto msa = parse_msa_file(ds);
-    REQUIRE(msa != nullptr);
-    pll_msa_destroy(msa);
+  for (auto &&ds : data_files_dna) {
+    msa_t msa{ds};
+    REQUIRE(msa.states() == 4);
+    REQUIRE(msa.map() == pll_map_nt);
   }
 }

@@ -6,8 +6,8 @@
 #define __stringify(s) std::string(#s)
 #define __stringify_base(s) __stringify(s)
 
-std::vector<std::string> data_files = {
-    __stringify_base(DATA_DIRECTORY_ABS) + "101.phy",
+std::vector<std::string> data_files_dna = {
+    __stringify_base(DATA_DIRECTORY_DNA_ABS) + "101.phy",
 };
 
 #endif
