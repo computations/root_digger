@@ -4,9 +4,10 @@
 extern "C" {
 #include <libpll/pll.h>
 }
-#include "tree.hpp"
 #include "msa.hpp"
+#include "tree.hpp"
 #include <string>
+#include <utility>
 #include <vector>
 
 typedef std::vector<double> model_params_t;
@@ -21,12 +22,12 @@ model_params_t parse_model_params(const std::string &model_string);
 model_params_t parse_model_file(const std::string &model_filename);
 
 class model_t {
-  model_t(const model_params_t &rate_parameters, pll_utree_t *tree,
-          const msa_t &msa);
+public:
+  model_t(const model_params_t &, rooted_tree_t, const msa_t &);
   ~model_t();
 
 private:
-  pll_utree_t *_tree;
+  rooted_tree_t _tree;
   pll_partition_t *_partition;
 };
 

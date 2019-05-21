@@ -1,6 +1,9 @@
 #include "msa.hpp"
 #include <stdexcept>
 #include <vector>
+extern "C"{
+#include <libpll/pll_msa.h>
+}
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename) {
 

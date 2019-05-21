@@ -1,13 +1,9 @@
 #ifndef __RD_TEST_DATA_HPP_
 #define __RD_TEST_DATA_HPP_
-#include <vector>
 #include <string>
+#include <utility>
+#include <vector>
 
-#define __stringify(s) std::string(#s)
-#define __stringify_base(s) __stringify(s)
-
-std::vector<std::string> data_files_dna = {
-    __stringify_base(DATA_DIRECTORY_DNA_ABS) + "101.phy",
-};
+extern std::vector<std::pair<std::string, std::string>> data_files_dna;
 
 #endif

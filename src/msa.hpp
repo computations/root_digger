@@ -6,6 +6,7 @@ extern "C" {
 }
 
 #include <string>
+#include <vector>
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename);
 
