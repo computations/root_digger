@@ -42,7 +42,12 @@ public:
 
   std::unordered_map<std::string, unsigned int> label_map() const;
 
+  std::vector<pll_operation_t>
+  generate_operations(const root_location_t &) const;
+
 private:
+  std::vector<pll_unode_t*> full_tree_traverse() const;
+  std::vector<pll_unode_t*> full_tree_traverse(pll_unode_t*) const;
   void generate_root_locations();
 
   pll_utree_t *_tree;
