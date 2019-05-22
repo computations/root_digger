@@ -10,3 +10,5 @@ file(COPY
     ${PLLMOD_SRC}/util/pllmod_util.h
     ${LIBPLL_SRC}/pll.h
     DESTINATION ${LOCALDEPS_DIR}/include/libpll)
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LOCALDEPS_DIR}/lib)
