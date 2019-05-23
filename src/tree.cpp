@@ -12,6 +12,8 @@ rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
     }
   } else {
     _tree = nullptr;
+    _root_clv_index = 0;
+    _root_scaler_index = 0;
   }
 }
 
@@ -27,6 +29,8 @@ rooted_tree_t &rooted_tree_t::operator=(rooted_tree_t &&other) {
     _tree = other._tree;
     other._tree = nullptr; // ensure that what is now _ours_ stays _ours_!
     _roots = std::move(other._roots);
+    _root_clv_index = other._root_clv_index;
+    _root_scaler_index = other._root_scaler_index;
   }
   return *this;
 }
@@ -41,6 +45,14 @@ rooted_tree_t &rooted_tree_t::operator=(const rooted_tree_t &other) {
   generate_root_locations();
   return *this;
 }
+
+root_location_t rooted_tree_t::root_location(size_t index) const {
+  if (index < _roots.size())
+    return _roots[index];
+  throw std::invalid_argument("Requested a root that does not exist");
+}
+
+size_t rooted_tree_t::root_count() const { return _roots.size(); }
 
 std::vector<pll_unode_t *> rooted_tree_t::full_tree_traverse() const {
   return full_tree_traverse(_tree->vroot);
@@ -95,9 +107,14 @@ unsigned int rooted_tree_t::inner_count() const { return _tree->inner_count; }
 
 unsigned int rooted_tree_t::tip_count() const { return _tree->tip_count; }
 
+unsigned int rooted_tree_t::root_clv_index() const { return _root_clv_index; }
+unsigned int rooted_tree_t::root_scaler_index() const {
+  return _root_clv_index;
+}
+
 /*
- * Creates a map from tip label to clv index. Primarily used to match the clv
- * buffers with the corriesponding alignment.
+ * Creates a map from tip label to clv index. Primarily used to match the
+ * clv buffers with the corriesponding alignment.
  */
 std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
   std::unordered_map<std::string, unsigned int> label_map;
@@ -111,7 +128,8 @@ std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
   return label_map;
 }
 
-std::vector<pll_operation_t>
+std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
+           std::vector<double>>
 rooted_tree_t::generate_operations(const root_location_t &root) const {
   std::vector<pll_operation_t> ops;
 
@@ -120,18 +138,38 @@ rooted_tree_t::generate_operations(const root_location_t &root) const {
   /* Reserve an aditional operation for the "extra" root clv */
   ops.resize(_tree->inner_count + 1);
 
+  std::vector<double> branches(_tree->edge_count + 2);
+  std::vector<unsigned int> pmatrix_indicies(_tree->edge_count + 2);
+
   unsigned int ops_size = 0;
-  pll_utree_create_operations(trav_buf.data(), trav_buf.size(), nullptr, nullptr,
-                        ops.data(), nullptr, &ops_size);
+  unsigned int matrix_count = 0;
+  pll_utree_create_operations(trav_buf.data(), trav_buf.size(), branches.data(),
+                              pmatrix_indicies.data(), ops.data(),
+                              &matrix_count, &ops_size);
+
+  pmatrix_indicies.resize(matrix_count + 2);
 
   /* manually construct the final operation */
   auto root_op_it = ops.end() - 1;
+
   root_op_it->parent_clv_index = _tree->inner_count + _tree->tip_count;
   root_op_it->parent_scaler_index = _tree->inner_count + _tree->tip_count;
+
   root_op_it->child1_clv_index = (root_op_it - 1)->parent_clv_index;
   root_op_it->child1_scaler_index = (root_op_it - 1)->parent_scaler_index;
+  root_op_it->child1_matrix_index = _tree->edge_count;
+
   root_op_it->child2_clv_index = (root_op_it - 2)->parent_clv_index;
   root_op_it->child2_scaler_index = (root_op_it - 2)->parent_scaler_index;
+  root_op_it->child2_matrix_index = _tree->edge_count + 1;
 
-  return ops;
+  auto root_branches_it = branches.end() - 1;
+  *root_branches_it = root.brlen();
+  *(root_branches_it - 1) = root.brlen_compliment();
+
+  auto root_pmatrix_indicies_it = pmatrix_indicies.end() - 1;
+  *root_pmatrix_indicies_it = _tree->edge_count + 1;
+  *(root_pmatrix_indicies_it - 1) = _tree->edge_count;
+
+  return std::make_tuple(ops, pmatrix_indicies, branches);
 }

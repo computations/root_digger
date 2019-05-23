@@ -25,6 +25,7 @@ class model_t {
 public:
   model_t(const model_params_t &, rooted_tree_t, const msa_t &);
   ~model_t();
+  double compute_lh(const root_location_t &root_location);
 
 private:
   rooted_tree_t _tree;

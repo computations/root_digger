@@ -8,7 +8,8 @@ extern "C" {
 
 TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
   for (auto &ds : data_files_dna) {
-    rooted_tree_t{ds.second};
+    rooted_tree_t tree{ds.second};
+    CHECK(tree.root_count() > 0);
   }
 }
 
@@ -43,5 +44,29 @@ TEST_CASE("rooted_tree move asignment constructor", "[rooted_tree_t]") {
     CHECK(tree2.branches() > 0);
     CHECK(tree2.inner_count() > 0);
     CHECK(tree2.tip_count() > 0);
+  }
+}
+
+TEST_CASE("rooted_tree_t label map", "[rooted_tree_t]") {
+  for (auto &ds : data_files_dna) {
+    rooted_tree_t tree{ds.second};
+    auto lm = tree.label_map();
+    for (const auto &kv : lm) {
+      CHECK(kv.second <= tree.tip_count());
+    }
+  }
+}
+
+TEST_CASE("rooted_tree_t generate operations", "[rooted_tree_t]") {
+  for (auto &ds : data_files_dna) {
+    rooted_tree_t tree{ds.second};
+    std::vector<pll_operation_t> ops;
+    std::vector<unsigned int> pmatrices;
+    std::vector<double> branches;
+
+    for (size_t i = 0; i < tree.root_count(); ++i) {
+      GENERATE_AND_UNPACK_OPS(tree, tree.root_location(i), ops, pmatrices,
+                              branches);
+    }
   }
 }

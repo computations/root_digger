@@ -104,6 +104,36 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
   /* no need to set rates and rate weights, only 1 category */
 }
 
-model_t::~model_t() {
-  pll_partition_destroy(_partition);
+model_t::~model_t() { pll_partition_destroy(_partition); }
+
+double model_t::compute_lh(const root_location_t &root_location) {
+  std::vector<pll_operation_t> ops;
+  std::vector<unsigned int> pmatrix_indicies;
+  std::vector<double> branches;
+
+#if 0
+  /* I'm trying to tell the complier here to perform a destructive move */
+  {
+    auto results = _tree.generate_operations(root_location);
+    ops = std::move(std::get<0>(results));
+    pmatrix_indicies = std::move(std::get<1>(results));
+    branches = std::move(std::get<2>(results));
+  }
+#endif
+
+  GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indicies,
+                          branches);
+
+  /* update the pmatricies */
+  unsigned int params_index = 0;
+
+  pll_update_prob_matrices(_partition, &params_index, pmatrix_indicies.data(),
+                           branches.data(), branches.size());
+
+  pll_update_partials(_partition, ops.data(), ops.size());
+
+  double loglh = pll_compute_root_loglikelihood(
+      _partition, _tree.root_clv_index(), _tree.root_scaler_index(), &params_index, nullptr);
+
+  return loglh;
 }
