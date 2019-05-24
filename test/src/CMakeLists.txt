@@ -8,7 +8,8 @@ add_executable(rd_test
     ${RD_SOURCES}
 )
 
-set(TEST_LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLLMODULES_LIBRARIES} Catch2::Catch2 pll_static)
+set(TEST_LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLLMODULES_LIBRARIES}
+    Catch2::Catch2 pll_static gsl cblas)
 target_compile_definitions(rd_test PRIVATE
     DATA_DIRECTORY_DNA_ABS=${CMAKE_CURRENT_SOURCE_DIR}/../data/dna/
     DATA_DIRECTORY_TREE_ABS=${CMAKE_CURRENT_SOURCE_DIR}/../data/tree/)

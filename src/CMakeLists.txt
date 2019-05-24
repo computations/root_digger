@@ -14,7 +14,8 @@ set_target_properties(rd PROPERTIES
 )
 
 # We duplicate the libararies here to solve a dumb link time error
-set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES})
+set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
+    gsl cblas)
 
 target_link_libraries(rd ${LINK_LIBS})
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow

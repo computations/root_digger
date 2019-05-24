@@ -70,7 +70,7 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    */
   unsigned int attributes = 0;
   attributes |= PLL_ATTRIB_ARCH_CPU;
-  // attributes |= PLL_ATTRIB_NONREV;
+  attributes |= PLL_ATTRIB_NONREV;
 
   _partition = pll_partition_create(
       _tree.tip_count(), _tree.branches(), msa.states(), msa.length(),
