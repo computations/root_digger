@@ -70,7 +70,7 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    */
   unsigned int attributes = 0;
   attributes |= PLL_ATTRIB_ARCH_CPU;
-  // attributes |= PLL_ATTRIB_NONREV;
+  attributes |= PLL_ATTRIB_NONREV;
 
   _partition = pll_partition_create(_tree.tip_count(), _tree.branch_count(),
                                     msa.states(), msa.length(), submodels,
@@ -122,8 +122,8 @@ double model_t::compute_lh(const root_location_t &root_location) {
 
   pll_update_partials(_partition, ops.data(), ops.size());
 
-  double lh = pll_compute_root_loglikelihood(
-      _partition, _tree.root_clv_index(), _tree.root_scaler_index(), params,
-      nullptr);
+  double lh = pll_compute_root_loglikelihood(_partition, _tree.root_clv_index(),
+                                             _tree.root_scaler_index(), params,
+                                             nullptr);
   return lh;
 }
