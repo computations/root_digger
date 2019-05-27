@@ -31,25 +31,21 @@ pll_utree_t *parse_tree_file(const std::string &tree_filename);
 
 class rooted_tree_t {
 public:
-  rooted_tree_t()
-      : _tree{nullptr}, _roots{}, _root_clv_index{0}, _root_scaler_index{0} {}
+  rooted_tree_t() : _tree{nullptr}, _roots{} {}
+
   rooted_tree_t(const std::string &tree_filename)
-      : _tree{parse_tree_file(tree_filename)}, _roots{},
-        _root_clv_index{0},
-        _root_scaler_index{0} {
+      : _tree{parse_tree_file(tree_filename)}, _roots{} {
     if (_tree == nullptr) {
       throw std::invalid_argument("Tree file could not be parsed");
     }
-    _root_clv_index = _tree->inner_count+ _tree->tip_count;
-    _root_scaler_index = _tree->inner_count+ _tree->tip_count;
     generate_root_locations();
   }
+
   rooted_tree_t(rooted_tree_t &&other)
-      : _tree{std::move(other._tree)}, _roots{std::move(other._roots)},
-        _root_clv_index{other._root_clv_index}, _root_scaler_index{
-                                                    other._root_scaler_index} {
+      : _tree{std::move(other._tree)}, _roots{std::move(other._roots)} {
     other._tree = nullptr;
   }
+
   rooted_tree_t(const rooted_tree_t &);
   ~rooted_tree_t();
 
@@ -61,26 +57,23 @@ public:
 
   unsigned int tip_count() const;
   unsigned int inner_count() const;
-  unsigned int branches() const;
-
-  unsigned int root_clv_index() const;
-  unsigned int root_scaler_index() const;
+  unsigned int branch_count() const;
 
   std::unordered_map<std::string, unsigned int> label_map() const;
 
   std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
              std::vector<double>>
-  generate_operations(const root_location_t &) const;
+  generate_operations(const root_location_t &);
 
 private:
-  std::vector<pll_unode_t *> full_tree_traverse() const;
-  std::vector<pll_unode_t *> full_tree_traverse(pll_unode_t *) const;
   void generate_root_locations();
+  void root_by(const root_location_t&);
+  void unroot();
+  std::vector<pll_unode_t*> full_traverse() const;
+  std::vector<pll_unode_t*> edge_traverse() const;
 
   pll_utree_t *_tree;
   std::vector<root_location_t> _roots;
-  unsigned int _root_clv_index;
-  unsigned int _root_scaler_index;
 };
 
 #endif

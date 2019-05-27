@@ -70,11 +70,11 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    */
   unsigned int attributes = 0;
   attributes |= PLL_ATTRIB_ARCH_CPU;
-  attributes |= PLL_ATTRIB_NONREV;
+  // attributes |= PLL_ATTRIB_NONREV;
 
   _partition = pll_partition_create(
-      _tree.tip_count(), _tree.branches(), msa.states(), msa.length(),
-      submodels, _tree.branches(), submodels, _tree.branches(), attributes);
+      _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
+      submodels, _tree.branch_count(), submodels, _tree.branch_count(), attributes);
   pll_set_subst_params(_partition, 0, rate_parameters.data());
 
   /* make a label map */
@@ -107,33 +107,4 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
 model_t::~model_t() { pll_partition_destroy(_partition); }
 
 double model_t::compute_lh(const root_location_t &root_location) {
-  std::vector<pll_operation_t> ops;
-  std::vector<unsigned int> pmatrix_indicies;
-  std::vector<double> branches;
-
-#if 0
-  /* I'm trying to tell the complier here to perform a destructive move */
-  {
-    auto results = _tree.generate_operations(root_location);
-    ops = std::move(std::get<0>(results));
-    pmatrix_indicies = std::move(std::get<1>(results));
-    branches = std::move(std::get<2>(results));
-  }
-#endif
-
-  GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indicies,
-                          branches);
-
-  /* update the pmatricies */
-  unsigned int params_index = 0;
-
-  pll_update_prob_matrices(_partition, &params_index, pmatrix_indicies.data(),
-                           branches.data(), branches.size());
-
-  pll_update_partials(_partition, ops.data(), ops.size());
-
-  double loglh = pll_compute_root_loglikelihood(
-      _partition, _tree.root_clv_index(), _tree.root_scaler_index(), &params_index, nullptr);
-
-  return loglh;
 }

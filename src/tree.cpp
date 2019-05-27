@@ -5,171 +5,181 @@ pll_utree_t *parse_tree_file(const std::string &tree_filename) {
 }
 
 rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
-  if (other._tree) {
-    _tree = pll_utree_clone(other._tree);
-    if (other._roots.size() > 0) {
-      generate_root_locations();
-    }
-  } else {
-    _tree = nullptr;
-    _root_clv_index = 0;
-    _root_scaler_index = 0;
-  }
+  _tree = pll_utree_clone(other._tree);
+  generate_root_locations();
 }
 
 rooted_tree_t::~rooted_tree_t() {
-  if (_tree)
+  if (_tree != nullptr) {
     pll_utree_destroy(_tree, nullptr);
+  }
 }
 
 rooted_tree_t &rooted_tree_t::operator=(rooted_tree_t &&other) {
-  if (this != &other) {
-    if (_tree)
-      pll_utree_destroy(_tree, nullptr);
-    _tree = other._tree;
-    other._tree = nullptr; // ensure that what is now _ours_ stays _ours_!
-    _roots = std::move(other._roots);
-    _root_clv_index = other._root_clv_index;
-    _root_scaler_index = other._root_scaler_index;
-  }
+  _tree = std::move(other._tree);
+  _roots = std::move(other._roots);
+  other._tree = nullptr;
   return *this;
 }
 
 rooted_tree_t &rooted_tree_t::operator=(const rooted_tree_t &other) {
-  if (_tree)
-    pll_utree_destroy(_tree, nullptr);
-  if (other._tree)
-    _tree = pll_utree_clone(other._tree);
-  else
-    _tree = nullptr;
+  _tree = pll_utree_clone(other._tree);
   generate_root_locations();
   return *this;
 }
 
 root_location_t rooted_tree_t::root_location(size_t index) const {
-  if (index < _roots.size())
-    return _roots[index];
-  throw std::invalid_argument("Requested a root that does not exist");
+  if (index > _roots.size()) {
+    throw std::invalid_argument("Invalid index for roots on this tree");
+  }
+  return _roots[index];
 }
 
 size_t rooted_tree_t::root_count() const { return _roots.size(); }
 
-std::vector<pll_unode_t *> rooted_tree_t::full_tree_traverse() const {
-  return full_tree_traverse(_tree->vroot);
+unsigned int rooted_tree_t::tip_count() const { return _tree->tip_count; }
+unsigned int rooted_tree_t::inner_count() const { return _tree->inner_count; }
+unsigned int rooted_tree_t::branch_count() const {
+  return _tree->tip_count * 2 - 2;
 }
 
-std::vector<pll_unode_t *>
-rooted_tree_t::full_tree_traverse(pll_unode_t *vroot) const {
-  std::vector<pll_unode_t *> trav_buf(_tree->edge_count);
-  /*
-   * pll_utree_traverse only puts each edge in once, so we can just use it to
-   * produce a list of edges
-   */
-  auto edge_cb = [](pll_unode_t *node) -> int {
-    if (node->next)
+std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
+  std::unordered_map<std::string, unsigned int> label_map;
+  for (unsigned int i = 0; i < tip_count(); ++i) {
+    auto cur_node = _tree->nodes[i];
+    label_map[cur_node->label] = cur_node->clv_index;
+  }
+  return label_map;
+}
+
+void rooted_tree_t::generate_root_locations() {
+  auto edges = edge_traverse();
+  _roots.resize(edges.size());
+
+  for (size_t i = 0; i < edges.size(); ++i) {
+    _roots[i] = {edges[i], 0.5};
+  }
+}
+
+std::vector<pll_unode_t *> rooted_tree_t::edge_traverse() const {
+  std::vector<pll_unode_t *> trav_buf(inner_count());
+  unsigned int trav_size = 0;
+
+  auto edge_trav_cb = [](pll_unode_t *node) -> int {
+    if (node->next != nullptr) {
       return PLL_SUCCESS;
+    }
     return PLL_FAILURE;
   };
 
-  unsigned int trav_size = 0;
-
-  pll_utree_traverse(vroot, PLL_TREE_TRAVERSE_POSTORDER, edge_cb,
+  pll_utree_traverse(_tree->vroot, PLL_TREE_TRAVERSE_POSTORDER, edge_trav_cb,
                      trav_buf.data(), &trav_size);
   trav_buf.resize(trav_size);
   return trav_buf;
 }
 
-void rooted_tree_t::generate_root_locations() {
-  _roots.clear();
-  if (_roots.capacity() < _tree->edge_count) {
-    _roots.reserve(_tree->edge_count);
-  }
+std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
+  std::vector<pll_unode_t *> trav_buf(tip_count() + inner_count());
+  unsigned int trav_size = 0;
 
-  auto trav_buf = full_tree_traverse();
+  auto full_trav_cb = [](pll_unode_t *) -> int { return PLL_SUCCESS; };
 
-  for (size_t i = 0; i < trav_buf.size(); ++i) {
-    _roots.push_back(root_location_t{trav_buf[i], 0.5});
-  }
+  pll_utree_traverse(_tree->vroot, PLL_TREE_TRAVERSE_POSTORDER, full_trav_cb,
+                     trav_buf.data(), &trav_size);
+  trav_buf.resize(trav_size);
+  return trav_buf;
 }
 
-/*
- * We are going to cheat the partition, where we extra CLVS that don't have
- * corriesponding nodes on the tree. These will be used to fake a root, so we
- * don't need to keep inserting and removing nodes. So, the number of branches
- * (and clvs and pmatrices) is going to be 2 more than the typical unrooted tree
- * case.
- */
-unsigned int rooted_tree_t::branches() const {
-  return _tree->tip_count * 2 - 3 + 2;
-}
+void rooted_tree_t::root_by(const root_location_t &root_location) {
+  pll_unode_t *root_node_left = (pll_unode_t *)malloc(sizeof(pll_unode_t));
+  pll_unode_t *root_node_right = (pll_unode_t *)malloc(sizeof(pll_unode_t));
 
-unsigned int rooted_tree_t::inner_count() const { return _tree->inner_count; }
+  /* bind them as a "node" */
+  root_node_left->next = root_node_right;
+  root_node_right->next = root_node_left;
 
-unsigned int rooted_tree_t::tip_count() const { return _tree->tip_count; }
+  /*insert them into the tree */
+  pll_unode_t *old_back = root_location.edge->back;
 
-unsigned int rooted_tree_t::root_clv_index() const { return _root_clv_index; }
-unsigned int rooted_tree_t::root_scaler_index() const {
-  return _root_clv_index;
-}
+  root_location.edge->back = root_node_left;
+  root_node_left->back = root_location.edge;
 
-/*
- * Creates a map from tip label to clv index. Primarily used to match the
- * clv buffers with the corriesponding alignment.
- */
-std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
-  std::unordered_map<std::string, unsigned int> label_map;
+  old_back->back = root_node_right;
+  root_node_right->back = old_back;
 
-  for (unsigned int i = 0; i < tip_count(); ++i) {
-    pll_unode_t *cur_node = _tree->nodes[i];
-    if (cur_node->label) {
-      label_map[cur_node->label] = cur_node->clv_index;
-    }
+  /* update the lengths */
+  double left_length = root_location.brlen();
+  double right_length = root_location.brlen_compliment();
+
+  root_location.edge->length = root_node_left->length = left_length;
+  old_back->length = root_node_right->length = right_length;
+
+  /* update the tree */
+  unsigned int saved_tip_count = tip_count();
+  unsigned int saved_saved_inner = inner_count() + 1;
+  free(_tree->nodes);
+  free(_tree);
+  _tree = pll_utree_wraptree_multi(root_node_left, saved_tip_count,
+                                   saved_saved_inner);
+  if (_tree == PLL_FAILURE) {
+    throw std::runtime_error("Failed to wrap the tree after rooting");
   }
-  return label_map;
+  pll_utree_reset_template_indices(_tree->vroot, saved_tip_count);
+}
+
+void rooted_tree_t::unroot() {
+  /* check if the tree is already a binary tree */
+  if (_tree->vroot != _tree->vroot->next->next) {
+    return;
+  }
+  pll_unode_t *old_root_left = _tree->vroot;
+  pll_unode_t *old_root_right = _tree->vroot -> next;
+
+  pll_unode_t *left_child = old_root_left->back;
+  pll_unode_t *right_child = old_root_right->back;
+
+  double old_length = old_root_left->length + old_root_right->length;
+
+  left_child->length = right_child->length = old_length;
+
+  left_child->back = right_child;
+  right_child->back = left_child;
+
+  unsigned int saved_tip_count = tip_count();
+  unsigned int saved_saved_inner = inner_count() - 1;
+  free(_tree->nodes);
+  free(_tree);
+  _tree = pll_utree_wraptree_multi(left_child, saved_tip_count,
+                                   saved_saved_inner);
+  if (_tree == PLL_FAILURE) {
+    throw std::runtime_error("Failed to wrap the tree after rooting");
+  }
+  pll_utree_reset_template_indices(_tree->vroot, saved_tip_count);
+
+  free(old_root_right);
+  free(old_root_left);
 }
 
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
            std::vector<double>>
-rooted_tree_t::generate_operations(const root_location_t &root) const {
-  std::vector<pll_operation_t> ops;
+rooted_tree_t::generate_operations(const root_location_t &new_root) {
 
-  std::vector<pll_unode_t *> trav_buf = full_tree_traverse(root.edge);
+  root_by(new_root);
 
-  /* Reserve an aditional operation for the "extra" root clv */
-  ops.resize(_tree->inner_count + 1);
+  auto trav_buf = full_traverse();
 
-  std::vector<double> branches(_tree->edge_count + 2);
-  std::vector<unsigned int> pmatrix_indicies(_tree->edge_count + 2);
+  std::vector<pll_operation_t> ops(trav_buf.size());
+  std::vector<unsigned int> pmatrix_indices(trav_buf.size());
+  std::vector<double> branch_lengths(trav_buf.size());
 
-  unsigned int ops_size = 0;
+  unsigned int op_count = 0;
   unsigned int matrix_count = 0;
-  pll_utree_create_operations(trav_buf.data(), trav_buf.size(), branches.data(),
-                              pmatrix_indicies.data(), ops.data(),
-                              &matrix_count, &ops_size);
 
-  pmatrix_indicies.resize(matrix_count + 2);
+  pll_utree_create_operations(trav_buf.data(), trav_buf.size(),
+                              branch_lengths.data(), pmatrix_indices.data(),
+                              ops.data(), &matrix_count, &op_count);
 
-  /* manually construct the final operation */
-  auto root_op_it = ops.end() - 1;
+  unroot();
 
-  root_op_it->parent_clv_index = _tree->inner_count + _tree->tip_count;
-  root_op_it->parent_scaler_index = _tree->inner_count + _tree->tip_count;
-
-  root_op_it->child1_clv_index = (root_op_it - 1)->parent_clv_index;
-  root_op_it->child1_scaler_index = (root_op_it - 1)->parent_scaler_index;
-  root_op_it->child1_matrix_index = _tree->edge_count;
-
-  root_op_it->child2_clv_index = (root_op_it - 2)->parent_clv_index;
-  root_op_it->child2_scaler_index = (root_op_it - 2)->parent_scaler_index;
-  root_op_it->child2_matrix_index = _tree->edge_count + 1;
-
-  auto root_branches_it = branches.end() - 1;
-  *root_branches_it = root.brlen();
-  *(root_branches_it - 1) = root.brlen_compliment();
-
-  auto root_pmatrix_indicies_it = pmatrix_indicies.end() - 1;
-  *root_pmatrix_indicies_it = _tree->edge_count + 1;
-  *(root_pmatrix_indicies_it - 1) = _tree->edge_count;
-
-  return std::make_tuple(ops, pmatrix_indicies, branches);
+  return std::make_tuple(ops, pmatrix_indices, branch_lengths);
 }
