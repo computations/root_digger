@@ -43,6 +43,13 @@ unsigned int rooted_tree_t::branch_count() const {
   return _tree->tip_count * 2 - 2;
 }
 
+unsigned int rooted_tree_t::root_clv_index() const{
+  return _tree->vroot->clv_index;
+}
+unsigned int rooted_tree_t::root_scaler_index() const {
+  return _tree->vroot->scaler_index;
+}
+
 std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
   std::unordered_map<std::string, unsigned int> label_map;
   for (unsigned int i = 0; i < tip_count(); ++i) {
@@ -178,6 +185,10 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   pll_utree_create_operations(trav_buf.data(), trav_buf.size(),
                               branch_lengths.data(), pmatrix_indices.data(),
                               ops.data(), &matrix_count, &op_count);
+
+  ops.resize(op_count);
+  pmatrix_indices.resize(matrix_count);
+  branch_lengths.resize(matrix_count);
 
   unroot();
 

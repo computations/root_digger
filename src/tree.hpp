@@ -59,6 +59,9 @@ public:
   unsigned int inner_count() const;
   unsigned int branch_count() const;
 
+  unsigned int root_clv_index() const;
+  unsigned int root_scaler_index() const;
+
   std::unordered_map<std::string, unsigned int> label_map() const;
 
   std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
