@@ -1,4 +1,7 @@
 #include "tree.hpp"
+extern "C" {
+#include <libpll/pll_tree.h>
+}
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename) {
   return pll_utree_parse_newick_unroot(tree_filename.c_str());
@@ -38,12 +41,14 @@ root_location_t rooted_tree_t::root_location(size_t index) const {
 size_t rooted_tree_t::root_count() const { return _roots.size(); }
 
 unsigned int rooted_tree_t::tip_count() const { return _tree->tip_count; }
-unsigned int rooted_tree_t::inner_count() const { return _tree->inner_count; }
+unsigned int rooted_tree_t::inner_count() const {
+  return _tree->inner_count + 1;
+}
 unsigned int rooted_tree_t::branch_count() const {
   return _tree->tip_count * 2 - 2;
 }
 
-unsigned int rooted_tree_t::root_clv_index() const{
+unsigned int rooted_tree_t::root_clv_index() const {
   return _tree->vroot->clv_index;
 }
 unsigned int rooted_tree_t::root_scaler_index() const {
@@ -98,73 +103,73 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
 }
 
 void rooted_tree_t::root_by(const root_location_t &root_location) {
-  pll_unode_t *root_node_left = (pll_unode_t *)malloc(sizeof(pll_unode_t));
-  pll_unode_t *root_node_right = (pll_unode_t *)malloc(sizeof(pll_unode_t));
+  /* make the roots */
+  pll_unode_t *new_root_left = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
+  pll_unode_t *new_root_right = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
 
-  /* bind them as a "node" */
-  root_node_left->next = root_node_right;
-  root_node_right->next = root_node_left;
+  new_root_left->next = new_root_right;
+  new_root_right->next = new_root_left;
 
-  /*insert them into the tree */
-  pll_unode_t *old_back = root_location.edge->back;
+  pll_unode_t *left_child = root_location.edge;
+  pll_unode_t *right_child = left_child->back;
 
-  root_location.edge->back = root_node_left;
-  root_node_left->back = root_location.edge;
+  left_child->back = new_root_left;
+  new_root_left->back = left_child;
+  left_child->length = new_root_left->length = root_location.brlen();
 
-  old_back->back = root_node_right;
-  root_node_right->back = old_back;
+  right_child->back = new_root_right;
+  new_root_right->back = right_child;
+  right_child->length = new_root_right->length = root_location.brlen();
 
-  /* update the lengths */
-  double left_length = root_location.brlen();
-  double right_length = root_location.brlen_compliment();
+  size_t new_size = _tree->inner_count + _tree->tip_count + 1;
+  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count;
 
-  root_location.edge->length = root_node_left->length = left_length;
-  old_back->length = root_node_right->length = right_length;
+  _tree->nodes =
+      (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * (new_size));
 
-  /* update the tree */
-  unsigned int saved_tip_count = tip_count();
-  unsigned int saved_saved_inner = inner_count() + 1;
-  free(_tree->nodes);
-  free(_tree);
-  _tree = pll_utree_wraptree_multi(root_node_left, saved_tip_count,
-                                   saved_saved_inner);
-  if (_tree == PLL_FAILURE) {
-    throw std::runtime_error("Failed to wrap the tree after rooting");
-  }
-  pll_utree_reset_template_indices(_tree->vroot, saved_tip_count);
+  _tree->nodes[new_size - 1] = new_root_left;
+  _tree->inner_count += 1;
+  _tree->edge_count += 1;
+  _tree->vroot = new_root_left;
+
+  new_root_left->clv_index = new_root_right->clv_index = new_size - 1;
+  new_root_left->scaler_index = new_root_right->scaler_index =
+      _tree->inner_count - 1;
+
+  new_root_left->node_index = total_unodes + 1;
+  left_child->pmatrix_index = new_root_left->pmatrix_index =
+      _tree->edge_count - 2;
+
+  new_root_right->node_index = total_unodes + 2;
+  right_child->pmatrix_index = new_root_right->pmatrix_index =
+      _tree->edge_count - 1;
 }
 
 void rooted_tree_t::unroot() {
-  /* check if the tree is already a binary tree */
-  if (_tree->vroot != _tree->vroot->next->next) {
-    return;
-  }
-  pll_unode_t *old_root_left = _tree->vroot;
-  pll_unode_t *old_root_right = _tree->vroot -> next;
+  pll_unode_t *left_child = _tree->vroot->back;
+  pll_unode_t *right_child = _tree->vroot->next->back;
+  pll_unode_t *root_left = _tree->vroot;
+  pll_unode_t *root_right = _tree->vroot->next;
 
-  pll_unode_t *left_child = old_root_left->back;
-  pll_unode_t *right_child = old_root_right->back;
-
-  double old_length = old_root_left->length + old_root_right->length;
-
-  left_child->length = right_child->length = old_length;
-
-  left_child->back = right_child;
   right_child->back = left_child;
+  left_child->back = right_child;
 
-  unsigned int saved_tip_count = tip_count();
-  unsigned int saved_saved_inner = inner_count() - 1;
-  free(_tree->nodes);
-  free(_tree);
-  _tree = pll_utree_wraptree_multi(left_child, saved_tip_count,
-                                   saved_saved_inner);
-  if (_tree == PLL_FAILURE) {
-    throw std::runtime_error("Failed to wrap the tree after rooting");
-  }
-  pll_utree_reset_template_indices(_tree->vroot, saved_tip_count);
+  double new_length = right_child->length + left_child->length;
+  right_child->length = left_child->length = new_length;
 
-  free(old_root_right);
-  free(old_root_left);
+  free(root_left);
+  free(root_right);
+
+  _tree->vroot = left_child->next ? left_child : right_child;
+  /* TODO check that the vroot is an inner node */
+
+  size_t new_size = _tree->inner_count + _tree->tip_count - 1;
+  _tree->nodes =
+      (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * new_size);
+  _tree->inner_count -= 1;
+  _tree->edge_count -= 1;
+
+  right_child->pmatrix_index = left_child->pmatrix_index = _tree->edge_count - 1;
 }
 
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
@@ -182,15 +187,32 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   unsigned int op_count = 0;
   unsigned int matrix_count = 0;
 
-  pll_utree_create_operations(trav_buf.data(), trav_buf.size(),
+  pll_utree_create_operations(trav_buf.data(), trav_buf.size() - 1,
                               branch_lengths.data(), pmatrix_indices.data(),
                               ops.data(), &matrix_count, &op_count);
 
-  ops.resize(op_count);
+  ops.resize(op_count + 1);
   pmatrix_indices.resize(matrix_count);
   branch_lengths.resize(matrix_count);
 
+  auto root_op_it = ops.end() - 1;
+  pll_unode_t *root_node = *(trav_buf.end() - 1);
+  root_op_it->parent_clv_index = root_node->clv_index;
+  root_op_it->parent_scaler_index = root_node->scaler_index;
+
+  root_op_it->child1_clv_index = root_node->back->clv_index;
+  root_op_it->child1_scaler_index = root_node->back->scaler_index;
+  root_op_it->child1_matrix_index = root_node->back->pmatrix_index;
+
+  root_op_it->child2_clv_index = root_node->next->back->clv_index;
+  root_op_it->child2_scaler_index = root_node->next->back->scaler_index;
+  root_op_it->child2_matrix_index = root_node->next->back->pmatrix_index;
+
   unroot();
+
+  if (pll_utree_check_integrity(_tree) == PLL_FAILURE) {
+    throw std::runtime_error(pll_errmsg);
+  }
 
   return std::make_tuple(ops, pmatrix_indices, branch_lengths);
 }

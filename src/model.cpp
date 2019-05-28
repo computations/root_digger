@@ -70,7 +70,7 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    */
   unsigned int attributes = 0;
   attributes |= PLL_ATTRIB_ARCH_CPU;
-  attributes |= PLL_ATTRIB_NONREV;
+  // attributes |= PLL_ATTRIB_NONREV;
 
   _partition = pll_partition_create(_tree.tip_count(), _tree.branch_count(),
                                     msa.states(), msa.length(), submodels,
@@ -95,9 +95,10 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    * For now we are going to just use emperical frequencies, but in the future,
    * we can do something more clever.
    */
-  double *emp_freqs = pllmod_msa_empirical_frequencies(_partition);
-  pll_set_frequencies(_partition, 0, emp_freqs);
-  free(emp_freqs);
+  // double *emp_freqs = pllmod_msa_empirical_frequencies(_partition);
+  std::vector<double> freqs{.25, .25, .25, .25};
+  pll_set_frequencies(_partition, 0, freqs.data());
+  // free(emp_freqs);
 
   /* update the invariant sites */
   pll_update_invariant_sites(_partition);
@@ -106,6 +107,8 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
 }
 
 model_t::~model_t() { pll_partition_destroy(_partition); }
+
+#include <iostream>
 
 double model_t::compute_lh(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
@@ -117,8 +120,38 @@ double model_t::compute_lh(const root_location_t &root_location) {
 
   unsigned int params[] = {0};
 
-  pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
-                           branch_lengths.data(), pmatrix_indices.size());
+  int result =
+      pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
+                               branch_lengths.data(), pmatrix_indices.size());
+
+  if (result == PLL_FAILURE) {
+    throw std::runtime_error(pll_errmsg);
+  }
+
+  std::cout << "eigenvecs" << std::endl;
+  for (size_t i = 0; i < 4; ++i) {
+    for (size_t j = 0; j < 4; ++j) {
+      std::cout << _partition->eigenvecs[0][i * 4 + j] << " ";
+    }
+    std::cout << std::endl;
+  }
+  std::cout << std::endl;
+
+  std::cout << "eigenvals" << std::endl;
+  for (size_t i = 0; i < 4; ++i) {
+    std::cout << _partition->eigenvals[0][i] << " ";
+  }
+  std::cout << std::endl;
+  std::cout << std::endl;
+
+  std::cout << "inv eigenvecs" << std::endl;
+  for (size_t i = 0; i < 4; ++i) {
+    for (size_t j = 0; j < 4; ++j) {
+      std::cout << _partition->inv_eigenvecs[0][i * 4 + j] << " ";
+    }
+    std::cout << std::endl;
+  }
+  std::cout << std::endl;
 
   pll_update_partials(_partition, ops.data(), ops.size());
 
