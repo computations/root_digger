@@ -68,6 +68,12 @@ TEST_CASE("rooted_tree_t generate operations", "[rooted_tree_t]") {
     for (size_t i = 0; i < tree.root_count(); ++i) {
       GENERATE_AND_UNPACK_OPS(tree, tree.root_location(i), ops, pmatrices,
                               branches);
+      CHECK(ops.size() > 0);
+      CHECK(pmatrices.size() > 0);
+      CHECK(branches.size() > 0);
+      for (auto brlen : branches) {
+        CHECK(brlen >= 0.0);
+      }
     }
   }
 }
