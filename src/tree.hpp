@@ -70,10 +70,10 @@ public:
 
 private:
   void generate_root_locations();
-  void root_by(const root_location_t&);
+  void root_by(const root_location_t &);
   void unroot();
-  std::vector<pll_unode_t*> full_traverse() const;
-  std::vector<pll_unode_t*> edge_traverse() const;
+  std::vector<pll_unode_t *> full_traverse() const;
+  std::vector<pll_unode_t *> edge_traverse() const;
 
   pll_utree_t *_tree;
   std::vector<root_location_t> _roots;

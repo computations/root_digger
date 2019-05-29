@@ -70,13 +70,32 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    */
   unsigned int attributes = 0;
   attributes |= PLL_ATTRIB_ARCH_CPU;
-  // attributes |= PLL_ATTRIB_NONREV;
+  attributes |= PLL_ATTRIB_NONREV;
 
   _partition = pll_partition_create(_tree.tip_count(), _tree.branch_count(),
                                     msa.states(), msa.length(), submodels,
                                     _tree.branch_count(), submodels,
                                     _tree.branch_count(), attributes);
   pll_set_subst_params(_partition, 0, rate_parameters.data());
+
+  /* set the frequencies
+   *
+   * For now we are going to just use emperical frequencies, but in the future,
+   * we can do something more clever.
+   */
+  // double *emp_freqs = pllmod_msa_empirical_frequencies(_partition);
+  std::vector<double> freqs{.25, .25, .25, .25};
+  pll_set_frequencies(_partition, 0, freqs.data());
+  // free(emp_freqs);
+
+  double rate_cats[submodels] = {0};
+  pll_compute_gamma_cats(1, 4, rate_cats, PLL_GAMMA_RATES_MEAN);
+  pll_set_category_rates(_partition, rate_cats);
+
+  /* update the invariant sites */
+  pll_update_invariant_sites(_partition);
+
+  /* no need to set rates and rate weights, only 1 category */
 
   /* make a label map */
   auto label_map = _tree.label_map();
@@ -89,26 +108,9 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
 
   /* set pattern weights */
   pll_set_pattern_weights(_partition, msa.weights());
-
-  /* set the frequencies
-   *
-   * For now we are going to just use emperical frequencies, but in the future,
-   * we can do something more clever.
-   */
-  // double *emp_freqs = pllmod_msa_empirical_frequencies(_partition);
-  std::vector<double> freqs{.25, .25, .25, .25};
-  pll_set_frequencies(_partition, 0, freqs.data());
-  // free(emp_freqs);
-
-  /* update the invariant sites */
-  pll_update_invariant_sites(_partition);
-
-  /* no need to set rates and rate weights, only 1 category */
 }
 
 model_t::~model_t() { pll_partition_destroy(_partition); }
-
-#include <iostream>
 
 double model_t::compute_lh(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
@@ -127,31 +129,6 @@ double model_t::compute_lh(const root_location_t &root_location) {
   if (result == PLL_FAILURE) {
     throw std::runtime_error(pll_errmsg);
   }
-
-  std::cout << "eigenvecs" << std::endl;
-  for (size_t i = 0; i < 4; ++i) {
-    for (size_t j = 0; j < 4; ++j) {
-      std::cout << _partition->eigenvecs[0][i * 4 + j] << " ";
-    }
-    std::cout << std::endl;
-  }
-  std::cout << std::endl;
-
-  std::cout << "eigenvals" << std::endl;
-  for (size_t i = 0; i < 4; ++i) {
-    std::cout << _partition->eigenvals[0][i] << " ";
-  }
-  std::cout << std::endl;
-  std::cout << std::endl;
-
-  std::cout << "inv eigenvecs" << std::endl;
-  for (size_t i = 0; i < 4; ++i) {
-    for (size_t j = 0; j < 4; ++j) {
-      std::cout << _partition->inv_eigenvecs[0][i * 4 + j] << " ";
-    }
-    std::cout << std::endl;
-  }
-  std::cout << std::endl;
 
   pll_update_partials(_partition, ops.data(), ops.size());
 

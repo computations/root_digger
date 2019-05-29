@@ -169,7 +169,8 @@ void rooted_tree_t::unroot() {
   _tree->inner_count -= 1;
   _tree->edge_count -= 1;
 
-  right_child->pmatrix_index = left_child->pmatrix_index = _tree->edge_count - 1;
+  right_child->pmatrix_index = left_child->pmatrix_index =
+      _tree->edge_count - 1;
 }
 
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
