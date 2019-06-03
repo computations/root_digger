@@ -69,7 +69,7 @@ void rooted_tree_t::generate_root_locations() {
   _roots.resize(edges.size());
 
   for (size_t i = 0; i < edges.size(); ++i) {
-    _roots[i] = {edges[i], 0.5};
+    _roots[i] = {edges[i], edges[i]->length, 0.5};
   }
 }
 
@@ -102,6 +102,7 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
   return trav_buf;
 }
 
+#include <iostream>
 void rooted_tree_t::root_by(const root_location_t &root_location) {
   if (root_location.edge == _tree->vroot ||
       root_location.edge == _tree->vroot->next) {
@@ -131,7 +132,7 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
       root_location.brlen_compliment();
 
   size_t new_size = _tree->inner_count + _tree->tip_count + 1;
-  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count - 1;
+  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count;
 
   _tree->nodes =
       (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * (new_size));
@@ -189,6 +190,9 @@ void rooted_tree_t::unroot() {
 
   _tree->vroot = left_child->next != nullptr ? left_child : right_child;
   /* TODO check that the vroot is an inner node */
+  if (_tree->vroot->next == nullptr) {
+    throw std::runtime_error("unrooted to a tip");
+  }
 
   size_t new_size = _tree->inner_count + _tree->tip_count - 1;
   _tree->nodes =

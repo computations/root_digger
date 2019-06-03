@@ -20,10 +20,11 @@ extern "C" {
 
 struct root_location_t {
   pll_unode_t *edge;
+  double saved_brlen;
   double brlen_ratio;
-  constexpr inline double brlen() const { return edge->length * brlen_ratio; }
+  constexpr inline double brlen() const { return saved_brlen * brlen_ratio; }
   constexpr inline double brlen_compliment() const {
-    return edge->length * (1 - brlen_ratio);
+    return saved_brlen * (1 - brlen_ratio);
   }
 };
 

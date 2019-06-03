@@ -286,6 +286,17 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
     }
   }
 
+  if(beg_end_pos){
+    return end;
+  }
+  else{
+    return beg;
+  }
+
+  /* if we got here, we can just return the best of beg or end, since it seems
+   * like there is no root
+   */
+
   throw std::runtime_error(
       "Initial derivatives failed when optimizing alpha, ran out of cases");
 }
