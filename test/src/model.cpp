@@ -20,7 +20,7 @@ TEST_CASE("model_t constructor", "[model_t]") {
   }
 }
 
-TEST_CASE("model_t compute lhe", "[model_t]") {
+TEST_CASE("model_t compute lh", "[model_t]") {
   for (auto &ds : data_files_dna) {
     for (auto &mp : params) {
       msa_t msa{ds.first};
@@ -33,6 +33,74 @@ TEST_CASE("model_t compute lhe", "[model_t]") {
         double lh = model.compute_lh(tree.root_location(i));
         CHECK(std::isfinite(lh));
         CHECK(lh < 0.0);
+      }
+    }
+  }
+}
+
+TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
+  for (auto &ds : data_files_dna) {
+    for (auto &mp : params) {
+      msa_t msa{ds.first};
+      rooted_tree_t tree{ds.second};
+      model_t model{mp, tree, msa};
+      for (size_t i = 0; i < tree.root_count(); ++i) {
+        if (tree.root_location(i).edge->back == nullptr) {
+          continue;
+        }
+        double dlh = model.compute_dlh(tree.root_location(i));
+        CHECK(std::isfinite(dlh));
+      }
+    }
+  }
+}
+
+TEST_CASE("model_t optimize root locations on individual roots",
+          "[model_t][opt]") {
+  for (auto &ds : data_files_dna) {
+    for (auto &mp : params) {
+      msa_t msa{ds.first};
+      rooted_tree_t tree{ds.second};
+      model_t model{mp, tree, msa};
+      for (size_t i = 0; i < tree.root_count(); ++i) {
+        if (tree.root_location(i).edge->back == nullptr) {
+          continue;
+        }
+        model.optimize_alpha(tree.root_location(i));
+      }
+    }
+  }
+}
+
+TEST_CASE("model_t optimize root locations with extreme points",
+          "[model_t][opt]") {
+  for (auto &ds : data_files_dna) {
+    for (auto &mp : params) {
+      msa_t msa{ds.first};
+      rooted_tree_t tree{ds.second};
+      model_t model{mp, tree, msa};
+      for (size_t i = 0; i < tree.root_count(); ++i) {
+        if (tree.root_location(i).edge->back == nullptr) {
+          continue;
+        }
+        auto rl = tree.root_location(i);
+        rl.brlen_ratio = 0.0;
+        model.optimize_alpha(tree.root_location(i));
+      }
+    }
+  }
+  for (auto &ds : data_files_dna) {
+    for (auto &mp : params) {
+      msa_t msa{ds.first};
+      rooted_tree_t tree{ds.second};
+      model_t model{mp, tree, msa};
+      for (size_t i = 0; i < tree.root_count(); ++i) {
+        if (tree.root_location(i).edge->back == nullptr) {
+          continue;
+        }
+        auto rl = tree.root_location(i);
+        rl.brlen_ratio = 1.0;
+        model.optimize_alpha(tree.root_location(i));
       }
     }
   }

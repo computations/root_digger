@@ -26,8 +26,14 @@ public:
   model_t(const model_params_t &, rooted_tree_t, const msa_t &);
   ~model_t();
   double compute_lh(const root_location_t &root_location);
+  double compute_dlh(const root_location_t &root_location);
+  root_location_t optimize_alpha(const root_location_t &root);
 
 private:
+  std::pair<root_location_t, double>
+  bisect(const root_location_t &beg, double d_beg, const root_location_t &end,
+         double d_end, double atol, size_t depth);
+
   rooted_tree_t _tree;
   pll_partition_t *_partition;
 };

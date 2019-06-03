@@ -103,6 +103,14 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
 }
 
 void rooted_tree_t::root_by(const root_location_t &root_location) {
+  if (root_location.edge == _tree->vroot ||
+      root_location.edge == _tree->vroot->next) {
+    update_root(root_location);
+    return;
+  }
+  if (_tree->vroot->next->next == _tree->vroot) {
+    unroot();
+  }
   /* make the roots */
   pll_unode_t *new_root_left = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
   pll_unode_t *new_root_right = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
@@ -119,10 +127,11 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
 
   right_child->back = new_root_right;
   new_root_right->back = right_child;
-  right_child->length = new_root_right->length = root_location.brlen();
+  right_child->length = new_root_right->length =
+      root_location.brlen_compliment();
 
   size_t new_size = _tree->inner_count + _tree->tip_count + 1;
-  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count;
+  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count - 1;
 
   _tree->nodes =
       (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * (new_size));
@@ -145,6 +154,18 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
       _tree->edge_count - 1;
 }
 
+void rooted_tree_t::update_root(const root_location_t &root) {
+  if (root.edge != _tree->vroot) {
+    throw std::runtime_error("Provided root doesn't match the current tree");
+  }
+
+  pll_unode_t *right_root = _tree->vroot;
+  pll_unode_t *left_root = _tree->vroot->next;
+
+  right_root->length = right_root->back->length = root.brlen();
+  left_root->length = left_root->back->length = root.brlen_compliment();
+}
+
 void rooted_tree_t::unroot() {
   pll_unode_t *left_child = _tree->vroot->back;
   pll_unode_t *right_child = _tree->vroot->next->back;
@@ -154,13 +175,19 @@ void rooted_tree_t::unroot() {
   right_child->back = left_child;
   left_child->back = right_child;
 
-  double new_length = right_child->length + left_child->length;
+  double new_length = root_left->length + root_right->length;
   right_child->length = left_child->length = new_length;
+
+  root_left->back = nullptr;
+  root_right->back = nullptr;
+
+  root_left->next = nullptr;
+  root_right->next = nullptr;
 
   free(root_left);
   free(root_right);
 
-  _tree->vroot = left_child->next ? left_child : right_child;
+  _tree->vroot = left_child->next != nullptr ? left_child : right_child;
   /* TODO check that the vroot is an inner node */
 
   size_t new_size = _tree->inner_count + _tree->tip_count - 1;
@@ -171,6 +198,11 @@ void rooted_tree_t::unroot() {
 
   right_child->pmatrix_index = left_child->pmatrix_index =
       _tree->edge_count - 1;
+
+  int err = pll_utree_check_integrity(_tree);
+  if (err == PLL_FAILURE) {
+    throw std::runtime_error(pll_errmsg);
+  }
 }
 
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
@@ -209,11 +241,29 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   root_op_it->child2_scaler_index = root_node->next->back->scaler_index;
   root_op_it->child2_matrix_index = root_node->next->back->pmatrix_index;
 
-  unroot();
-
   if (pll_utree_check_integrity(_tree) == PLL_FAILURE) {
     throw std::runtime_error(pll_errmsg);
   }
 
   return std::make_tuple(ops, pmatrix_indices, branch_lengths);
+}
+
+std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
+rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
+  update_root(root);
+
+  pll_operation_t op;
+  std::vector<unsigned int> pmatrix_indices(2);
+  std::vector<double> branch_lengths(2);
+
+  unsigned int ops_count = 0;
+
+  pll_utree_create_operations(&(_tree->vroot), 1, branch_lengths.data(),
+                              pmatrix_indices.data(), &op, nullptr, &ops_count);
+
+  if (ops_count != 1) {
+    throw std::runtime_error("Creating operations for the derivative failed");
+  }
+
+  return std::make_tuple(op, pmatrix_indices, branch_lengths);
 }

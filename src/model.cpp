@@ -1,5 +1,7 @@
 #include "model.hpp"
+#include <cmath>
 #include <fstream>
+#include <string>
 #include <unordered_map>
 extern "C" {
 #include <libpll/pll_msa.h>
@@ -136,4 +138,154 @@ double model_t::compute_lh(const root_location_t &root_location) {
                                              _tree.root_scaler_index(), params,
                                              nullptr);
   return lh;
+}
+
+/*
+ * Use a tangent method to compute the derivative
+ */
+double model_t::compute_dlh(const root_location_t &root) {
+  constexpr double EPSILON = 1e-4;
+
+  root_location_t root_prime{root};
+  root_prime.brlen_ratio += EPSILON;
+  if (root_prime.brlen_ratio >= 1.0) {
+    throw std::runtime_error(
+        "Alpha out of bounds while computing derivative: " +
+        std::to_string(root.brlen_ratio));
+  }
+
+  double fx = compute_lh(root);
+  if (!std::isfinite(fx)) {
+    throw std::runtime_error("fx is not finite when computing derivative: " +
+                             std::to_string(root.edge->length));
+  }
+  double fxh = compute_lh(root_prime);
+  if (!std::isfinite(fxh)) {
+    throw std::runtime_error("fxh is not finite when computing derivative: " +
+                             std::to_string(root_prime.edge->length));
+  }
+
+  return (fxh - fx) / EPSILON;
+}
+
+std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
+                                                   double d_beg,
+                                                   const root_location_t &end,
+                                                   double d_end, double atol,
+                                                   size_t depth = 0) {
+  root_location_t midpoint{beg};
+  midpoint.brlen_ratio = (beg.brlen_ratio + end.brlen_ratio) / 2;
+
+  double d_midpoint = compute_dlh(midpoint);
+
+  if (depth > 64) {
+    return {midpoint, compute_lh(midpoint)};
+  }
+
+  /* case 1: d_midpoint is within tolerance of 0.0
+   * We found a root, and should return
+   */
+
+  if (fabs(d_midpoint) < atol) {
+    return {midpoint, compute_lh(midpoint)};
+  }
+
+  /* case 2: midpoint is opposite sign of both beg and end
+   * There are 2 roots, so we recurse on both sides, and return the one with the
+   * best LH
+   */
+  if ((d_beg > 0.0 && d_end > 0.0 && d_midpoint < 0.0) ||
+      (d_beg < 0.0 && d_end < 0.0 && d_midpoint > 0.0)) {
+    auto r1 = bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
+    auto r2 = bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
+    if (r1.second < r2.second) {
+      return r2;
+    }
+    return r1;
+  }
+  /* case 3: end and midpoint share a sign, while beg has the opposite sign
+   * In this case, there is a root between midpoint and beg
+   */
+  if ((d_beg < 0.0 && d_midpoint > 0.0 && d_end > 0.0) ||
+      (d_beg > 0.0 && d_midpoint < 0.0 && d_end < 0.0)) {
+    return bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
+  }
+
+  /* case 4: beg and midpoint share a sign, while end has the opposite sign
+   * In this case, there is a root between midpoint and end
+   */
+  if ((d_beg < 0.0 && d_midpoint < 0.0 && d_end > 0.0) ||
+      (d_beg > 0.0 && d_midpoint > 0.0 && d_end < 0.0)) {
+    return bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
+  }
+
+  /* case 5: something went wrong */
+  throw std::runtime_error(
+      "Bisection failed to converge with interval : " + std::to_string(d_beg) +
+      ", " + std::to_string(d_end) +
+      ", midpoint: " + std::to_string(d_midpoint));
+}
+
+/* Find the optimum for the ratio via the bisection method */
+root_location_t model_t::optimize_alpha(const root_location_t &root) {
+  constexpr double ATOL = 1e-6;
+  root_location_t beg{root};
+  beg.brlen_ratio = 1e-4;
+
+  root_location_t end{root};
+  end.brlen_ratio = 1.0 - 1e-4 * 2;
+
+  double d_beg = compute_dlh(beg);
+  if (fabs(d_beg) < ATOL) {
+    return beg;
+  }
+
+  double d_end = compute_dlh(end);
+  if (fabs(d_end) < ATOL) {
+    return end;
+  }
+
+  if (!std::isfinite(d_beg) || !std::isfinite(d_end)) {
+    throw std::runtime_error(
+        "Initial derivatives failed when optimizing alpha: " +
+        std::to_string(root.edge->length));
+  }
+
+  if ((d_beg < 0.0 && d_end > 0.0) || (d_beg > 0.0 && d_end < 0.0)) {
+    return bisect(beg, d_beg, end, d_end, ATOL).first;
+  }
+
+  /* if we have gotten here, then we must have an "even" function so, grid
+   * search to find a midpoint which has an opposite sign value and use that to
+   * do bisection with
+   */
+
+  bool beg_end_pos = d_beg > 0.0 && d_end > 0.0;
+
+  for (size_t midpoints = 2; midpoints <= 16; midpoints *= 2) {
+    for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
+      if (midpoint % 2 == 0)
+        continue;
+
+      double alpha = 1.0 / (double)midpoints * midpoint;
+      root_location_t midpoint_root{beg};
+      midpoint_root.brlen_ratio = alpha;
+      double d_midpoint = compute_dlh(midpoint_root);
+      if (fabs(d_midpoint) < ATOL) {
+        return midpoint_root;
+      }
+      if ((beg_end_pos && d_midpoint < 0.0) ||
+          (!beg_end_pos && d_midpoint > 0.0)) {
+        auto r1 = bisect(beg, d_beg, midpoint_root, d_midpoint, ATOL);
+        auto r2 = bisect(midpoint_root, d_midpoint, end, d_end, ATOL);
+        if (r1.second < r2.second) {
+          return r2.first;
+        }
+        return r1.first;
+      }
+    }
+  }
+
+  throw std::runtime_error(
+      "Initial derivatives failed when optimizing alpha, ran out of cases");
 }

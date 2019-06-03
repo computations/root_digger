@@ -10,6 +10,9 @@ TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
   for (auto &ds : data_files_dna) {
     rooted_tree_t tree{ds.second};
     CHECK(tree.root_count() > 0);
+    for (size_t i = 0; i < tree.root_count(); ++i) {
+      CHECK(tree.root_location(i).edge->length > 0.0);
+    }
   }
 }
 
@@ -72,7 +75,7 @@ TEST_CASE("rooted_tree_t generate operations", "[rooted_tree_t]") {
       CHECK(pmatrices.size() > 0);
       CHECK(branches.size() > 0);
       for (auto brlen : branches) {
-        CHECK(brlen >= 0.0);
+        CHECK(brlen > 0.0);
       }
     }
   }
@@ -115,4 +118,14 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
   CHECK(ops[2].child2_clv_index == 5);
   CHECK(ops[2].child2_scaler_index == 1);
   CHECK(ops[2].child2_matrix_index == 5);
+}
+
+TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
+  for (auto &ds : data_files_dna) {
+    rooted_tree_t tree{ds.second};
+    for (size_t i = 0; i < tree.root_count(); ++i) {
+      tree.root_by(tree.root_location(i));
+      tree.unroot();
+    }
+  }
 }

@@ -68,10 +68,15 @@ public:
              std::vector<double>>
   generate_operations(const root_location_t &);
 
+  std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
+  generate_derivative_operations(const root_location_t &root);
+
+  void root_by(const root_location_t &);
+  void update_root(const root_location_t &);
+  void unroot();
+
 private:
   void generate_root_locations();
-  void root_by(const root_location_t &);
-  void unroot();
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;
 
