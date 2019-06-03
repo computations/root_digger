@@ -300,3 +300,17 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   throw std::runtime_error(
       "Initial derivatives failed when optimizing alpha, ran out of cases");
 }
+
+root_location_t model_t::optimize_root_location(){
+  std::pair<root_location_t, double> best;
+  best.second = -INFINITY;
+  for(size_t i=0; i < _tree.root_count(); ++i){
+    root_location_t rl = optimize_alpha(_tree.root_location(i));
+    double rl_lh = compute_lh(rl);
+    if (rl_lh > best.second){
+      best.first = rl;
+      best.second = rl_lh;
+    }
+  }
+  return best.first;
+}

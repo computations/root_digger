@@ -85,7 +85,7 @@ TEST_CASE("model_t optimize root locations with extreme points",
         }
         auto rl = tree.root_location(i);
         rl.brlen_ratio = 0.0;
-        model.optimize_alpha(tree.root_location(i));
+        model.optimize_alpha(rl);
       }
     }
   }
@@ -100,7 +100,7 @@ TEST_CASE("model_t optimize root locations with extreme points",
         }
         auto rl = tree.root_location(i);
         rl.brlen_ratio = 1.0;
-        model.optimize_alpha(tree.root_location(i));
+        model.optimize_alpha(rl);
       }
     }
   }

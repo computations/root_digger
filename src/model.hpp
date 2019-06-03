@@ -28,6 +28,7 @@ public:
   double compute_lh(const root_location_t &root_location);
   double compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root);
+  root_location_t optimize_root_location();
 
 private:
   std::pair<root_location_t, double>
