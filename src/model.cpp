@@ -260,8 +260,8 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
 
 /* Find the optimum for the ratio via the bisection method */
 root_location_t model_t::optimize_alpha(const root_location_t &root) {
-  double initial_lh = compute_lh(root);
   constexpr double ATOL = 1e-6;
+  compute_lh(root);
   root_location_t beg{root};
   beg.brlen_ratio = 1e-4;
 

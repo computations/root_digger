@@ -2,6 +2,7 @@
 extern "C" {
 #include <libpll/pll_tree.h>
 }
+#include <unordered_set>
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename) {
   return pll_utree_parse_newick_unroot(tree_filename.c_str());
@@ -65,11 +66,19 @@ std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
 }
 
 void rooted_tree_t::generate_root_locations() {
-  auto edges = edge_traverse();
-  _roots.resize(edges.size());
+  auto edges = full_traverse();
 
-  for (size_t i = 0; i < edges.size(); ++i) {
-    _roots[i] = {edges[i], edges[i]->length, 0.5};
+  std::unordered_set<pll_unode_t *> node_set;
+  for (auto edge : edges) {
+    if (node_set.find(edge) == node_set.end() &&
+        node_set.find(edge->back) == node_set.end()) {
+      node_set.insert(edge);
+    }
+  }
+
+  _roots.reserve(node_set.size());
+  for (auto edge : node_set) {
+    _roots.push_back({edge, edge->length, 0.5});
   }
 }
 
@@ -104,12 +113,11 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
 
 #include <iostream>
 void rooted_tree_t::root_by(const root_location_t &root_location) {
-  if (root_location.edge == _tree->vroot ||
-      root_location.edge == _tree->vroot->next) {
+  if (root_location.edge == _tree->vroot) {
     update_root(root_location);
     return;
   }
-  if (_tree->vroot->next->next == _tree->vroot) {
+  if (rooted()) {
     unroot();
   }
   /* make the roots */
@@ -155,13 +163,13 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
       _tree->edge_count - 1;
 }
 
-void rooted_tree_t::update_root(const root_location_t &root) {
+void rooted_tree_t::update_root(root_location_t root) {
   if (root.edge != _tree->vroot) {
     throw std::runtime_error("Provided root doesn't match the current tree");
   }
 
-  pll_unode_t *right_root = _tree->vroot;
-  pll_unode_t *left_root = _tree->vroot->next;
+  pll_unode_t *right_root = root.edge;
+  pll_unode_t *left_root = root.edge->next;
 
   right_root->length = right_root->back->length = root.brlen();
   left_root->length = left_root->back->length = root.brlen_compliment();
@@ -207,6 +215,10 @@ void rooted_tree_t::unroot() {
   if (err == PLL_FAILURE) {
     throw std::runtime_error(pll_errmsg);
   }
+}
+
+bool rooted_tree_t::rooted() const {
+  return _tree->vroot->next->next == _tree->vroot;
 }
 
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
@@ -270,4 +282,11 @@ rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
   }
 
   return std::make_tuple(op, pmatrix_indices, branch_lengths);
+}
+
+std::string rooted_tree_t::newick() {
+  char *newick_string = pll_utree_export_newick(_tree->vroot, nullptr);
+  std::string ret{newick_string};
+  free(newick_string);
+  return ret;
 }

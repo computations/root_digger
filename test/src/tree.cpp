@@ -88,7 +88,7 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
   std::vector<unsigned int> pmatrices;
   std::vector<double> branches;
 
-  GENERATE_AND_UNPACK_OPS(tree, tree.root_location(0), ops, pmatrices,
+  GENERATE_AND_UNPACK_OPS(tree, tree.root_location(2), ops, pmatrices,
                           branches);
   CHECK(ops.size() == 3);
 
@@ -128,4 +128,63 @@ TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
       tree.unroot();
     }
   }
+}
+
+TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
+  rooted_tree_t tree{data_files_dna[0].second};
+  REQUIRE(tree.root_count() == 5);
+  auto rl1 = tree.root_location(0);
+  rl1.brlen_ratio = 0.25;
+  tree.root_by(rl1);
+  CHECK("(b:0.025000,((c:0.100000,d:0.100000)n2:0.550000,a:0.100000)n1:0."
+        "075000):0.0;" == tree.newick());
+
+  rl1.brlen_ratio = 0.75;
+  tree.root_by(rl1);
+  CHECK("(b:0.075000,((c:0.100000,d:0.100000)n2:0.550000,a:0.100000)n1:0."
+        "025000):0.0;" == tree.newick());
+
+  auto rl2 = tree.root_location(1);
+  rl2.brlen_ratio = 0.25;
+  tree.root_by(rl2);
+  CHECK("(a:0.025000,(b:0.100000,(c:0.100000,d:0.100000)n2:0.550000)n1:0."
+        "075000):0.0;" == tree.newick());
+
+  rl2.brlen_ratio = 0.75;
+  tree.root_by(rl2);
+  CHECK("(a:0.075000,(b:0.100000,(c:0.100000,d:0.100000)n2:0.550000)n1:0."
+        "025000):0.0;" == tree.newick());
+
+  auto rl3 = tree.root_location(2);
+  rl3.brlen_ratio = 0.25;
+  tree.root_by(rl3);
+  CHECK("((c:0.100000,d:0.100000)n2:0.137500,(a:0.100000,b:0.100000)n1:0."
+        "412500):0.0;" == tree.newick());
+
+  rl3.brlen_ratio = 0.75;
+  tree.root_by(rl3);
+  CHECK("((c:0.100000,d:0.100000)n2:0.412500,(a:0.100000,b:0.100000)n1:0."
+        "137500):0.0;" == tree.newick());
+
+  auto rl4 = tree.root_location(3);
+  rl4.brlen_ratio = 0.25;
+  tree.root_by(rl4);
+  CHECK("(c:0.025000,(d:0.100000,(a:0.100000,b:0.100000)n1:0.550000)n2:0."
+        "075000):0.0;" == tree.newick());
+
+  rl4.brlen_ratio = 0.75;
+  tree.root_by(rl4);
+  CHECK("(c:0.075000,(d:0.100000,(a:0.100000,b:0.100000)n1:0.550000)n2:0."
+        "025000):0.0;" == tree.newick());
+
+  auto rl5 = tree.root_location(4);
+  rl5.brlen_ratio = 0.25;
+  tree.root_by(rl5);
+  CHECK("(d:0.025000,((a:0.100000,b:0.100000)n1:0.550000,c:0.100000)n2:0."
+        "075000):0.0;" == tree.newick());
+
+  rl5.brlen_ratio = 0.75;
+  tree.root_by(rl5);
+  CHECK("(d:0.075000,((a:0.100000,b:0.100000)n1:0.550000,c:0.100000)n2:0."
+        "025000):0.0;" == tree.newick());
 }

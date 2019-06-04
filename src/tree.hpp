@@ -73,11 +73,15 @@ public:
   generate_derivative_operations(const root_location_t &root);
 
   void root_by(const root_location_t &);
-  void update_root(const root_location_t &);
+  void update_root(root_location_t);
   void unroot();
+  bool rooted() const;
+
+  std::string newick();
 
 private:
   void generate_root_locations();
+  void deduplicate_roots();
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;
 
