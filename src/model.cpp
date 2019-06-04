@@ -140,12 +140,43 @@ double model_t::compute_lh(const root_location_t &root_location) {
   return lh;
 }
 
+double model_t::compute_lh_root(const root_location_t &root) {
+  pll_operation_t op;
+  std::vector<unsigned int> pmatrix_indices;
+  std::vector<double> branch_lengths;
+
+  {
+    auto result = _tree.generate_derivative_operations(root);
+    op = std::move(std::get<0>(result));
+    pmatrix_indices = std::move(std::get<1>(result));
+    branch_lengths = std::move(std::get<2>(result));
+  }
+
+  unsigned int params[] = {0};
+
+  int result =
+      pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
+                               branch_lengths.data(), pmatrix_indices.size());
+
+  if (result == PLL_FAILURE) {
+    throw std::runtime_error(pll_errmsg);
+  }
+  pll_update_partials(_partition, &op, 1);
+  std::vector<double> persite(_partition->sites);
+  double lh = pll_compute_root_loglikelihood(_partition, _tree.root_clv_index(),
+                                             _tree.root_scaler_index(), params,
+                                             persite.data());
+  if (!std::isfinite(lh)) {
+    throw std::runtime_error("lh at root is not finite: " + std::to_string(lh));
+  }
+  return lh;
+}
+
 /*
  * Use a tangent method to compute the derivative
  */
 double model_t::compute_dlh(const root_location_t &root) {
   constexpr double EPSILON = 1e-4;
-
   root_location_t root_prime{root};
   root_prime.brlen_ratio += EPSILON;
   if (root_prime.brlen_ratio >= 1.0) {
@@ -154,12 +185,13 @@ double model_t::compute_dlh(const root_location_t &root) {
         std::to_string(root.brlen_ratio));
   }
 
-  double fx = compute_lh(root);
+  double fx = compute_lh_root(root);
+
   if (!std::isfinite(fx)) {
     throw std::runtime_error("fx is not finite when computing derivative: " +
                              std::to_string(root.edge->length));
   }
-  double fxh = compute_lh(root_prime);
+  double fxh = compute_lh_root(root_prime);
   if (!std::isfinite(fxh)) {
     throw std::runtime_error("fxh is not finite when computing derivative: " +
                              std::to_string(root_prime.edge->length));
@@ -228,6 +260,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
 
 /* Find the optimum for the ratio via the bisection method */
 root_location_t model_t::optimize_alpha(const root_location_t &root) {
+  double initial_lh = compute_lh(root);
   constexpr double ATOL = 1e-6;
   root_location_t beg{root};
   beg.brlen_ratio = 1e-4;
@@ -286,10 +319,9 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
     }
   }
 
-  if(beg_end_pos){
+  if (beg_end_pos) {
     return end;
-  }
-  else{
+  } else {
     return beg;
   }
 
@@ -301,13 +333,13 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
       "Initial derivatives failed when optimizing alpha, ran out of cases");
 }
 
-root_location_t model_t::optimize_root_location(){
+root_location_t model_t::optimize_root_location() {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
-  for(size_t i=0; i < _tree.root_count(); ++i){
+  for (size_t i = 0; i < _tree.root_count(); ++i) {
     root_location_t rl = optimize_alpha(_tree.root_location(i));
     double rl_lh = compute_lh(rl);
-    if (rl_lh > best.second){
+    if (rl_lh > best.second) {
       best.first = rl;
       best.second = rl_lh;
     }

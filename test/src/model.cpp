@@ -48,6 +48,7 @@ TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
         if (tree.root_location(i).edge->back == nullptr) {
           continue;
         }
+        model.compute_lh(tree.root_location(i));
         double dlh = model.compute_dlh(tree.root_location(i));
         CHECK(std::isfinite(dlh));
       }
@@ -102,6 +103,19 @@ TEST_CASE("model_t optimize root locations with extreme points",
         rl.brlen_ratio = 1.0;
         model.optimize_alpha(rl);
       }
+    }
+  }
+}
+
+TEST_CASE("model_t optimize whole tree", "[model_t]") {
+  for (auto &ds : data_files_dna) {
+    for (auto &mp : params) {
+      msa_t msa{ds.first};
+      rooted_tree_t tree{ds.second};
+      model_t model{mp, tree, msa};
+      auto rl = model.optimize_root_location();
+      CHECK(rl.brlen_ratio >= 0.0);
+      CHECK(rl.brlen_ratio <= 1.0);
     }
   }
 }

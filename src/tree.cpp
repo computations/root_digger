@@ -254,7 +254,7 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
 
 std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
 rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
-  update_root(root);
+  root_by(root);
 
   pll_operation_t op;
   std::vector<unsigned int> pmatrix_indices(2);

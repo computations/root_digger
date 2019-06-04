@@ -26,6 +26,7 @@ public:
   model_t(const model_params_t &, rooted_tree_t, const msa_t &);
   ~model_t();
   double compute_lh(const root_location_t &root_location);
+  double compute_lh_root(const root_location_t &root);
   double compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root);
   root_location_t optimize_root_location();
