@@ -346,3 +346,8 @@ root_location_t model_t::optimize_root_location() {
   }
   return best.first;
 }
+
+const rooted_tree_t& model_t::rooted_tree(const root_location_t& root){
+  _tree.root_by(root);
+  return _tree;
+}

@@ -30,6 +30,7 @@ public:
   double compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root);
   root_location_t optimize_root_location();
+  const rooted_tree_t &rooted_tree(const root_location_t &root);
 
 private:
   std::pair<root_location_t, double>

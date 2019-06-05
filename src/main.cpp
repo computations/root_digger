@@ -43,9 +43,7 @@ int main(int argv, char **argc) {
   rooted_tree_t tree{tree_filename};
   model_t model{parse_model_file(model_filename), tree, msa};
   auto rl = model.optimize_root_location();
-  tree.root_by(rl);
-  std::cout<<tree.newick()<<std::endl;
-
+  std::cout<<model.rooted_tree(rl).newick()<<std::endl;
 
   return 0;
 }

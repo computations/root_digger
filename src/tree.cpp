@@ -111,7 +111,6 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
   return trav_buf;
 }
 
-#include <iostream>
 void rooted_tree_t::root_by(const root_location_t &root_location) {
   if (root_location.edge == _tree->vroot) {
     update_root(root_location);
@@ -197,7 +196,6 @@ void rooted_tree_t::unroot() {
   free(root_right);
 
   _tree->vroot = left_child->next != nullptr ? left_child : right_child;
-  /* TODO check that the vroot is an inner node */
   if (_tree->vroot->next == nullptr) {
     throw std::runtime_error("unrooted to a tip");
   }
@@ -284,9 +282,14 @@ rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
   return std::make_tuple(op, pmatrix_indices, branch_lengths);
 }
 
-std::string rooted_tree_t::newick() {
+std::string rooted_tree_t::newick() const {
   char *newick_string = pll_utree_export_newick(_tree->vroot, nullptr);
   std::string ret{newick_string};
   free(newick_string);
   return ret;
+}
+
+void rooted_tree_t::show_tree() const {
+  pll_utree_show_ascii(_tree->vroot,
+                       PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH);
 }

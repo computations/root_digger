@@ -77,7 +77,9 @@ public:
   void unroot();
   bool rooted() const;
 
-  std::string newick();
+  std::string newick() const;
+
+  void show_tree() const;
 
 private:
   void generate_root_locations();

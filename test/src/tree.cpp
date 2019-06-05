@@ -88,7 +88,9 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
   std::vector<unsigned int> pmatrices;
   std::vector<double> branches;
 
-  GENERATE_AND_UNPACK_OPS(tree, tree.root_location(2), ops, pmatrices,
+  CHECK(std::string(tree.root_location(3).edge->label) == "n2");
+
+  GENERATE_AND_UNPACK_OPS(tree, tree.root_location(3), ops, pmatrices,
                           branches);
   CHECK(ops.size() == 3);
 
