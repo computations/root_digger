@@ -73,7 +73,7 @@ TEST_CASE("model_t optimize root locations on individual roots",
   }
 }
 
-TEST_CASE("model_t optimize root locations with extreme points",
+TEST_CASE("model_t optimize root locations with beg points",
           "[model_t][opt]") {
   for (auto &ds : data_files_dna) {
     for (auto &mp : params) {
@@ -90,6 +90,10 @@ TEST_CASE("model_t optimize root locations with extreme points",
       }
     }
   }
+}
+
+TEST_CASE("model_t optimize root locations with end points",
+          "[model_t][opt]") {
   for (auto &ds : data_files_dna) {
     for (auto &mp : params) {
       msa_t msa{ds.first};

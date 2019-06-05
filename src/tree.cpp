@@ -270,14 +270,22 @@ rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
   std::vector<unsigned int> pmatrix_indices(2);
   std::vector<double> branch_lengths(2);
 
-  unsigned int ops_count = 0;
+  pll_unode_t *vroot = _tree->vroot;
 
-  pll_utree_create_operations(&(_tree->vroot), 1, branch_lengths.data(),
-                              pmatrix_indices.data(), &op, nullptr, &ops_count);
+  op.parent_clv_index = root_clv_index();
+  op.parent_scaler_index = root_scaler_index();
 
-  if (ops_count != 1) {
-    throw std::runtime_error("Creating operations for the derivative failed");
-  }
+  op.child1_clv_index = vroot->back->clv_index;
+  op.child1_matrix_index = vroot->back->pmatrix_index;
+  op.child1_scaler_index = vroot->back->scaler_index;
+  pmatrix_indices[0] = vroot->back->pmatrix_index;
+  branch_lengths[0] = vroot->back->length;
+
+  op.child2_clv_index = vroot->next->back->clv_index;
+  op.child2_matrix_index = vroot->next->back->pmatrix_index;
+  op.child2_scaler_index = vroot->next->back->scaler_index;
+  pmatrix_indices[1] = vroot->next->back->pmatrix_index;
+  branch_lengths[1] = vroot->next->back->length;
 
   return std::make_tuple(op, pmatrix_indices, branch_lengths);
 }

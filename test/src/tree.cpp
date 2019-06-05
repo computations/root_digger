@@ -6,6 +6,14 @@ extern "C" {
 #include <tree.hpp>
 #include <utility>
 
+root_location_t find_node(const rooted_tree_t &tree, const std::string &label) {
+  for (size_t i = 0; i < tree.root_count(); ++i) {
+    if (tree.root_location(i).edge->label == label)
+      return tree.root_location(i);
+  }
+  throw std::invalid_argument("Could not find the correct node");
+}
+
 TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
   for (auto &ds : data_files_dna) {
     rooted_tree_t tree{ds.second};
@@ -88,9 +96,9 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
   std::vector<unsigned int> pmatrices;
   std::vector<double> branches;
 
-  CHECK(std::string(tree.root_location(3).edge->label) == "n2");
+  auto root_location = find_node(tree, "n2");
 
-  GENERATE_AND_UNPACK_OPS(tree, tree.root_location(3), ops, pmatrices,
+  GENERATE_AND_UNPACK_OPS(tree, root_location, ops, pmatrices,
                           branches);
   CHECK(ops.size() == 3);
 
@@ -122,6 +130,38 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
   CHECK(ops[2].child2_matrix_index == 5);
 }
 
+TEST_CASE("rooted_tree_t generate root operations", "[rooted_tree_t]") {
+  rooted_tree_t tree{data_files_dna[0].second};
+  pll_operation_t op;
+  std::vector<unsigned int> pmatrices;
+  std::vector<double> branches;
+
+  auto root_location = find_node(tree, "n2");
+  {
+    auto result = tree.generate_derivative_operations(root_location);
+    op = std::move(std::get<0>(result));
+    pmatrices = std::move(std::get<1>(result));
+    branches = std::move(std::get<2>(result));
+  }
+
+  CHECK(op.parent_clv_index == 6);
+  CHECK(op.parent_scaler_index == 2);
+  CHECK(op.child1_clv_index == 4);
+  CHECK(op.child1_scaler_index == 0);
+  CHECK(op.child1_matrix_index == 4);
+  CHECK(op.child2_clv_index == 5);
+  CHECK(op.child2_scaler_index == 1);
+  CHECK(op.child2_matrix_index == 5);
+
+  CHECK(pmatrices.size() == 2);
+  CHECK(pmatrices[0] == 4);
+  CHECK(pmatrices[1] == 5);
+
+  CHECK(branches.size() == 2);
+  CHECK(branches[0] == 0.1);
+  CHECK(branches[1] == 0.1);
+}
+
 TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
   for (auto &ds : data_files_dna) {
     rooted_tree_t tree{ds.second};
@@ -132,7 +172,7 @@ TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
   }
 }
 
-TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
+TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
   rooted_tree_t tree{data_files_dna[0].second};
   REQUIRE(tree.root_count() == 5);
   auto rl1 = tree.root_location(0);
