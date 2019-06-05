@@ -6,7 +6,6 @@
 extern "C" {
 #include <libpll/pll_msa.h>
 }
-#include <iostream>
 
 std::string read_file_contents(std::ifstream &infile) {
   std::string str;
@@ -199,7 +198,6 @@ double model_t::compute_dlh(const root_location_t &root) {
   }
 
   double dlh = (fxh - fx) / EPSILON;
-  //std::cout << "[compute_dlh] returning " << dlh << std::endl;
   return dlh * sign;
 }
 
@@ -212,12 +210,10 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
   midpoint.brlen_ratio = (beg.brlen_ratio + end.brlen_ratio) / 2;
 
   if (depth > 64) {
-    //std::cout << "[bisect] hit max depth" << std::endl;
     return {midpoint, compute_lh(midpoint)};
   }
 
   double d_midpoint = compute_dlh(midpoint);
-  //std::cout << "[bisect] d_midpoint: " << d_midpoint << std::endl;
 
   /* case 1: d_midpoint is within tolerance of 0.0
    * We found a root, and should return
@@ -277,16 +273,12 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   end.brlen_ratio = 1.0;
 
   double d_beg = compute_dlh(beg);
-  //std::cout << "[optimize_alpha] d_beg: " << d_beg << std::endl;
   if (fabs(d_beg) < ATOL) {
-    //std::cout << "[optimize_alpha] returning beg" << std::endl;
     return beg;
   }
 
   double d_end = compute_dlh(end);
-  //std::cout << "[optimize_alpha] d_end: " << d_end << std::endl;
   if (fabs(d_end) < ATOL) {
-    //std::cout << "[optimize_alpha] returning end" << std::endl;
     return end;
   }
 
@@ -297,7 +289,6 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   }
 
   if ((d_beg < 0.0 && d_end > 0.0) || (d_beg > 0.0 && d_end < 0.0)) {
-    //std::cout << "[optimize_alpha] bisecting with end and beg" << std::endl;
     return bisect(beg, d_beg, end, d_end, ATOL).first;
   }
 
@@ -308,15 +299,12 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
 
   bool beg_end_pos = d_beg > 0.0 && d_end > 0.0;
 
-  //std::cout << "[optimize_alpha] performing grid search to start bisection"
-   //         << std::endl;
   for (size_t midpoints = 2; midpoints <= 128; midpoints *= 2) {
     for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
       if (midpoint % 2 == 0)
         continue;
 
       double alpha = 1.0 / (double)midpoints * midpoint;
-      //std::cout << "[optimize_alpha] alpha: " << alpha << std::endl;
       root_location_t midpoint_root{beg};
       midpoint_root.brlen_ratio = alpha;
       double d_midpoint = compute_dlh(midpoint_root);
@@ -342,9 +330,6 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
    * the end. Likewise, if both are negative, then the best endpoint is at the
    * begining.
    */
-  //std::cout
-   //   << "[optimize_alpha] grid search unsuccessful, returning an endpoint"
-    //  << std::endl;
   if (beg_end_pos) {
     return end;
   } else {

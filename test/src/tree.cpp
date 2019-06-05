@@ -158,8 +158,8 @@ TEST_CASE("rooted_tree_t generate root operations", "[rooted_tree_t]") {
   CHECK(pmatrices[1] == 5);
 
   CHECK(branches.size() == 2);
-  CHECK(branches[0] == 0.1);
-  CHECK(branches[1] == 0.1);
+  CHECK(branches[0] == 0.275);
+  CHECK(branches[1] == 0.275);
 }
 
 TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
@@ -172,7 +172,7 @@ TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
   }
 }
 
-TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
+TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
   rooted_tree_t tree{data_files_dna[0].second};
   REQUIRE(tree.root_count() == 5);
   auto rl1 = tree.root_location(0);
