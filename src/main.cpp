@@ -1,6 +1,7 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#include <cmath>
 #include <fstream>
 #include <getopt.h>
 #include <iostream>
@@ -39,11 +40,26 @@ int main(int argv, char **argc) {
     }
   }
 
-  msa_t msa{msa_filename};
+  model_params_t params = parse_model_file(model_filename);
+
+  unsigned int states = static_cast<unsigned int>(std::ceil(std::sqrt(params.size())));
+  const pll_state_t *map = nullptr;
+
+  if (states == 4)
+    map = pll_map_nt;
+  if (states == 20)
+    map = pll_map_aa;
+
+  if (map == nullptr) {
+    throw std::invalid_argument(
+        "Root digger only supports protien and nuculotide data");
+  }
+
+  msa_t msa{msa_filename, map, states};
   rooted_tree_t tree{tree_filename};
-  model_t model{parse_model_file(model_filename), tree, msa};
+  model_t model{params, tree, msa};
   auto rl = model.optimize_root_location();
-  std::cout<<model.rooted_tree(rl).newick()<<std::endl;
+  std::cout << model.rooted_tree(rl).newick() << std::endl;
 
   return 0;
 }

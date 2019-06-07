@@ -7,6 +7,8 @@ extern "C" {
 #include <libpll/pll_msa.h>
 }
 
+#include <iostream>
+
 std::string read_file_contents(std::ifstream &infile) {
   std::string str;
   infile.seekg(0, std::ios::end);
@@ -71,7 +73,7 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    * at this moment.
    */
   unsigned int attributes = 0;
-  attributes |= PLL_ATTRIB_ARCH_CPU;
+  attributes |= PLL_ATTRIB_ARCH_AVX;
   attributes |= PLL_ATTRIB_NONREV;
 
   _partition = pll_partition_create(_tree.tip_count(), _tree.branch_count(),
@@ -166,7 +168,7 @@ double model_t::compute_lh_root(const root_location_t &root) {
   double lh = pll_compute_root_loglikelihood(_partition, _tree.root_clv_index(),
                                              _tree.root_scaler_index(), params,
                                              persite.data());
-  if (!std::isfinite(lh)) {
+  if (std::isnan(lh)) {
     throw std::runtime_error("lh at root is not finite: " + std::to_string(lh));
   }
   return lh;
@@ -176,7 +178,7 @@ double model_t::compute_lh_root(const root_location_t &root) {
  * Use a tangent method to compute the derivative
  */
 double model_t::compute_dlh(const root_location_t &root) {
-  constexpr double EPSILON = 1e-4;
+  constexpr double EPSILON = 1e-8;
   root_location_t root_prime{root};
   root_prime.brlen_ratio += EPSILON;
   double sign = 1.0;
@@ -187,17 +189,27 @@ double model_t::compute_dlh(const root_location_t &root) {
 
   double fx = compute_lh_root(root);
 
-  if (!std::isfinite(fx)) {
+  if (std::isnan(fx)) {
     throw std::runtime_error("fx is not finite when computing derivative: " +
                              std::to_string(root.edge->length));
   }
   double fxh = compute_lh_root(root_prime);
-  if (!std::isfinite(fxh)) {
+  if (std::isnan(fxh)) {
     throw std::runtime_error("fxh is not finite when computing derivative: " +
                              std::to_string(root_prime.edge->length));
   }
 
+  if (std::isnan(fxh)) {
+    throw std::runtime_error("fxh is not finite when computing derivative: " +
+                             std::to_string(root_prime.edge->length));
+  }
+  if (std::isinf(fxh) && std::isinf(fx)) {
+    std::cout << "both evals are inf, returning 0 for derivative" << std::endl;
+    return 0;
+  }
   double dlh = (fxh - fx) / EPSILON;
+  std::cout << "[compute_dlh] dlh: " << dlh * sign << ", fx: " << fx
+            << ", fxh: " << fxh << std::endl;
   return dlh * sign;
 }
 
@@ -220,15 +232,17 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
 
   if (fabs(d_midpoint) < atol) {
+    std::cout << "[bisect] case 1" << std::endl;
     return {midpoint, compute_lh(midpoint)};
   }
 
   /* case 2: midpoint is opposite sign of both beg and end
-   * There are 2 roots, so we recurse on both sides, and return the one with the
-   * best LH
+   * There are at least 2 roots, so we recurse on both sides, and return the one
+   * with the best LH
    */
   if ((d_beg > 0.0 && d_end > 0.0 && d_midpoint < 0.0) ||
       (d_beg < 0.0 && d_end < 0.0 && d_midpoint > 0.0)) {
+    std::cout << "[bisect] case 2" << std::endl;
     auto r1 = bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
     auto r2 = bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
     if (r1.second < r2.second) {
@@ -241,6 +255,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg < 0.0 && d_midpoint > 0.0 && d_end > 0.0) ||
       (d_beg > 0.0 && d_midpoint < 0.0 && d_end < 0.0)) {
+    std::cout << "[bisect] case 3" << std::endl;
     return bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
   }
 
@@ -249,6 +264,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg < 0.0 && d_midpoint < 0.0 && d_end > 0.0) ||
       (d_beg > 0.0 && d_midpoint > 0.0 && d_end < 0.0)) {
+    std::cout << "[bisect] case 4" << std::endl;
     return bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
   }
 
@@ -261,9 +277,9 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
 
 /* Find the optimum for the ratio via the bisection method */
 root_location_t model_t::optimize_alpha(const root_location_t &root) {
-  constexpr double ATOL = 1e-6;
+  constexpr double ATOL = 1e-8;
   double lh = compute_lh(root);
-  if(!std::isfinite(lh)){
+  if (std::isnan(lh)) {
     throw std::runtime_error("initial liklihood calculation is not finite");
   }
   root_location_t beg{root};
@@ -272,24 +288,35 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   root_location_t end{root};
   end.brlen_ratio = 1.0;
 
+  double lh_beg = compute_lh(beg);
   double d_beg = compute_dlh(beg);
-  if (fabs(d_beg) < ATOL) {
-    return beg;
-  }
 
+  double lh_end = compute_lh(end);
   double d_end = compute_dlh(end);
-  if (fabs(d_end) < ATOL) {
-    return end;
+
+  root_location_t best_endpoint = lh_beg >= lh_end ? beg : end;
+  double lh_best_endpoint = lh_beg >= lh_end ? lh_beg : lh_end;
+
+  std::cout << "[optimize_alpha] lh_endpoint: " << lh_best_endpoint
+            << std::endl;
+  std::cout << "[optimize_alpha] d_beg: " << d_beg << " d_end: " << d_end
+            << std::endl;
+
+  if (fabs(d_beg) < ATOL || fabs(d_end) < ATOL) {
+    return best_endpoint;
   }
 
-  if (!std::isfinite(d_beg) || !std::isfinite(d_end)) {
+  if (std::isnan(d_beg) || std::isnan(d_end)) {
     throw std::runtime_error(
         "Initial derivatives failed when optimizing alpha: " +
         std::to_string(root.edge->length));
   }
 
   if ((d_beg < 0.0 && d_end > 0.0) || (d_beg > 0.0 && d_end < 0.0)) {
-    return bisect(beg, d_beg, end, d_end, ATOL).first;
+    auto mid = bisect(beg, d_beg, end, d_end, ATOL);
+    std::cout << "[optimize_alpha] mid lh: " << mid.second
+              << " end lh: " << lh_best_endpoint << std::endl;
+    return lh_best_endpoint >= mid.second ? best_endpoint : mid.first;
   }
 
   /* if we have gotten here, then we must have an "even" function so, grid
@@ -305,20 +332,28 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
         continue;
 
       double alpha = 1.0 / (double)midpoints * midpoint;
+      std::cout << "[optimize_alpha] alpha: " << alpha << std::endl;
       root_location_t midpoint_root{beg};
       midpoint_root.brlen_ratio = alpha;
       double d_midpoint = compute_dlh(midpoint_root);
+      std::cout << "[optimize_alpha] d_midpoint: " << d_midpoint << std::endl;
       if (fabs(d_midpoint) < ATOL) {
         return midpoint_root;
       }
       if ((beg_end_pos && d_midpoint < 0.0) ||
           (!beg_end_pos && d_midpoint > 0.0)) {
+        /*
+         * we have a midpoint, so now we need to figure out if it is a min or a
+         * maximum.
+         */
         auto r1 = bisect(beg, d_beg, midpoint_root, d_midpoint, ATOL);
         auto r2 = bisect(midpoint_root, d_midpoint, end, d_end, ATOL);
+        std::cout << "[optimize_alpha] r1 lh: " << r1.second
+                  << " r2 lh: " << r2.second << std::endl;
         if (r1.second < r2.second) {
-          return r2.first;
+          return lh_best_endpoint >= r2.second ? best_endpoint : r2.first;
         }
-        return r1.first;
+        return lh_best_endpoint >= r1.second ? best_endpoint : r1.first;
       }
     }
   }
