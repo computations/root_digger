@@ -171,10 +171,10 @@ TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
   }
 }
 
-TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
+TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
   rooted_tree_t tree{data_files_dna[0].second};
   REQUIRE(tree.root_count() == 5);
-  auto rl1 = tree.root_location(0);
+  auto rl1 = find_node(tree, "b");
   rl1.brlen_ratio = 0.25;
   tree.root_by(rl1);
   CHECK("(b:0.025000,((c:0.100000,d:0.100000)n2:0.550000,a:0.100000)n1:0."
@@ -185,7 +185,7 @@ TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
   CHECK("(b:0.075000,((c:0.100000,d:0.100000)n2:0.550000,a:0.100000)n1:0."
         "025000):0.0;" == tree.newick());
 
-  auto rl2 = tree.root_location(1);
+  auto rl2 = find_node(tree, "a");
   rl2.brlen_ratio = 0.25;
   tree.root_by(rl2);
   CHECK("(a:0.025000,(b:0.100000,(c:0.100000,d:0.100000)n2:0.550000)n1:0."
@@ -196,7 +196,7 @@ TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
   CHECK("(a:0.075000,(b:0.100000,(c:0.100000,d:0.100000)n2:0.550000)n1:0."
         "025000):0.0;" == tree.newick());
 
-  auto rl3 = tree.root_location(2);
+  auto rl3 = find_node(tree, "n2");
   rl3.brlen_ratio = 0.25;
   tree.root_by(rl3);
   CHECK("((c:0.100000,d:0.100000)n2:0.137500,(a:0.100000,b:0.100000)n1:0."
@@ -207,7 +207,7 @@ TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
   CHECK("((c:0.100000,d:0.100000)n2:0.412500,(a:0.100000,b:0.100000)n1:0."
         "137500):0.0;" == tree.newick());
 
-  auto rl4 = tree.root_location(3);
+  auto rl4 = find_node(tree, "c");
   rl4.brlen_ratio = 0.25;
   tree.root_by(rl4);
   CHECK("(c:0.025000,(d:0.100000,(a:0.100000,b:0.100000)n1:0.550000)n2:0."
@@ -218,7 +218,7 @@ TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
   CHECK("(c:0.075000,(d:0.100000,(a:0.100000,b:0.100000)n1:0.550000)n2:0."
         "025000):0.0;" == tree.newick());
 
-  auto rl5 = tree.root_location(4);
+  auto rl5 = find_node(tree, "d");
   rl5.brlen_ratio = 0.25;
   tree.root_by(rl5);
   CHECK("(d:0.025000,((a:0.100000,b:0.100000)n1:0.550000,c:0.100000)n2:0."
