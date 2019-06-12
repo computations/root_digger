@@ -73,8 +73,7 @@ TEST_CASE("model_t optimize root locations on individual roots",
   }
 }
 
-TEST_CASE("model_t optimize root locations with beg points",
-          "[model_t][opt]") {
+TEST_CASE("model_t optimize root locations with beg points", "[model_t][opt]") {
   for (auto &ds : data_files_dna) {
     for (auto &mp : params) {
       msa_t msa{ds.first};
@@ -92,8 +91,7 @@ TEST_CASE("model_t optimize root locations with beg points",
   }
 }
 
-TEST_CASE("model_t optimize root locations with end points",
-          "[model_t][opt]") {
+TEST_CASE("model_t optimize root locations with end points", "[model_t][opt]") {
   for (auto &ds : data_files_dna) {
     for (auto &mp : params) {
       msa_t msa{ds.first};
@@ -123,3 +121,23 @@ TEST_CASE("model_t optimize whole tree", "[model_t]") {
     }
   }
 }
+
+/*
+TEST_CASE("model_t liklihood computation", "[model_t]") {
+  for (auto &ds : data_files_dna) {
+    for (auto &mp : params) {
+      msa_t msa{ds.first};
+      rooted_tree_t tree{ds.second};
+      model_t model{mp, tree, msa};
+      for (size_t i = 0; i < tree.root_count(); ++i) {
+        if (tree.root_location(i).edge->back == nullptr) {
+          continue;
+        }
+        auto rl = tree.root_location(i);
+        model.compute_lh(rl);
+        CHECK(std::fabs(model.compute_lh(rl) - model.compute_lh_root(rl)) == Approx(0.0));
+      }
+    }
+  }
+}
+*/

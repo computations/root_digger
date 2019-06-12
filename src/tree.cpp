@@ -2,6 +2,7 @@
 extern "C" {
 #include <libpll/pll_tree.h>
 }
+#include <iostream>
 #include <unordered_set>
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename) {
@@ -66,6 +67,8 @@ std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
 }
 
 void rooted_tree_t::generate_root_locations() {
+  std::cout << "[generate_root_locations] generating root locations"
+            << std::endl;
   auto edges = full_traverse();
 
   std::unordered_set<pll_unode_t *> node_set;
@@ -112,6 +115,8 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
 }
 
 void rooted_tree_t::root_by(const root_location_t &root_location) {
+  std::cout << "[root_by] rooting by node label: " << root_location.label()
+            << std::endl;
   if (root_location.edge == _tree->vroot) {
     update_root(root_location);
     return;
@@ -154,12 +159,12 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
       _tree->inner_count - 1;
 
   new_root_left->node_index = total_unodes + 1;
-  left_child->pmatrix_index = new_root_left->pmatrix_index =
-      _tree->edge_count - 2;
+  new_root_left->pmatrix_index = left_child->pmatrix_index;
 
   new_root_right->node_index = total_unodes + 2;
   right_child->pmatrix_index = new_root_right->pmatrix_index =
       _tree->edge_count - 1;
+  new_root_right->pmatrix_index = _tree->edge_count - 1;
 }
 
 void rooted_tree_t::update_root(root_location_t root) {
@@ -206,8 +211,7 @@ void rooted_tree_t::unroot() {
   _tree->inner_count -= 1;
   _tree->edge_count -= 1;
 
-  right_child->pmatrix_index = left_child->pmatrix_index =
-      _tree->edge_count - 1;
+  right_child->pmatrix_index = left_child->pmatrix_index;
 
   int err = pll_utree_check_integrity(_tree);
   if (err == PLL_FAILURE) {
@@ -222,10 +226,28 @@ bool rooted_tree_t::rooted() const {
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_operations(const root_location_t &new_root) {
+  /*
+  {
+    auto trav_buf = full_traverse();
+    for (auto node : trav_buf) {
+      std::cout << "[generate_operations] traversal node label: "
+                << (node->label != nullptr ? node->label : "null")
+                << ", pmatrix index: " << node->pmatrix_index
+                << ", clv index: " << node->clv_index << std::endl;
+    }
+  }
+  */
 
   root_by(new_root);
 
   auto trav_buf = full_traverse();
+  std::cout << "[generate_operations] traversal after root" << std::endl;
+  for (auto node : trav_buf) {
+    std::cout << "[generate_operations] traversal node label: "
+              << (node->label != nullptr ? node->label : "null")
+              << ", pmatrix index: " << node->pmatrix_index
+              << ", clv index: " << node->clv_index << std::endl;
+  }
 
   std::vector<pll_operation_t> ops(trav_buf.size());
   std::vector<unsigned int> pmatrix_indices(trav_buf.size());

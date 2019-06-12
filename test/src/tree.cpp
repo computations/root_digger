@@ -98,8 +98,7 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
 
   auto root_location = find_node(tree, "n2");
 
-  GENERATE_AND_UNPACK_OPS(tree, root_location, ops, pmatrices,
-                          branches);
+  GENERATE_AND_UNPACK_OPS(tree, root_location, ops, pmatrices, branches);
   CHECK(ops.size() == 3);
 
   CHECK(ops[0].parent_clv_index == 4);
@@ -172,7 +171,7 @@ TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
   }
 }
 
-TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
+TEST_CASE("rooted_tree_t newick", "[!hide][rooted_tree_t]") {
   rooted_tree_t tree{data_files_dna[0].second};
   REQUIRE(tree.root_count() == 5);
   auto rl1 = tree.root_location(0);
@@ -229,4 +228,42 @@ TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
   tree.root_by(rl5);
   CHECK("(d:0.075000,((a:0.100000,b:0.100000)n1:0.550000,c:0.100000)n2:0."
         "025000):0.0;" == tree.newick());
+}
+
+TEST_CASE("rooted_tree_t check derivative vs regular operations",
+          "[rooted_tree_t]") {
+  rooted_tree_t tree{data_files_dna[0].second};
+  for (size_t i = 0; i < tree.root_count(); ++i) {
+    auto root_location = tree.root_location(i);
+    std::vector<pll_operation_t> ops_regular;
+    std::vector<unsigned int> pmatrices_regular;
+    std::vector<double> branches_regular;
+
+    GENERATE_AND_UNPACK_OPS(tree, root_location, ops_regular, pmatrices_regular,
+                            branches_regular);
+
+    pll_operation_t op_root;
+    std::vector<unsigned int> pmatrices_root;
+    std::vector<double> branches_root;
+
+    {
+      auto result = tree.generate_derivative_operations(root_location);
+      op_root = std::move(std::get<0>(result));
+      pmatrices_root = std::move(std::get<1>(result));
+      branches_root = std::move(std::get<2>(result));
+    }
+
+    auto regular_end_op = *(ops_regular.end() - 1);
+    CHECK(op_root.parent_clv_index == regular_end_op.parent_clv_index);
+    CHECK(op_root.parent_scaler_index == regular_end_op.parent_scaler_index);
+
+    CHECK(op_root.child1_clv_index == regular_end_op.child1_clv_index);
+    CHECK(op_root.child2_clv_index == regular_end_op.child2_clv_index);
+
+    CHECK(op_root.child1_scaler_index == regular_end_op.child1_scaler_index);
+    CHECK(op_root.child2_scaler_index == regular_end_op.child2_scaler_index);
+
+    CHECK(op_root.child1_matrix_index == regular_end_op.child1_matrix_index);
+    CHECK(op_root.child2_matrix_index == regular_end_op.child2_matrix_index);
+  }
 }

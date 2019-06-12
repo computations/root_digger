@@ -26,6 +26,9 @@ struct root_location_t {
   constexpr inline double brlen_compliment() const {
     return saved_brlen * (1 - brlen_ratio);
   }
+  std::string label() const{
+    return edge->label != nullptr ? edge->label : "(null)";
+  }
 };
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename);

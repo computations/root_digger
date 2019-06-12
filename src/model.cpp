@@ -95,6 +95,7 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
   double rate_cats[submodels] = {0};
   pll_compute_gamma_cats(1, 4, rate_cats, PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partition, rate_cats);
+  std::cout << "[model_t] rate: " << rate_cats[0] << std::endl;
 
   /* update the invariant sites */
   pll_update_invariant_sites(_partition);
@@ -129,6 +130,16 @@ double model_t::compute_lh(const root_location_t &root_location) {
   int result =
       pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
                                branch_lengths.data(), pmatrix_indices.size());
+
+  /*
+  std::cout << "[compute_lh] updating partials with these pmatricies"
+            << std::endl;
+  for (size_t i = 0; i < pmatrix_indices.size(); ++i) {
+    std::cout << "brlen: " << branch_lengths[i]
+              << ", index: " << pmatrix_indices[i] << std::endl;
+    pll_show_pmatrix(_partition, pmatrix_indices[i], 10);
+  }
+  */
 
   if (result == PLL_FAILURE) {
     throw std::runtime_error(pll_errmsg);
@@ -169,7 +180,8 @@ double model_t::compute_lh_root(const root_location_t &root) {
                                              _tree.root_scaler_index(), params,
                                              persite.data());
   if (std::isnan(lh)) {
-    throw std::runtime_error("lh at root is not finite: " + std::to_string(lh));
+    throw std::runtime_error("lh at root is not a number: " +
+                             std::to_string(lh));
   }
   return lh;
 }
@@ -178,6 +190,7 @@ double model_t::compute_lh_root(const root_location_t &root) {
  * Use a tangent method to compute the derivative
  */
 double model_t::compute_dlh(const root_location_t &root) {
+
   constexpr double EPSILON = 1e-8;
   root_location_t root_prime{root};
   root_prime.brlen_ratio += EPSILON;
@@ -204,7 +217,8 @@ double model_t::compute_dlh(const root_location_t &root) {
                              std::to_string(root_prime.edge->length));
   }
   if (std::isinf(fxh) && std::isinf(fx)) {
-    std::cout << "both evals are inf, returning 0 for derivative" << std::endl;
+    std::cout << "[compute_dlh] both evals are inf, returning 0 for derivative"
+              << std::endl;
     return 0;
   }
   double dlh = (fxh - fx) / EPSILON;
@@ -221,11 +235,14 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
   root_location_t midpoint{beg};
   midpoint.brlen_ratio = (beg.brlen_ratio + end.brlen_ratio) / 2;
 
-  if (depth > 64) {
-    return {midpoint, compute_lh(midpoint)};
-  }
-
   double d_midpoint = compute_dlh(midpoint);
+
+  if (depth > 64) {
+    std::cout << "[bisect] depth too low, returning midpoint with ratio: "
+              << midpoint.brlen_ratio << ", lh: " << compute_lh_root(midpoint)
+              << std::endl;
+    return {midpoint, compute_lh_root(midpoint)};
+  }
 
   /* case 1: d_midpoint is within tolerance of 0.0
    * We found a root, and should return
@@ -233,7 +250,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
 
   if (fabs(d_midpoint) < atol) {
     std::cout << "[bisect] case 1" << std::endl;
-    return {midpoint, compute_lh(midpoint)};
+    return {midpoint, compute_lh_root(midpoint)};
   }
 
   /* case 2: midpoint is opposite sign of both beg and end
@@ -255,7 +272,9 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg < 0.0 && d_midpoint > 0.0 && d_end > 0.0) ||
       (d_beg > 0.0 && d_midpoint < 0.0 && d_end < 0.0)) {
-    std::cout << "[bisect] case 3" << std::endl;
+    std::cout << "[bisect] case 3, d_beg: " << d_beg
+              << ", d_midpoint: " << d_midpoint << ", d_end: " << d_end
+              << ", alpha: " << midpoint.brlen_ratio << std::endl;
     return bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
   }
 
@@ -277,25 +296,30 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
 
 /* Find the optimum for the ratio via the bisection method */
 root_location_t model_t::optimize_alpha(const root_location_t &root) {
-  constexpr double ATOL = 1e-8;
+  constexpr double ATOL = 1e-7;
   double lh = compute_lh(root);
   if (std::isnan(lh)) {
     throw std::runtime_error("initial liklihood calculation is not finite");
   }
   root_location_t beg{root};
-  beg.brlen_ratio = 0;
+  beg.brlen_ratio = 0.0;
 
   root_location_t end{root};
   end.brlen_ratio = 1.0;
 
-  double lh_beg = compute_lh(beg);
+  double lh_beg = compute_lh_root(beg);
   double d_beg = compute_dlh(beg);
 
-  double lh_end = compute_lh(end);
+  double lh_end = compute_lh_root(end);
   double d_end = compute_dlh(end);
 
   root_location_t best_endpoint = lh_beg >= lh_end ? beg : end;
   double lh_best_endpoint = lh_beg >= lh_end ? lh_beg : lh_end;
+  if (lh_beg >= lh_end) {
+    std::cout << "[optimize_alpha] beg end point is best" << std::endl;
+  } else {
+    std::cout << "[optimize_alpha] end end point is best" << std::endl;
+  }
 
   std::cout << "[optimize_alpha] lh_endpoint: " << lh_best_endpoint
             << std::endl;
@@ -303,6 +327,8 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
             << std::endl;
 
   if (fabs(d_beg) < ATOL || fabs(d_end) < ATOL) {
+    std::cout << "[optimize_alpha] one of the endpoints is sufficient"
+              << std::endl;
     return best_endpoint;
   }
 
@@ -316,7 +342,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
     auto mid = bisect(beg, d_beg, end, d_end, ATOL);
     std::cout << "[optimize_alpha] mid lh: " << mid.second
               << " end lh: " << lh_best_endpoint << std::endl;
-    return lh_best_endpoint >= mid.second ? best_endpoint : mid.first;
+    return lh_best_endpoint > mid.second ? best_endpoint : mid.first;
   }
 
   /* if we have gotten here, then we must have an "even" function so, grid
@@ -326,10 +352,12 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
 
   bool beg_end_pos = d_beg > 0.0 && d_end > 0.0;
 
-  for (size_t midpoints = 2; midpoints <= 128; midpoints *= 2) {
+  for (size_t midpoints = 2; midpoints <= 64; midpoints *= 2) {
     for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
+      /*
       if (midpoint % 2 == 0)
         continue;
+      */
 
       double alpha = 1.0 / (double)midpoints * midpoint;
       std::cout << "[optimize_alpha] alpha: " << alpha << std::endl;
@@ -379,13 +407,20 @@ root_location_t model_t::optimize_root_location() {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
   for (size_t i = 0; i < _tree.root_count(); ++i) {
+    std::cout << "[optimize_root_location] working rl: "
+              << _tree.root_location(i).label() << std::endl;
     root_location_t rl = optimize_alpha(_tree.root_location(i));
+    std::cout << "[optimize_root_location] alpha: " << rl.brlen_ratio
+              << std::endl;
     double rl_lh = compute_lh(rl);
+    std::cout << "[optimize_root_location] rl_lh: " << rl_lh << std::endl;
     if (rl_lh > best.second) {
       best.first = rl;
       best.second = rl_lh;
     }
   }
+  std::cout << "[optimize_root_location] finished with lh: " << best.second
+            << std::endl;
   return best.first;
 }
 
