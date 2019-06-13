@@ -37,12 +37,16 @@ int main(int argv, char **argc) {
     case 2:
       model_filename = optarg;
       break;
+    default:
+      std::cout << "An arguement was not recognized" << std::endl;
+      return 1;
     }
   }
 
   model_params_t params = parse_model_file(model_filename);
 
-  unsigned int states = static_cast<unsigned int>(std::ceil(std::sqrt(params.size())));
+  unsigned int states =
+      static_cast<unsigned int>(std::ceil(std::sqrt(params.size())));
   const pll_state_t *map = nullptr;
 
   if (states == 4)
@@ -52,7 +56,7 @@ int main(int argv, char **argc) {
 
   if (map == nullptr) {
     throw std::invalid_argument(
-        "Root digger only supports protien and nuculotide data");
+        "Root digger only supports protein and nucleotide data");
   }
 
   msa_t msa{msa_filename, map, states};
