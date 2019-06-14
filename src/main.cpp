@@ -18,12 +18,9 @@ bool __VERBOSE__ = false;
 
 int main(int argv, char **argc) {
   static struct option long_opts[] = {
-      {"msa", required_argument, 0, 0},
-      {"tree", required_argument, 0, 0},
-      {"model", required_argument, 0, 0},
-      {"freqs", required_argument, 0, 0},
-      {"verbose", no_argument, 0, 0},
-      {0, 0, 0, 0},
+      {"msa", required_argument, 0, 0},   {"tree", required_argument, 0, 0},
+      {"model", required_argument, 0, 0}, {"freqs", required_argument, 0, 0},
+      {"verbose", no_argument, 0, 0},     {0, 0, 0, 0},
   };
 
   try {
@@ -35,25 +32,32 @@ int main(int argv, char **argc) {
     std::string freqs_filename;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
-      case 0: //msa
+      case 0: // msa
         msa_filename = optarg;
         break;
-      case 1: //tree
+      case 1: // tree
         tree_filename = optarg;
         break;
-      case 2: //model
+      case 2: // model
         model_filename = optarg;
         break;
-      case 3: //freqs
+      case 3: // freqs
         freqs_filename = optarg;
         break;
-      case 4: //verbose
+      case 4: // verbose
         __VERBOSE__ = true;
         break;
-      default: 
+      default:
         throw std::invalid_argument("An argument was not recognized");
       }
     }
+
+    if (msa_filename.empty())
+      throw std::invalid_argument("An alignment file is required");
+    if (tree_filename.empty())
+      throw std::invalid_argument("A tree file is required");
+    if (model_filename.empty())
+      throw std::invalid_argument("A model file is required");
 
     model_params_t params = parse_model_file(model_filename);
     model_params_t freqs;

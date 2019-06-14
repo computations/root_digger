@@ -19,4 +19,5 @@ set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
 
 target_link_libraries(rd ${LINK_LIBS})
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
-    -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines -pedantic)
+    -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
+    -Wmisleading-indentation -pedantic)
