@@ -16,6 +16,30 @@ extern "C" {
 
 bool __VERBOSE__ = false;
 
+#define STRING(s) #s
+#define STRINGIFY(s) STRING(s)
+#define GIT_REV_STRING STRINGIFY(GIT_REV)
+
+void print_usage() {
+  std::cout << "Usage: rd [options]\n"
+            << "Version: " << GIT_REV_STRING << "\n"
+            << "Application Options:\n"
+            << "    --msa [FILE]\n"
+            << "           File containing the alignment.\n"
+            << "    --tree [NUMBER]\n"
+            << "           File containing the tree, with branch lengths.\n"
+            << "    --model [RATIO]\n"
+            << "           File containing the substitution model.\n"
+            << "           Ideally, this should be a non-reversible model.\n"
+            << "    --freqs [FILE]\n"
+            << "           Optional file containing the frequencies. If not "
+               "given, then\n"
+            << "           empirical frequencies are used instead.\n"
+            << "    --verbose\n"
+            << "       Enable debug output. Warning, extremely noisy\n"
+            << std::endl;
+}
+
 int main(int argv, char **argc) {
   static struct option long_opts[] = {
       {"msa", required_argument, 0, 0},   {"tree", required_argument, 0, 0},
@@ -52,12 +76,18 @@ int main(int argv, char **argc) {
       }
     }
 
-    if (msa_filename.empty())
-      throw std::invalid_argument("An alignment file is required");
-    if (tree_filename.empty())
-      throw std::invalid_argument("A tree file is required");
-    if (model_filename.empty())
-      throw std::invalid_argument("A model file is required");
+    if (msa_filename.empty()){
+      print_usage();
+      return 1;
+    }
+    if (tree_filename.empty()){
+      print_usage();
+      return 1;
+    }
+    if (model_filename.empty()){
+      print_usage();
+      return 1;
+    }
 
     model_params_t params = parse_model_file(model_filename);
     model_params_t freqs;
