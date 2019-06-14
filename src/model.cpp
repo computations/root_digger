@@ -57,7 +57,7 @@ model_params_t parse_model_file(const std::string &model_filename) {
 }
 
 model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
-                 const msa_t &msa) {
+                 const msa_t &msa, const model_params_t &freqs) {
 
   _tree = std::move(tree);
 
@@ -82,16 +82,6 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
                                     _tree.branch_count(), attributes);
   pll_set_subst_params(_partition, 0, rate_parameters.data());
 
-  /* set the frequencies
-   *
-   * For now we are going to just use emperical frequencies, but in the future,
-   * we can do something more clever.
-   */
-  // double *emp_freqs = pllmod_msa_empirical_frequencies(_partition);
-  std::vector<double> freqs{.25, .25, .25, .25};
-  pll_set_frequencies(_partition, 0, freqs.data());
-  // free(emp_freqs);
-
   double rate_cats[submodels] = {0};
   pll_compute_gamma_cats(1, 4, rate_cats, PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partition, rate_cats);
@@ -113,6 +103,33 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
 
   /* set pattern weights */
   pll_set_pattern_weights(_partition, msa.weights());
+
+  /* set the frequencies
+   *
+   * For now we are going to just use emperical frequencies, but in the future,
+   * we can do something more clever.
+   */
+  if (freqs.size() == 0) {
+    double *emp_freqs = pllmod_msa_empirical_frequencies(_partition);
+    for (size_t i = 0; i < msa.states(); ++i) {
+      if (emp_freqs[i] <= 0) {
+        free(emp_freqs);
+        pll_partition_destroy(_partition);
+        throw std::runtime_error("One of the state frequenices is zero while "
+                                 "using emperical frequenices");
+      }
+    }
+    pll_set_frequencies(_partition, 0, emp_freqs);
+    free(emp_freqs);
+  } else {
+    for (auto f : freqs) {
+      if (f <= 0.0){
+        pll_partition_destroy(_partition);
+        throw std::runtime_error("Frequencies with 0 entries are not allowed");
+      }
+    }
+    pll_set_frequencies(_partition, 0, freqs.data());
+  }
 }
 
 model_t::~model_t() { pll_partition_destroy(_partition); }

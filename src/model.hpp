@@ -28,7 +28,10 @@ model_params_t parse_model_file(const std::string &model_filename);
 
 class model_t {
 public:
-  model_t(const model_params_t &, rooted_tree_t, const msa_t &);
+  model_t(const model_params_t &, rooted_tree_t, const msa_t &,
+          const model_params_t &);
+  model_t(const model_params_t &p, rooted_tree_t t, const msa_t &msa)
+      : model_t(p, t, msa, model_params_t()){};
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
