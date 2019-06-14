@@ -355,6 +355,9 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
    */
 
   bool beg_end_pos = d_beg.dlh > 0.0 && d_end.dlh > 0.0;
+  dlh_t best_midpoint_lh = {-INFINITY, 0};
+  root_location_t best_midpoint;
+  bool found_midpoint = false;
 
   for (size_t midpoints = 2; midpoints <= 64; midpoints *= 2) {
     for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
@@ -369,7 +372,11 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
       std::cout << "[optimize_alpha] d_midpoint.dlh: " << d_midpoint.dlh
                 << std::endl;
       if (fabs(d_midpoint.dlh) < ATOL) {
-        return midpoint_root;
+        if (best_midpoint_lh.lh < d_midpoint.lh) {
+          best_midpoint_lh = d_midpoint;
+          best_midpoint = midpoint_root;
+          found_midpoint = true;
+        }
       }
       if ((beg_end_pos && d_midpoint.dlh < 0.0) ||
           (!beg_end_pos && d_midpoint.dlh > 0.0)) {
@@ -381,12 +388,20 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
         auto r2 = bisect(midpoint_root, d_midpoint, end, d_end, ATOL);
         std::cout << "[optimize_alpha] r1 lh: " << r1.second
                   << " r2 lh: " << r2.second << std::endl;
+        if (lh_best_endpoint.lh < best_midpoint_lh.lh) {
+          lh_best_endpoint = best_midpoint_lh;
+          best_endpoint = best_midpoint;
+        }
         if (r1.second < r2.second) {
           return lh_best_endpoint.lh >= r2.second ? best_endpoint : r2.first;
         }
         return lh_best_endpoint.lh >= r1.second ? best_endpoint : r1.first;
       }
     }
+  }
+
+  if (found_midpoint) {
+    return best_midpoint;
   }
 
   /*
