@@ -19,6 +19,14 @@ bool __VERBOSE__ = false;
 #define STRING(s) #s
 #define STRINGIFY(s) STRING(s)
 #define GIT_REV_STRING STRINGIFY(GIT_REV)
+#define GIT_COMMIT_STRING STRINGIFY(GIT_COMMIT)
+#define BUILD_DATE_STRING STRINGIFY(BUILD_DATE)
+
+void print_version() {
+  std::cout << "Version: " << GIT_REV_STRING << "\n"
+            << "Build Commit: " << GIT_COMMIT_STRING << "\n"
+            << "Build Date: " << BUILD_DATE_STRING << std::endl;
+}
 
 void print_usage() {
   std::cout << "Usage: rd [options]\n"
@@ -42,9 +50,13 @@ void print_usage() {
 
 int main(int argv, char **argc) {
   static struct option long_opts[] = {
-      {"msa", required_argument, 0, 0},   {"tree", required_argument, 0, 0},
-      {"model", required_argument, 0, 0}, {"freqs", required_argument, 0, 0},
-      {"verbose", no_argument, 0, 0},     {0, 0, 0, 0},
+      {"msa", required_argument, 0, 0},
+      {"tree", required_argument, 0, 0},
+      {"model", required_argument, 0, 0},
+      {"freqs", required_argument, 0, 0},
+      {"verbose", no_argument, 0, 0},
+      {"version", no_argument, 0, 0},
+      {0, 0, 0, 0},
   };
 
   try {
@@ -71,22 +83,23 @@ int main(int argv, char **argc) {
       case 4: // verbose
         __VERBOSE__ = true;
         break;
+      case 5: //version
+        print_version();
+        return 0;
       default:
         throw std::invalid_argument("An argument was not recognized");
       }
     }
 
-    if (msa_filename.empty()){
+    if (msa_filename.empty()) {
       print_usage();
       return 1;
     }
-    if (tree_filename.empty()){
+    if (tree_filename.empty()) {
       print_usage();
-      return 1;
     }
-    if (model_filename.empty()){
-      print_usage();
-      return 1;
+    if (model_filename.empty()) {
+      throw std::invalid_argument("A model file is required");
     }
 
     model_params_t params = parse_model_file(model_filename);
@@ -126,6 +139,5 @@ int main(int argv, char **argc) {
               << e.what() << std::endl;
     return 1;
   }
-
   return 0;
 }
