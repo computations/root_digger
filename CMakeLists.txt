@@ -4,7 +4,7 @@ project(root_digger)
 find_package(Git)
 if(GIT_FOUND)
     execute_process(
-        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=1
+        COMMAND ${GIT_EXECUTABLE} describe --tags
         WORKING_DIRECTORY "${local_dir}"
         OUTPUT_VARIABLE RD_BUILD_VERSION
         ERROR_QUIET

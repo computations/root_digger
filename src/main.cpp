@@ -59,6 +59,10 @@ int main(int argv, char **argc) {
       {0, 0, 0, 0},
   };
 
+  if (argv == 1){
+    print_usage();
+    return 0;
+  }
   try {
     int c;
     int index = 0;
