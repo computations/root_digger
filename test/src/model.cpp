@@ -1,6 +1,7 @@
 #include "data.hpp"
 #include <catch2/catch.hpp>
 #include <cmath>
+#include <debug.h>
 #include <model.hpp>
 
 model_params_t params[] = {

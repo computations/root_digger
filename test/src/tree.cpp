@@ -4,6 +4,7 @@ extern "C" {
 #include "data.hpp"
 #include <catch2/catch.hpp>
 #include <tree.hpp>
+#include <debug.h>
 #include <utility>
 
 root_location_t find_node(const rooted_tree_t &tree, const std::string &label) {

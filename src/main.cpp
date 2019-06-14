@@ -9,9 +9,12 @@ extern "C" {
 #include <string>
 #include <vector>
 
+#include "debug.h"
 #include "model.hpp"
 #include "msa.hpp"
 #include "tree.hpp"
+
+bool __VERBOSE__ = false;
 
 int main(int argv, char **argc) {
   static struct option long_opts[] = {
@@ -19,6 +22,7 @@ int main(int argv, char **argc) {
       {"tree", required_argument, 0, 0},
       {"model", required_argument, 0, 0},
       {"freqs", required_argument, 0, 0},
+      {"verbose", no_argument, 0, 0},
       {0, 0, 0, 0},
   };
 
@@ -31,19 +35,22 @@ int main(int argv, char **argc) {
     std::string freqs_filename;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
-      case 0:
+      case 0: //msa
         msa_filename = optarg;
         break;
-      case 1:
+      case 1: //tree
         tree_filename = optarg;
         break;
-      case 2:
+      case 2: //model
         model_filename = optarg;
         break;
-      case 3:
+      case 3: //freqs
         freqs_filename = optarg;
         break;
-      default:
+      case 4: //verbose
+        __VERBOSE__ = true;
+        break;
+      default: 
         throw std::invalid_argument("An argument was not recognized");
       }
     }

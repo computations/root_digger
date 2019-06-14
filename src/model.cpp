@@ -1,3 +1,4 @@
+#include "debug.h"
 #include "model.hpp"
 #include <cmath>
 #include <fstream>
@@ -6,8 +7,6 @@
 extern "C" {
 #include <libpll/pll_msa.h>
 }
-
-#include <iostream>
 
 std::string read_file_contents(std::ifstream &infile) {
   std::string str;
@@ -85,7 +84,7 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
   double rate_cats[submodels] = {0};
   pll_compute_gamma_cats(1, 4, rate_cats, PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partition, rate_cats);
-  std::cout << "[model_t] rate: " << rate_cats[0] << std::endl;
+  debug_print("rate: %f", rate_cats[0]);
 
   /* update the invariant sites */
   pll_update_invariant_sites(_partition);
@@ -123,7 +122,7 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
     free(emp_freqs);
   } else {
     for (auto f : freqs) {
-      if (f <= 0.0){
+      if (f <= 0.0) {
         pll_partition_destroy(_partition);
         throw std::runtime_error("Frequencies with 0 entries are not allowed");
       }
@@ -147,16 +146,6 @@ double model_t::compute_lh(const root_location_t &root_location) {
   int result =
       pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
                                branch_lengths.data(), pmatrix_indices.size());
-
-  /*
-  std::cout << "[compute_lh] updating partials with these pmatricies"
-            << std::endl;
-  for (size_t i = 0; i < pmatrix_indices.size(); ++i) {
-    std::cout << "brlen: " << branch_lengths[i]
-              << ", index: " << pmatrix_indices[i] << std::endl;
-    pll_show_pmatrix(_partition, pmatrix_indices[i], 10);
-  }
-  */
 
   if (result == PLL_FAILURE) {
     throw std::runtime_error(pll_errmsg);
@@ -238,13 +227,11 @@ dlh_t model_t::compute_dlh(const root_location_t &root) {
                              std::to_string(root_prime.edge->length));
   }
   if (std::isinf(fxh) && std::isinf(fx)) {
-    std::cout << "[compute_dlh] both evals are inf, returning 0 for derivative"
-              << std::endl;
+    debug_string("Both evals are -inf, returning a 0 derivative");
     return {fx, 0};
   }
   double dlh = (fxh - fx) / EPSILON;
-  std::cout << "[compute_dlh] dlh: " << dlh * sign << ", fx: " << fx
-            << ", fxh: " << fxh << std::endl;
+  debug_print("dlh: %f, fx: %f, fxh: %f", dlh * sign, fx, fxh);
   ret.dlh = dlh * sign;
   return ret;
 }
@@ -260,9 +247,9 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
   auto d_midpoint = compute_dlh(midpoint);
 
   if (depth > 64) {
-    std::cout << "[bisect] depth too low, returning midpoint with ratio: "
-              << midpoint.brlen_ratio << ", lh: " << compute_lh_root(midpoint)
-              << std::endl;
+    debug_print(
+        "depth exceeded limit, returning midpoint with ratio: %f, lh: %f",
+        midpoint.brlen_ratio, d_midpoint.lh);
     return {midpoint, d_midpoint.lh};
   }
 
@@ -271,7 +258,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
 
   if (fabs(d_midpoint.dlh) < atol) {
-    std::cout << "[bisect] case 1" << std::endl;
+    debug_string("case 1");
     return {midpoint, d_midpoint.lh};
   }
 
@@ -281,7 +268,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg.dlh > 0.0 && d_end.dlh > 0.0 && d_midpoint.dlh < 0.0) ||
       (d_beg.dlh < 0.0 && d_end.dlh < 0.0 && d_midpoint.dlh > 0.0)) {
-    std::cout << "[bisect] case 2" << std::endl;
+    debug_string("case 2");
     auto r1 = bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
     auto r2 = bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
     if (r1.second < r2.second) {
@@ -294,9 +281,9 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg.dlh < 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh < 0.0)) {
-    std::cout << "[bisect] case 3, d_beg: " << d_beg.dlh
-              << ", d_midpoint: " << d_midpoint.dlh << ", d_end: " << d_end.dlh
-              << ", alpha: " << midpoint.brlen_ratio << std::endl;
+    debug_print(
+        "case 3, d_beg.dlh: %f, d_midpoint.dlh: %f, d_end:%f, alpha: %f",
+        d_beg.lh, d_midpoint.dlh, d_end.dlh, midpoint.brlen_ratio);
     return bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
   }
 
@@ -305,7 +292,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg.dlh < 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh < 0.0)) {
-    std::cout << "[bisect] case 4" << std::endl;
+    debug_string("case 4")
     return bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
   }
 
@@ -342,27 +329,23 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   root_location_t best_endpoint = d_beg.lh >= d_end.lh ? beg : end;
   auto lh_best_endpoint = d_beg.lh >= d_end.lh ? d_beg : d_end;
   if (d_beg.lh >= d_end.lh) {
-    std::cout << "[optimize_alpha] beg end point is best" << std::endl;
+    debug_string("beg endpoint is best");
   } else {
-    std::cout << "[optimize_alpha] end end point is best" << std::endl;
+    debug_string("end endpoint is best");
   }
 
-  std::cout << "[optimize_alpha] lh_endpoint.dlh: " << lh_best_endpoint.dlh
-            << std::endl;
-  std::cout << "[optimize_alpha] d_beg.dlh: " << d_beg.dlh
-            << " d_end.dlh: " << d_end.dlh << std::endl;
+  debug_print("lh_endpoint.dlh: %f", lh_best_endpoint.dlh);
+  debug_print("d_beg.dlh: %f, d_end.dlh: %f", d_beg.dlh, d_end.dlh);
 
   if (fabs(d_beg.dlh) < ATOL || fabs(d_end.dlh) < ATOL) {
-    std::cout << "[optimize_alpha] one of the endpoints is sufficient"
-              << std::endl;
+    debug_string("one of the endpoints is sufficient");
     return best_endpoint;
   }
 
   if ((d_beg.dlh < 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_end.dlh < 0.0)) {
     auto mid = bisect(beg, d_beg, end, d_end, ATOL);
-    std::cout << "[optimize_alpha] mid lh: " << mid.second
-              << " end lh: " << lh_best_endpoint.lh << std::endl;
+    debug_print("mid lh: %f, end lh: %f", mid.second, lh_best_endpoint.lh);
     return lh_best_endpoint.lh > mid.second ? best_endpoint : mid.first;
   }
 
@@ -382,12 +365,11 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
         continue;
 
       double alpha = 1.0 / (double)midpoints * midpoint;
-      std::cout << "[optimize_alpha] alpha: " << alpha << std::endl;
+      debug_print("alpha: %f", alpha);
       root_location_t midpoint_root{beg};
       midpoint_root.brlen_ratio = alpha;
       auto d_midpoint = compute_dlh(midpoint_root);
-      std::cout << "[optimize_alpha] d_midpoint.dlh: " << d_midpoint.dlh
-                << std::endl;
+      debug_print("d_midpoint.dlh: %f", d_midpoint.dlh);
       if (fabs(d_midpoint.dlh) < ATOL) {
         if (best_midpoint_lh.lh < d_midpoint.lh) {
           best_midpoint_lh = d_midpoint;
@@ -403,8 +385,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
          */
         auto r1 = bisect(beg, d_beg, midpoint_root, d_midpoint, ATOL);
         auto r2 = bisect(midpoint_root, d_midpoint, end, d_end, ATOL);
-        std::cout << "[optimize_alpha] r1 lh: " << r1.second
-                  << " r2 lh: " << r2.second << std::endl;
+        debug_print("r1 lh: %f, r2 lh: %f", r1.second, r2.second);
         if (lh_best_endpoint.lh < best_midpoint_lh.lh) {
           lh_best_endpoint = best_midpoint_lh;
           best_endpoint = best_midpoint;
@@ -442,20 +423,17 @@ root_location_t model_t::optimize_root_location() {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
   for (size_t i = 0; i < _tree.root_count(); ++i) {
-    std::cout << "[optimize_root_location] working rl: "
-              << _tree.root_location(i).label() << std::endl;
+    debug_print("working rl: %s", _tree.root_location(i).label().c_str());
     root_location_t rl = optimize_alpha(_tree.root_location(i));
-    std::cout << "[optimize_root_location] alpha: " << rl.brlen_ratio
-              << std::endl;
+    debug_print("alpha: %f", rl.brlen_ratio);
     double rl_lh = compute_lh(rl);
-    std::cout << "[optimize_root_location] rl_lh: " << rl_lh << std::endl;
+    debug_print("rl_lh: %f", rl_lh);
     if (rl_lh > best.second) {
       best.first = rl;
       best.second = rl_lh;
     }
   }
-  std::cout << "[optimize_root_location] finished with lh: " << best.second
-            << std::endl;
+  debug_print("finished with lh: %f", best.second);
   return best.first;
 }
 

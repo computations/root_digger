@@ -1,3 +1,4 @@
+#include "debug.h"
 #include "tree.hpp"
 extern "C" {
 #include <libpll/pll_tree.h>
@@ -67,8 +68,7 @@ std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
 }
 
 void rooted_tree_t::generate_root_locations() {
-  std::cout << "[generate_root_locations] generating root locations"
-            << std::endl;
+  debug_string("generating root locations");
   auto edges = full_traverse();
 
   std::unordered_set<pll_unode_t *> node_set;
@@ -115,8 +115,7 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
 }
 
 void rooted_tree_t::root_by(const root_location_t &root_location) {
-  std::cout << "[root_by] rooting by node label: " << root_location.label()
-            << std::endl;
+  debug_print("rooting by node labeled: %s", root_location.label().c_str());
   if (root_location.edge == _tree->vroot) {
     update_root(root_location);
     return;
@@ -226,27 +225,14 @@ bool rooted_tree_t::rooted() const {
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_operations(const root_location_t &new_root) {
-  /*
-  {
-    auto trav_buf = full_traverse();
-    for (auto node : trav_buf) {
-      std::cout << "[generate_operations] traversal node label: "
-                << (node->label != nullptr ? node->label : "null")
-                << ", pmatrix index: " << node->pmatrix_index
-                << ", clv index: " << node->clv_index << std::endl;
-    }
-  }
-  */
-
   root_by(new_root);
 
   auto trav_buf = full_traverse();
-  std::cout << "[generate_operations] traversal after root" << std::endl;
+  debug_string("traversal after root");
   for (auto node : trav_buf) {
-    std::cout << "[generate_operations] traversal node label: "
-              << (node->label != nullptr ? node->label : "null")
-              << ", pmatrix index: " << node->pmatrix_index
-              << ", clv index: " << node->clv_index << std::endl;
+    debug_print("traversal node label: %s, pmatrix index: %d, clv index: %d",
+                 (node->label != nullptr ? node->label : "null"),
+                 node->pmatrix_index, node->clv_index);
   }
 
   std::vector<pll_operation_t> ops(trav_buf.size());
