@@ -12,6 +12,11 @@ extern "C" {
 
 typedef std::vector<double> model_params_t;
 
+struct dlh_t {
+  double lh;
+  double dlh;
+};
+
 std::string read_file_contents(std::ifstream &infile);
 
 double parse_param(std::string::const_iterator begin,
@@ -27,15 +32,15 @@ public:
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
-  double compute_dlh(const root_location_t &root_location);
+  dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root);
   root_location_t optimize_root_location();
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
 private:
   std::pair<root_location_t, double>
-  bisect(const root_location_t &beg, double d_beg, const root_location_t &end,
-         double d_end, double atol, size_t depth);
+  bisect(const root_location_t &beg, dlh_t d_beg, const root_location_t &end,
+         dlh_t d_end, double atol, size_t depth);
 
   rooted_tree_t _tree;
   pll_partition_t *_partition;

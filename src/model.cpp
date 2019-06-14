@@ -188,9 +188,12 @@ double model_t::compute_lh_root(const root_location_t &root) {
 
 /*
  * Use a tangent method to compute the derivative
+ * TODO: Allow for the return of the likelihood at root, so that we can save an
+ * evalutation.
  */
-double model_t::compute_dlh(const root_location_t &root) {
+dlh_t model_t::compute_dlh(const root_location_t &root) {
 
+  dlh_t ret;
   constexpr double EPSILON = 1e-8;
   root_location_t root_prime{root};
   root_prime.brlen_ratio += EPSILON;
@@ -201,6 +204,7 @@ double model_t::compute_dlh(const root_location_t &root) {
   }
 
   double fx = compute_lh_root(root);
+  ret.lh = fx;
 
   if (std::isnan(fx)) {
     throw std::runtime_error("fx is not finite when computing derivative: " +
@@ -219,46 +223,47 @@ double model_t::compute_dlh(const root_location_t &root) {
   if (std::isinf(fxh) && std::isinf(fx)) {
     std::cout << "[compute_dlh] both evals are inf, returning 0 for derivative"
               << std::endl;
-    return 0;
+    return {fx, 0};
   }
   double dlh = (fxh - fx) / EPSILON;
   std::cout << "[compute_dlh] dlh: " << dlh * sign << ", fx: " << fx
             << ", fxh: " << fxh << std::endl;
-  return dlh * sign;
+  ret.dlh = dlh * sign;
+  return ret;
 }
 
 std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
-                                                   double d_beg,
+                                                   dlh_t d_beg,
                                                    const root_location_t &end,
-                                                   double d_end, double atol,
+                                                   dlh_t d_end, double atol,
                                                    size_t depth = 0) {
   root_location_t midpoint{beg};
   midpoint.brlen_ratio = (beg.brlen_ratio + end.brlen_ratio) / 2;
 
-  double d_midpoint = compute_dlh(midpoint);
+  auto d_midpoint = compute_dlh(midpoint);
 
   if (depth > 64) {
     std::cout << "[bisect] depth too low, returning midpoint with ratio: "
               << midpoint.brlen_ratio << ", lh: " << compute_lh_root(midpoint)
               << std::endl;
-    return {midpoint, compute_lh_root(midpoint)};
+    return {midpoint, d_midpoint.lh};
   }
 
   /* case 1: d_midpoint is within tolerance of 0.0
    * We found a root, and should return
    */
 
-  if (fabs(d_midpoint) < atol) {
+  if (fabs(d_midpoint.dlh) < atol) {
     std::cout << "[bisect] case 1" << std::endl;
-    return {midpoint, compute_lh_root(midpoint)};
+    return {midpoint, d_midpoint.lh};
   }
 
   /* case 2: midpoint is opposite sign of both beg and end
    * There are at least 2 roots, so we recurse on both sides, and return the one
    * with the best LH
    */
-  if ((d_beg > 0.0 && d_end > 0.0 && d_midpoint < 0.0) ||
-      (d_beg < 0.0 && d_end < 0.0 && d_midpoint > 0.0)) {
+  if ((d_beg.dlh > 0.0 && d_end.dlh > 0.0 && d_midpoint.dlh < 0.0) ||
+      (d_beg.dlh < 0.0 && d_end.dlh < 0.0 && d_midpoint.dlh > 0.0)) {
     std::cout << "[bisect] case 2" << std::endl;
     auto r1 = bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
     auto r2 = bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
@@ -270,10 +275,10 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
   /* case 3: end and midpoint share a sign, while beg has the opposite sign
    * In this case, there is a root between midpoint and beg
    */
-  if ((d_beg < 0.0 && d_midpoint > 0.0 && d_end > 0.0) ||
-      (d_beg > 0.0 && d_midpoint < 0.0 && d_end < 0.0)) {
-    std::cout << "[bisect] case 3, d_beg: " << d_beg
-              << ", d_midpoint: " << d_midpoint << ", d_end: " << d_end
+  if ((d_beg.dlh < 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh > 0.0) ||
+      (d_beg.dlh > 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh < 0.0)) {
+    std::cout << "[bisect] case 3, d_beg: " << d_beg.dlh
+              << ", d_midpoint: " << d_midpoint.dlh << ", d_end: " << d_end.dlh
               << ", alpha: " << midpoint.brlen_ratio << std::endl;
     return bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
   }
@@ -281,17 +286,17 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
   /* case 4: beg and midpoint share a sign, while end has the opposite sign
    * In this case, there is a root between midpoint and end
    */
-  if ((d_beg < 0.0 && d_midpoint < 0.0 && d_end > 0.0) ||
-      (d_beg > 0.0 && d_midpoint > 0.0 && d_end < 0.0)) {
+  if ((d_beg.dlh < 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh > 0.0) ||
+      (d_beg.dlh > 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh < 0.0)) {
     std::cout << "[bisect] case 4" << std::endl;
     return bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
   }
 
   /* case 5: something went wrong */
-  throw std::runtime_error(
-      "Bisection failed to converge with interval : " + std::to_string(d_beg) +
-      ", " + std::to_string(d_end) +
-      ", midpoint: " + std::to_string(d_midpoint));
+  throw std::runtime_error("Bisection failed to converge with interval : " +
+                           std::to_string(d_beg.dlh) + ", " +
+                           std::to_string(d_end.dlh) +
+                           ", midpoint.dlh: " + std::to_string(d_midpoint.dlh));
 }
 
 /* Find the optimum for the ratio via the bisection method */
@@ -299,7 +304,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   constexpr double ATOL = 1e-7;
   double lh = compute_lh(root);
   if (std::isnan(lh)) {
-    throw std::runtime_error("initial liklihood calculation is not finite");
+    throw std::runtime_error("initial likelihood calculation is not finite");
   }
   root_location_t beg{root};
   beg.brlen_ratio = 0.0;
@@ -307,42 +312,41 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   root_location_t end{root};
   end.brlen_ratio = 1.0;
 
-  double lh_beg = compute_lh_root(beg);
-  double d_beg = compute_dlh(beg);
+  auto d_beg = compute_dlh(beg);
 
-  double lh_end = compute_lh_root(end);
-  double d_end = compute_dlh(end);
+  auto d_end = compute_dlh(end);
 
-  root_location_t best_endpoint = lh_beg >= lh_end ? beg : end;
-  double lh_best_endpoint = lh_beg >= lh_end ? lh_beg : lh_end;
-  if (lh_beg >= lh_end) {
-    std::cout << "[optimize_alpha] beg end point is best" << std::endl;
-  } else {
-    std::cout << "[optimize_alpha] end end point is best" << std::endl;
-  }
-
-  std::cout << "[optimize_alpha] lh_endpoint: " << lh_best_endpoint
-            << std::endl;
-  std::cout << "[optimize_alpha] d_beg: " << d_beg << " d_end: " << d_end
-            << std::endl;
-
-  if (fabs(d_beg) < ATOL || fabs(d_end) < ATOL) {
-    std::cout << "[optimize_alpha] one of the endpoints is sufficient"
-              << std::endl;
-    return best_endpoint;
-  }
-
-  if (std::isnan(d_beg) || std::isnan(d_end)) {
+  if (std::isnan(d_beg.dlh) || std::isnan(d_end.dlh)) {
     throw std::runtime_error(
         "Initial derivatives failed when optimizing alpha: " +
         std::to_string(root.edge->length));
   }
 
-  if ((d_beg < 0.0 && d_end > 0.0) || (d_beg > 0.0 && d_end < 0.0)) {
+  root_location_t best_endpoint = d_beg.lh >= d_end.lh ? beg : end;
+  auto lh_best_endpoint = d_beg.lh >= d_end.lh ? d_beg : d_end;
+  if (d_beg.lh >= d_end.lh) {
+    std::cout << "[optimize_alpha] beg end point is best" << std::endl;
+  } else {
+    std::cout << "[optimize_alpha] end end point is best" << std::endl;
+  }
+
+  std::cout << "[optimize_alpha] lh_endpoint.dlh: " << lh_best_endpoint.dlh
+            << std::endl;
+  std::cout << "[optimize_alpha] d_beg.dlh: " << d_beg.dlh
+            << " d_end.dlh: " << d_end.dlh << std::endl;
+
+  if (fabs(d_beg.dlh) < ATOL || fabs(d_end.dlh) < ATOL) {
+    std::cout << "[optimize_alpha] one of the endpoints is sufficient"
+              << std::endl;
+    return best_endpoint;
+  }
+
+  if ((d_beg.dlh < 0.0 && d_end.dlh > 0.0) ||
+      (d_beg.dlh > 0.0 && d_end.dlh < 0.0)) {
     auto mid = bisect(beg, d_beg, end, d_end, ATOL);
     std::cout << "[optimize_alpha] mid lh: " << mid.second
-              << " end lh: " << lh_best_endpoint << std::endl;
-    return lh_best_endpoint > mid.second ? best_endpoint : mid.first;
+              << " end lh: " << lh_best_endpoint.lh << std::endl;
+    return lh_best_endpoint.lh > mid.second ? best_endpoint : mid.first;
   }
 
   /* if we have gotten here, then we must have an "even" function so, grid
@@ -350,26 +354,25 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
    * do bisection with
    */
 
-  bool beg_end_pos = d_beg > 0.0 && d_end > 0.0;
+  bool beg_end_pos = d_beg.dlh > 0.0 && d_end.dlh > 0.0;
 
   for (size_t midpoints = 2; midpoints <= 64; midpoints *= 2) {
     for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
-      /*
       if (midpoint % 2 == 0)
         continue;
-      */
 
       double alpha = 1.0 / (double)midpoints * midpoint;
       std::cout << "[optimize_alpha] alpha: " << alpha << std::endl;
       root_location_t midpoint_root{beg};
       midpoint_root.brlen_ratio = alpha;
-      double d_midpoint = compute_dlh(midpoint_root);
-      std::cout << "[optimize_alpha] d_midpoint: " << d_midpoint << std::endl;
-      if (fabs(d_midpoint) < ATOL) {
+      auto d_midpoint = compute_dlh(midpoint_root);
+      std::cout << "[optimize_alpha] d_midpoint.dlh: " << d_midpoint.dlh
+                << std::endl;
+      if (fabs(d_midpoint.dlh) < ATOL) {
         return midpoint_root;
       }
-      if ((beg_end_pos && d_midpoint < 0.0) ||
-          (!beg_end_pos && d_midpoint > 0.0)) {
+      if ((beg_end_pos && d_midpoint.dlh < 0.0) ||
+          (!beg_end_pos && d_midpoint.dlh > 0.0)) {
         /*
          * we have a midpoint, so now we need to figure out if it is a min or a
          * maximum.
@@ -379,9 +382,9 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
         std::cout << "[optimize_alpha] r1 lh: " << r1.second
                   << " r2 lh: " << r2.second << std::endl;
         if (r1.second < r2.second) {
-          return lh_best_endpoint >= r2.second ? best_endpoint : r2.first;
+          return lh_best_endpoint.lh >= r2.second ? best_endpoint : r2.first;
         }
-        return lh_best_endpoint >= r1.second ? best_endpoint : r1.first;
+        return lh_best_endpoint.lh >= r1.second ? best_endpoint : r1.first;
       }
     }
   }

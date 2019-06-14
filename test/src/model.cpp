@@ -49,8 +49,9 @@ TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
           continue;
         }
         model.compute_lh(tree.root_location(i));
-        double dlh = model.compute_dlh(tree.root_location(i));
-        CHECK(std::isfinite(dlh));
+        auto dlh = model.compute_dlh(tree.root_location(i));
+        CHECK(std::isfinite(dlh.lh));
+        CHECK(std::isfinite(dlh.dlh));
       }
     }
   }
@@ -122,7 +123,6 @@ TEST_CASE("model_t optimize whole tree", "[model_t]") {
   }
 }
 
-/*
 TEST_CASE("model_t liklihood computation", "[model_t]") {
   for (auto &ds : data_files_dna) {
     for (auto &mp : params) {
@@ -135,9 +135,9 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
         }
         auto rl = tree.root_location(i);
         model.compute_lh(rl);
-        CHECK(std::fabs(model.compute_lh(rl) - model.compute_lh_root(rl)) == Approx(0.0));
+        CHECK(std::fabs(model.compute_lh(rl) - model.compute_lh_root(rl)) ==
+              Approx(0.0));
       }
     }
   }
 }
-*/
