@@ -11,21 +11,51 @@ is to say, it is unknown which node is the most recent common ancestor of all
 the taxa present in the phylogenetic tree. This information is often desirable,
 as it provides a direction to the edges in the tree.  There exist several
 methods to recover a root, including midpoint rooting and using a special taxon
-as an outgroup. Additionally, a non-reversable Markov model can be used to
-compute the likelihood of a root. In this paper, we present software which uses
-a provided non-reversable model to compute the most likely root location.
+as a so called outgroup. Additionally, a non-reversable Markov model can be used
+to compute the likelihood of a root. In this paper, we present software which
+uses a provided non-reversable model to compute the most likely root location.
 \end{abstract}
 
 \maketitle
 
+% Main Points:
+% - Rerunning analysis with outgroups is expensive, and can introduce errors
+% - Midpoint rooting is a joke
+% - This is fast and accurate.
+
+
 \section{Introduction}
 
-
+% Outline:
+% - What is rooting
+% - Why do we need it
+% - Existing methods
+% - What this method is
 
 \section{Background}
 
+% Outline:
+% - What a non-reversable model is
+% - How it roots a tree
+
+\section{The Software}
+
+% Outline:
+% - Options
+% - How the software works (maybe)
+
 \section{Experiment and Results}
 
+% Outline:
+% - indel data generation
+% - run setup (cpu, memory etc)
+% - show results (time, accuracy)
+%   - Accuracy should be measured by getting the root on the right edge, as well
+%   as how far along that edge the root is.
+
 \section{Conclusion}
+
+% Outline:
+% - Tell 'em what you told 'em
 
 \end{document}
