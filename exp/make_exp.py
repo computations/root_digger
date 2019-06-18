@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import shutil
 import subprocess
+import sys
 
 if not shutil.which("indelible"):
     print("Please add indelible to your path")
@@ -23,11 +23,15 @@ CONTROL_FILE= """
 [EVOLVE] p1 1 seqs
 """
 
+RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --model {model} --freqs {freqs}"
+model_file = "random_unsym.model"
+freqs_file = 'uniform.freqs'
+
 if not os.path.exists('active_exp'):
     os.mkdir('active_exp')
 
 for taxa in [10, 100, 1000, 10000]:
-    for sites in [100, 1000, 10000, 100000]:
+    for sites in [100, 1000, 10000]:
         print("taxa: ", taxa, "sites: ", sites)
         exp_dir = os.path.join("active_exp",
                 "{taxa}taxa_{sites}sites".format(taxa=taxa, sites=sites))
@@ -42,5 +46,13 @@ for taxa in [10, 100, 1000, 10000]:
         old_dir = os.getcwd()
         os.chdir(exp_dir)
         subprocess.run("indelible", shell=True, check=True)
+        print(RD.format(msa="seqs_TRUE.phy", tree=os.path.join("../..",
+            tree_file), model=os.path.join('../../',model_file),
+            freqs=os.path.join("../../", freqs_file)).split(' '))
+        rd_output = subprocess.run(RD.format(msa="seqs_TRUE.phy", tree=os.path.join("../..",
+            tree_file), model=os.path.join('../../',model_file),
+            freqs=os.path.join("../../", freqs_file)).split(' '),
+            capture_output=True)
+        with open('rd_output', 'w') as rd_outfile:
+            rd_outfile.write(rd_output.stdout.decode('utf-8'))
         os.chdir(old_dir)
-
