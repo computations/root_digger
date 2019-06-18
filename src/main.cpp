@@ -34,9 +34,9 @@ void print_usage() {
             << "Application Options:\n"
             << "    --msa [FILE]\n"
             << "           File containing the alignment.\n"
-            << "    --tree [NUMBER]\n"
+            << "    --tree [FILE]\n"
             << "           File containing the tree, with branch lengths.\n"
-            << "    --model [RATIO]\n"
+            << "    --model [FILE]\n"
             << "           File containing the substitution model.\n"
             << "           Ideally, this should be a non-reversible model.\n"
             << "    --freqs [FILE]\n"
@@ -44,7 +44,7 @@ void print_usage() {
                "given, then\n"
             << "           empirical frequencies are used instead.\n"
             << "    --verbose\n"
-            << "       Enable debug output. Warning, extremely noisy\n"
+            << "           Enable debug output. Warning, extremely noisy\n"
             << std::endl;
 }
 
