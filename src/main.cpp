@@ -59,7 +59,7 @@ int main(int argv, char **argc) {
       {0, 0, 0, 0},
   };
 
-  if (argv == 1){
+  if (argv == 1) {
     print_usage();
     return 0;
   }
@@ -87,7 +87,7 @@ int main(int argv, char **argc) {
       case 4: // verbose
         __VERBOSE__ = true;
         break;
-      case 5: //version
+      case 5: // version
         print_version();
         return 0;
       default:
@@ -143,5 +143,6 @@ int main(int argv, char **argc) {
               << e.what() << std::endl;
     return 1;
   }
+
   return 0;
 }
