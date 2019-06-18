@@ -211,11 +211,6 @@ void rooted_tree_t::unroot() {
   _tree->edge_count -= 1;
 
   right_child->pmatrix_index = left_child->pmatrix_index;
-
-  int err = pll_utree_check_integrity(_tree);
-  if (err == PLL_FAILURE) {
-    throw std::runtime_error(pll_errmsg);
-  }
 }
 
 bool rooted_tree_t::rooted() const {
@@ -262,10 +257,6 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   root_op_it->child2_clv_index = root_node->next->back->clv_index;
   root_op_it->child2_scaler_index = root_node->next->back->scaler_index;
   root_op_it->child2_matrix_index = root_node->next->back->pmatrix_index;
-
-  if (pll_utree_check_integrity(_tree) == PLL_FAILURE) {
-    throw std::runtime_error(pll_errmsg);
-  }
 
   return std::make_tuple(ops, pmatrix_indices, branch_lengths);
 }

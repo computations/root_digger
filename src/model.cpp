@@ -72,7 +72,16 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    * at this moment.
    */
   unsigned int attributes = 0;
-  attributes |= PLL_ATTRIB_ARCH_AVX;
+  if(PLL_STAT(avx2_present)){
+    attributes |= PLL_ATTRIB_ARCH_AVX2;
+  }
+  else if(PLL_STAT(avx_present)){
+    attributes |= PLL_ATTRIB_ARCH_AVX;
+  }
+  else if(PLL_STAT(sse42_present)){
+    attributes |= PLL_ATTRIB_ARCH_SSE;
+  }
+
   attributes |= PLL_ATTRIB_NONREV;
 
   _partition = pll_partition_create(_tree.tip_count(), _tree.branch_count(),
@@ -292,7 +301,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg.dlh < 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh < 0.0)) {
-    debug_string("case 4")
+    debug_string("case 4");
     return bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
   }
 
@@ -359,7 +368,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   root_location_t best_midpoint;
   bool found_midpoint = false;
 
-  for (size_t midpoints = 2; midpoints <= 64; midpoints *= 2) {
+  for (size_t midpoints = 2; midpoints <= 32; midpoints *= 2) {
     for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
       if (midpoint % 2 == 0)
         continue;
