@@ -3,4 +3,4 @@
 	url = https://github.com/catchorg/Catch2.git
 [submodule "lib/pll-modules"]
 	path = lib/pll-modules
-	url = https://github.com/ddarriba/pll-modules
+	url = https://github.com/computations/pll-modules
