@@ -13,7 +13,7 @@ file(COPY
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LOCALDEPS_DIR}/lib)
 
 find_package(GSL)
-if(GSL_FOUND)
+if(GSL_FOUND AND !STATIC_GSL)
     set(GSL_LIBS gsl gslcblas PARENT_SCOPE)
 else()
     set(GSL_PREFIX "${CMAKE_BINARY_DIR}/localdeps/")
@@ -21,7 +21,7 @@ else()
     include(ExternalProject)
     ExternalProject_Add(gsl
         URL ftp://ftp.gnu.org/gnu/gsl/gsl-2.5.tar.gz
-        URL_HASH SHA 9b3a32ba4f4e79fc6164fdc62e56003ae6e991e5
+        URL_HASH SHA1=9b3a32ba4f4e79fc6164fdc62e56003ae6e991e5
         SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/gsl
         CONFIGURE_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gsl/autogen.sh &&
         ${CMAKE_CURRENT_BINARY_DIR}/gsl/configure --prefix=${GSL_PREFIX}

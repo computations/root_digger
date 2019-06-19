@@ -22,8 +22,6 @@ if(GIT_FOUND)
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
-find_package(GSL REQUIRED)
-
 string(TIMESTAMP RD_BUILD_DATE "%Y-%m-%dT%H:%M:%SZ")
 
 set(LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
