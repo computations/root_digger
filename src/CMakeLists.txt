@@ -15,13 +15,13 @@ set_target_properties(rd PROPERTIES
 
 # We duplicate the libararies here to solve a dumb link time error
 set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
-    gsl cblas)
+    gsl)
 
 target_link_libraries(rd ${LINK_LIBS})
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
     -Wmisleading-indentation -pedantic)
-target_compile_definitions(rd PRIVATE 
+target_compile_definitions(rd PRIVATE
     GIT_REV=${RD_BUILD_VERSION}
     GIT_COMMIT=${RD_BUILD_COMMIT}
     BUILD_DATE=${RD_BUILD_DATE})
