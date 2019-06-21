@@ -2,6 +2,7 @@
 #include "model.hpp"
 #include <cmath>
 #include <fstream>
+#include <random>
 #include <string>
 #include <unordered_map>
 extern "C" {
@@ -55,7 +56,7 @@ model_params_t parse_model_file(const std::string &model_filename) {
   return parse_model_params(read_file_contents(model_file));
 }
 
-model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
+model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
                  const msa_t &msa, const model_params_t &freqs) {
 
   _tree = std::move(tree);
@@ -72,13 +73,11 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
    * at this moment.
    */
   unsigned int attributes = 0;
-  if(PLL_STAT(avx2_present)){
+  if (PLL_STAT(avx2_present)) {
     attributes |= PLL_ATTRIB_ARCH_AVX2;
-  }
-  else if(PLL_STAT(avx_present)){
+  } else if (PLL_STAT(avx_present)) {
     attributes |= PLL_ATTRIB_ARCH_AVX;
-  }
-  else if(PLL_STAT(sse42_present)){
+  } else if (PLL_STAT(sse42_present)) {
     attributes |= PLL_ATTRIB_ARCH_SSE;
   }
 
@@ -138,6 +137,8 @@ model_t::model_t(const model_params_t &rate_parameters, rooted_tree_t tree,
     }
     pll_set_frequencies(_partition, 0, freqs.data());
   }
+
+  _subst_params = std::move(rate_parameters);
 }
 
 model_t::~model_t() { pll_partition_destroy(_partition); }
@@ -428,7 +429,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
       "Initial derivatives failed when optimizing alpha, ran out of cases");
 }
 
-root_location_t model_t::optimize_root_location() {
+std::pair<root_location_t, double> model_t::optimize_root_location() {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
   for (size_t i = 0; i < _tree.root_count(); ++i) {
@@ -443,7 +444,34 @@ root_location_t model_t::optimize_root_location() {
     }
   }
   debug_print("finished with lh: %f", best.second);
-  return best.first;
+  return best;
+}
+
+/* Optimize the substitution parameters by simulated annealing */
+root_location_t model_t::optimize_all() {
+  auto cur = optimize_root_location();
+  double temp = 1.0;
+  double final_temp = 1e-8;
+  std::minstd_rand engine(1231); // TODO add a seed
+  std::uniform_real_distribution<> roller(0.0, 1.0);
+  std::normal_distribution<> err(0.0, 0.1);
+
+  while (temp > final_temp) {
+    auto next_subst{_subst_params};
+    for (auto &r : next_subst) {
+      r += err(engine);
+      if (r <= 0) {
+        r = 1e-4;
+      }
+    }
+    pll_set_subst_params(_partition, 0, next_subst.data());
+    auto next = optimize_root_location();
+    if (exp(-(next.second - cur.second) / temp) >= roller(engine)) {
+      cur = next;
+    }
+    temp *= 0.8;
+  }
+  return cur.first;
 }
 
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {

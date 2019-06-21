@@ -130,11 +130,11 @@ int main(int argv, char **argc) {
     rooted_tree_t tree{tree_filename};
     if (freqs.size() == 0) {
       model_t model{params, tree, msa};
-      auto rl = model.optimize_root_location();
+      auto rl = model.optimize_all();
       std::cout << model.rooted_tree(rl).newick() << std::endl;
     } else {
       model_t model{params, tree, msa, freqs};
-      auto rl = model.optimize_root_location();
+      auto rl = model.optimize_all();
       std::cout << model.rooted_tree(rl).newick() << std::endl;
     }
 
