@@ -42,10 +42,8 @@ freqs_file = "freqs.model"
 IQTREE_RF = "iqtree -rf_all {trees}"
 IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
-#TAXA_STEPS = [10, 100, 1000, 10000]
-#SITE_STEPS = [10, 100, 1000, 10000]
-TAXA_STEPS = [10, 100]
-SITE_STEPS = [10, 100]
+TAXA_STEPS = [10, 100, 1000, 10000]
+SITE_STEPS = [10, 100, 1000, 10000]
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
 TOTAL_ITERS = 100
 
