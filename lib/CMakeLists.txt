@@ -13,7 +13,7 @@ file(COPY
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LOCALDEPS_DIR}/lib)
 
 find_package(GSL)
-if(GSL_FOUND AND !STATIC_GSL)
+if(GSL_FOUND AND NOT STATIC_GSL)
     set(GSL_LIBS gsl gslcblas PARENT_SCOPE)
 else()
     set(GSL_PREFIX "${CMAKE_BINARY_DIR}/localdeps/")
