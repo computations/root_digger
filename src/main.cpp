@@ -1,9 +1,11 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <getopt.h>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -24,13 +26,21 @@ bool __VERBOSE__ = false;
 #define GIT_COMMIT_STRING STRINGIFY(GIT_COMMIT)
 #define BUILD_DATE_STRING STRINGIFY(BUILD_DATE)
 
-void print_run_header(){
-}
-
 void print_version() {
   std::cout << "Version: " << GIT_REV_STRING << "\n"
             << "Build Commit: " << GIT_COMMIT_STRING << "\n"
             << "Build Date: " << BUILD_DATE_STRING << std::endl;
+}
+
+void print_run_header(
+    const std::chrono::time_point<std::chrono::system_clock> &start_time,
+    uint64_t seed) {
+  time_t st = std::chrono::system_clock::to_time_t(start_time);
+  std::cout << "Runing Root Digger \n";
+  print_version();
+  std::cout << "Started: " << std::put_time(std::localtime(&st), "%F %T")
+            << "\n"
+            << "Seed: " << seed << std::endl;
 }
 
 void print_usage() {
@@ -57,6 +67,7 @@ void print_usage() {
 }
 
 int main(int argv, char **argc) {
+  auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
       {"msa", required_argument, 0, 0},
       {"tree", required_argument, 0, 0},
@@ -136,6 +147,8 @@ int main(int argv, char **argc) {
       return 1;
     }
 
+    print_run_header(start_time, seed);
+
     const pll_state_t *map = nullptr;
 
     if (states == 4)
@@ -151,7 +164,6 @@ int main(int argv, char **argc) {
     msa_t msa{msa_filename, map, states};
     rooted_tree_t tree{tree_filename};
     std::shared_ptr<model_t> model;
-    std::cout << "Using seed: " << seed << std::endl;
     if (freqs_filename.empty() && model_filename.empty()) {
       model.reset(new model_t{tree, msa, seed});
     } else if (!freqs_filename.empty() && model_filename.empty()) {
