@@ -4,3 +4,5 @@
 *.fls
 *.fdb_latexmk
 *.gz
+*.bbl
+*.blg

@@ -31,12 +31,41 @@ uses a provided non-reversable model to compute the most likely root location.
 % - Why do we need it
 % - Existing methods
 % - What this method is
+% - Why should we use this method
 
 \section{Background}
 
 % Outline:
 % - What a non-reversable model is
 % - How it roots a tree
+
+To begin with, some definitions: A graph is a collection of objects (vertices)
+and their relationships (edges). A tree is a specific type of graph with exactly
+one path between any two nodes. A phylogenetic tree is a tree with verticies
+representing species, and edges representing an evolutionary process. Thus, a
+phylogenetic tree is a representation of evolutionary history and relationships. 
+
+Generally, phylogenetic trees have an additional constraint: every node is
+either trivalent, or univalent. This is to say, every vertex is a leaf,
+sometimes called a tip, or an interior node with exactly 3 adjacent vertices.
+The exception to this is a specially designated node called the root. The root
+is a bivalent vertex, i.e. it has two adjacent vertices. These vertices are the
+children of the root.
+
+In addition to a phylogenetic tree, phylogenetic inference requires a model of
+evolution. Commonly, a Markov substution process is used
+\cite{yang_computational_2006}, along with molecular data such as DNA sequences.
+Using this model of evolution, a probability of one species evolving into
+another in a specified amount of time can be calcluated. By representing each
+edge of the tree as one of these Markov processes, we can calculate the
+liklihood of both the subsutution processes, and the choosen topology of the
+tree.
+
+Phylogenetic inference often does not seek to find a root. The reasons for this
+are many, but a large reason is the pully principle
+\cite{felsenstein_evolutionary_1981}. To summarize, the pully priniciple shows
+that on a phylogenetic model with a reversable markov process, the root
+placement doesn't affect the final likelihood of the tree.
 
 \section{The Software}
 
@@ -63,5 +92,8 @@ uses a provided non-reversable model to compute the most likely root location.
 
 % Outline:
 % - Tell 'em what you told 'em
+
+\bibliographystyle{acm}
+\bibliography{main}
 
 \end{document}
