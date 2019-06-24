@@ -14,6 +14,7 @@ if(GIT_FOUND)
         OUTPUT_VARIABLE RD_BUILD_VERSION
         ERROR_QUIET
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REGEX REPLACE "-g.+" "" RD_BUILD_VERSION ${RD_BUILD_VERSION})
     execute_process(
         COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
         WORKING_DIRECTORY "${local_dir}"
@@ -22,7 +23,7 @@ if(GIT_FOUND)
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
-string(TIMESTAMP RD_BUILD_DATE "%Y-%m-%dT%H:%M:%SZ")
+string(TIMESTAMP RD_BUILD_DATE "%Y-%m-%d %H:%M:%S")
 
 set(LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
 add_subdirectory(lib)
