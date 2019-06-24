@@ -66,6 +66,22 @@ model_params_t random_params(size_t size, uint64_t seed) {
   return mp;
 }
 
+std::vector<double> sample_diriclet(std::minstd_rand engine, double alpha,
+                                    double beta, size_t size) {
+  std::vector<double> rand_sample(size);
+  static std::gamma_distribution<double> gd(alpha * (beta / (size * beta)),
+                                            1.0);
+  double sum = 0.0;
+  for (auto &f : rand_sample) {
+    f = gd(engine);
+    sum += f;
+  }
+  for (auto &f : rand_sample) {
+    f /= sum;
+  }
+  return rand_sample;
+}
+
 model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
                  const msa_t &msa, const model_params_t &freqs, uint64_t seed) {
 
@@ -468,6 +484,7 @@ root_location_t model_t::optimize_all() {
   std::normal_distribution<> err(0.0, 0.1);
 
   while (temp > final_temp) {
+
     auto next_subst{_subst_params};
     for (auto &r : next_subst) {
       r += err(engine);
@@ -476,9 +493,11 @@ root_location_t model_t::optimize_all() {
       }
     }
     pll_set_subst_params(_partition, 0, next_subst.data());
+
     auto next = optimize_root_location();
     if (exp(-(next.second - cur.second) / temp) >= roller(engine)) {
       cur = next;
+      _subst_params = next_subst;
     }
     temp *= 0.8;
   }
