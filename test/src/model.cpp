@@ -21,23 +21,37 @@ TEST_CASE("model_t constructor", "[model_t]") {
       for (auto &ds : data_files_dna) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t{mp, tree, msa, f};
+        uint64_t seed = std::rand();
+        model_t{mp, tree, msa, f, seed};
       }
     }
   }
 }
 
-TEST_CASE("model_t constructor, emperical freqs"
-          "[model_t]") {
+TEST_CASE("model_t constructor, emperical freqs", "[model_t]") {
   for (auto &mp : params) {
     for (auto &ds : data_files_dna) {
       msa_t msa{ds.first};
       rooted_tree_t tree{ds.second};
+      uint64_t seed = std::rand();
       if (msa.length() == 1) {
-        CHECK_THROWS(model_t{mp, tree, msa});
+        CHECK_THROWS(model_t{mp, tree, msa, seed});
       } else {
-        CHECK_NOTHROW(model_t{mp, tree, msa});
+        CHECK_NOTHROW(model_t{mp, tree, msa, seed});
       }
+    }
+  }
+}
+
+TEST_CASE("model_t constructor, random rates", "[model_t]") {
+  for (auto &ds : data_files_dna) {
+    msa_t msa{ds.first};
+    rooted_tree_t tree{ds.second};
+    uint64_t seed = std::rand();
+    if (msa.length() == 1) {
+      CHECK_THROWS(model_t{tree, msa, seed});
+    } else {
+      CHECK_NOTHROW(model_t{tree, msa, seed});
     }
   }
 }
@@ -48,7 +62,8 @@ TEST_CASE("model_t compute lh", "[model_t]") {
       for (auto &mp : params) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t model{mp, tree, msa, f};
+        uint64_t seed = std::rand();
+        model_t model{mp, tree, msa, f, seed};
         for (size_t i = 0; i < tree.root_count(); ++i) {
           if (tree.root_location(i).edge->back == nullptr) {
             continue;
@@ -68,7 +83,8 @@ TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
       for (auto &mp : params) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t model{mp, tree, msa, f};
+        uint64_t seed = std::rand();
+        model_t model{mp, tree, msa, f, seed};
         for (size_t i = 0; i < tree.root_count(); ++i) {
           if (tree.root_location(i).edge->back == nullptr) {
             continue;
@@ -90,7 +106,8 @@ TEST_CASE("model_t optimize root locations on individual roots",
       for (auto &mp : params) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t model{mp, tree, msa, f};
+        uint64_t seed = std::rand();
+        model_t model{mp, tree, msa, f, seed};
         for (size_t i = 0; i < tree.root_count(); ++i) {
           if (tree.root_location(i).edge->back == nullptr) {
             continue;
@@ -108,7 +125,8 @@ TEST_CASE("model_t optimize root locations with beg points", "[model_t][opt]") {
       for (auto &f : freqs) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t model{mp, tree, msa, f};
+        uint64_t seed = std::rand();
+        model_t model{mp, tree, msa, f, seed};
         for (size_t i = 0; i < tree.root_count(); ++i) {
           if (tree.root_location(i).edge->back == nullptr) {
             continue;
@@ -128,7 +146,8 @@ TEST_CASE("model_t optimize root locations with end points", "[model_t][opt]") {
       for (auto &f : freqs) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t model{mp, tree, msa, f};
+        uint64_t seed = std::rand();
+        model_t model{mp, tree, msa, f, seed};
         for (size_t i = 0; i < tree.root_count(); ++i) {
           if (tree.root_location(i).edge->back == nullptr) {
             continue;
@@ -148,8 +167,9 @@ TEST_CASE("model_t optimize whole tree", "[model_t]") {
       for (auto &f : freqs) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t model{mp, tree, msa, f};
-        auto rl = model.optimize_root_location();
+        uint64_t seed = std::rand();
+        model_t model{mp, tree, msa, f, seed};
+        auto rl = model.optimize_root_location().first;
         CHECK(rl.brlen_ratio >= 0.0);
         CHECK(rl.brlen_ratio <= 1.0);
       }
@@ -163,7 +183,8 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
       for (auto &f : freqs) {
         msa_t msa{ds.first};
         rooted_tree_t tree{ds.second};
-        model_t model{mp, tree, msa, f};
+        uint64_t seed = std::rand();
+        model_t model{mp, tree, msa, f, seed};
         for (size_t i = 0; i < tree.root_count(); ++i) {
           if (tree.root_location(i).edge->back == nullptr) {
             continue;
@@ -175,5 +196,20 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
         }
       }
     }
+  }
+}
+
+TEST_CASE("model_t Benchmarks", "[model_t][benchmarks]") {
+  SECTION("LH Computation") {
+    auto p = params[0];
+    msa_t msa{data_files_dna[0].first};
+    rooted_tree_t tree{data_files_dna[0].second};
+    model_params_t f = freqs[0];
+    uint64_t seed = std::rand();
+    model_t model{p, tree, msa, f, seed};
+    auto rl = tree.root_location(0);
+    BENCHMARK("model_t LH Computation root 0") { model.compute_lh(rl); }
+    rl = tree.root_location(1);
+    BENCHMARK("model_t LH Computation root 1") { model.compute_lh(rl); }
   }
 }

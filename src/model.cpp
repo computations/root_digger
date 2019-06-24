@@ -56,8 +56,18 @@ model_params_t parse_model_file(const std::string &model_filename) {
   return parse_model_params(read_file_contents(model_file));
 }
 
+model_params_t random_params(size_t size, uint64_t seed) {
+  model_params_t mp(size);
+  std::minstd_rand engine(seed);
+  std::uniform_real_distribution<> dist(1e-4, 1.0);
+  for (auto &f : mp) {
+    f = dist(engine);
+  }
+  return mp;
+}
+
 model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
-                 const msa_t &msa, const model_params_t &freqs) {
+                 const msa_t &msa, const model_params_t &freqs, uint64_t seed) {
 
   _tree = std::move(tree);
 
@@ -139,6 +149,7 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
   }
 
   _subst_params = std::move(rate_parameters);
+  _seed = seed;
 }
 
 model_t::~model_t() { pll_partition_destroy(_partition); }
@@ -452,7 +463,7 @@ root_location_t model_t::optimize_all() {
   auto cur = optimize_root_location();
   double temp = 1.0;
   double final_temp = 1e-8;
-  std::minstd_rand engine(1231); // TODO add a seed
+  std::minstd_rand engine(_seed); // TODO add a seed
   std::uniform_real_distribution<> roller(0.0, 1.0);
   std::normal_distribution<> err(0.0, 0.1);
 
