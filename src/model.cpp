@@ -484,7 +484,6 @@ root_location_t model_t::optimize_all() {
   std::normal_distribution<> err(0.0, 0.1);
 
   while (temp > final_temp) {
-
     auto next_subst{_subst_params};
     for (auto &r : next_subst) {
       r += err(engine);
@@ -494,8 +493,18 @@ root_location_t model_t::optimize_all() {
     }
     pll_set_subst_params(_partition, 0, next_subst.data());
 
+    auto next_freq{sample_diriclet(engine, 1.0 / _partition->states, 1.0,
+                                   _partition->states)};
+
+    for(auto f: next_freq){
+      if (f <= 0) {
+        throw std::runtime_error("Got a invalid frequency");
+      }
+    }
+    pll_set_frequencies(_partition, 0, next_freq.data());
+
     auto next = optimize_root_location();
-    if (exp(-(next.second - cur.second) / temp) >= roller(engine)) {
+    if (exp(-(cur.second - next.second) / temp) >= roller(engine)) {
       cur = next;
       _subst_params = next_subst;
     }

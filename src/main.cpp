@@ -181,6 +181,9 @@ int main(int argv, char **argc) {
     } else {
       final_rl = model->optimize_root_location().first;
     }
+    if(final_rl.edge == nullptr){
+      throw std::runtime_error("No root was optimized");
+    }
     std::cout << model->rooted_tree(final_rl).newick() << std::endl;
 
   } catch (const std::exception &e) {
