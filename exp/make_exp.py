@@ -62,7 +62,9 @@ class subst_params:
     def __init__(self):
         self._params = numpy.random.rand(4,4)
         self._params -= numpy.diag(numpy.diag(self._params))
-        self._params -= numpy.diagflat(self._params @ numpy.ones((4,1)))
+        self._params -= numpy.diagflat(numpy.dot(self._params, 
+            numpy.ones((4,1))))
+        print(self._params)
     def indel_repr(self):
         p = []
         for i in range(4):
