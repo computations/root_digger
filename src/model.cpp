@@ -232,8 +232,6 @@ double model_t::compute_lh_root(const root_location_t &root) {
 
 /*
  * Use a tangent method to compute the derivative
- * TODO: Allow for the return of the likelihood at root, so that we can save an
- * evalutation.
  */
 dlh_t model_t::compute_dlh(const root_location_t &root) {
 
