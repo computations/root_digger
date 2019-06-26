@@ -478,39 +478,61 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
 /* Optimize the substitution parameters by simulated annealing */
 root_location_t model_t::optimize_all() {
   auto cur = optimize_root_location();
+  double initial_lh = cur.second;
   double temp = 1.0;
   double final_temp = 1e-8;
-  std::minstd_rand engine(_seed); // TODO add a seed
+  std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
-  std::normal_distribution<> err(0.0, 0.1);
+  std::normal_distribution<> err_subst(0.0, 0.01);
+  std::normal_distribution<> err_freqs(0.0, 0.0001);
+  std::vector<double> next_freq(_partition->frequencies[0],
+                                _partition->frequencies[0] +
+                                    _partition->states);
 
   while (temp > final_temp) {
     auto next_subst{_subst_params};
     for (auto &r : next_subst) {
-      r += err(engine);
+      r += err_subst(engine);
       if (r <= 0) {
         r = 1e-4;
       }
     }
     pll_set_subst_params(_partition, 0, next_subst.data());
 
-    auto next_freq{sample_diriclet(engine, 1.0 / _partition->states, 1.0,
-                                   _partition->states)};
-
-    for (auto f : next_freq) {
+    for (auto &f : next_freq) {
+      f += err_subst(engine);
       if (f <= 0) {
-        throw std::runtime_error("Got a invalid frequency");
+        f = 1e-4;
       }
+    }
+
+    double sum = 0.0;
+    for (auto f : next_freq) {
+      sum += f;
+    }
+
+    for (auto &f : next_freq) {
+      sum /= f;
     }
     pll_set_frequencies(_partition, 0, next_freq.data());
 
     auto next = optimize_root_location();
-    if (exp(-(cur.second - next.second) / temp) >= roller(engine)) {
+    if (next.second > cur.second) {
+      cur = next;
+      _subst_params = next_subst;
+    } else if (exp((next.second - cur.second) / temp) > roller(engine)) {
       cur = next;
       _subst_params = next_subst;
     }
     temp *= _temp_ratio;
   }
+
+  temp = 1.0;
+  /*
+  if(initial_lh < cur.second){
+    throw std::runtime_error("Simulated Annealing Failed");
+  }
+  */
   return cur.first;
 }
 
@@ -519,7 +541,4 @@ const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
   return _tree;
 }
 
-
-void model_t::set_temp_ratio(double t){
-  _temp_ratio = t;
-}
+void model_t::set_temp_ratio(double t) { _temp_ratio = t; }

@@ -199,13 +199,14 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
   }
 }
 
-TEST_CASE("model_t optimize all", "[model_t]"){
+TEST_CASE("model_t optimize all", "[model_t]") {
   auto ds = data_files_dna[1];
   msa_t msa{ds.first};
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa,seed};
+  model_t model{tree, msa, seed};
   auto initial_rl = model.optimize_root_location();
+  model.set_temp_ratio(0.8);
   auto final_rl = model.optimize_all();
-  CHECK(model.calculate_lh(final_rl) >= initial_rl.second);
+  CHECK(model.compute_lh(final_rl) >= initial_rl.second);
 }
