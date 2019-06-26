@@ -57,10 +57,18 @@ void print_usage() {
       << "           Ideally, this should be a non-reversible model.\n"
       << "           If this is not given, then the parameters are inferred\n"
       << "    --freqs [FILE]\n"
-      << "           Optional file containing the frequencies. If not "
+      << "           Optional file containing the frequencies. If not\n"
       << "           given, then empirical frequencies are used instead.\n"
       << "    --seed [NUMBER]\n"
       << "           Random seed to use. Optional"
+      << "    --silent\n"
+      << "           Suppress output except for the final tree"
+      << "    --fast\n"
+      << "           Use a fast annealing schedule. Gives results quickly,\n"
+      << "           but might be less optimal.\n"
+      << "    --slow\n"
+      << "           Use a slow annealing schedule. Gives results slowly, \n"
+      << "           but results are more likely to be optimial.\n"
       << "    --verbose\n"
       << "           Enable debug output. Warning, extremely noisy\n"
       << std::endl;
@@ -69,15 +77,12 @@ void print_usage() {
 int main(int argv, char **argc) {
   auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
-      {"msa", required_argument, 0, 0},
-      {"tree", required_argument, 0, 0},
-      {"model", required_argument, 0, 0},
-      {"freqs", required_argument, 0, 0},
-      {"seed", required_argument, 0, 0},
-      {"states", required_argument, 0, 0},
-      {"verbose", no_argument, 0, 0},
-      {"version", no_argument, 0, 0},
-      {0, 0, 0, 0},
+      {"msa", required_argument, 0, 0},   {"tree", required_argument, 0, 0},
+      {"model", required_argument, 0, 0}, {"freqs", required_argument, 0, 0},
+      {"seed", required_argument, 0, 0},  {"states", required_argument, 0, 0},
+      {"verbose", no_argument, 0, 0},     {"silent", no_argument, 0, 0},
+      {"fast", no_argument, 0, 0},        {"slow", no_argument, 0, 0},
+      {"version", no_argument, 0, 0},     {0, 0, 0, 0},
   };
 
   if (argv == 1) {
@@ -93,6 +98,8 @@ int main(int argv, char **argc) {
     std::string freqs_filename;
     uint64_t seed = std::random_device()();
     unsigned int states = 0;
+    bool silent = false;
+    double temp_param = 0.7;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
       case 0: // msa
@@ -116,7 +123,16 @@ int main(int argv, char **argc) {
       case 6: // verbose
         __VERBOSE__ = true;
         break;
-      case 7: // version
+      case 7: // silent
+        silent = true;
+        break;
+      case 8: // fast
+        temp_param = 0.6;
+        break;
+      case 9: // slow
+        temp_param = 0.8;
+        break;
+      case 10: // version
         print_version();
         return 0;
       default:
@@ -147,7 +163,8 @@ int main(int argv, char **argc) {
       return 1;
     }
 
-    print_run_header(start_time, seed);
+    if (!silent)
+      print_run_header(start_time, seed);
 
     const pll_state_t *map = nullptr;
 
@@ -175,13 +192,15 @@ int main(int argv, char **argc) {
       model.reset(new model_t{model_params, tree, msa,
                               parse_model_file(freqs_filename), seed});
     }
+    model->set_temp_ratio(temp_param);
+
     root_location_t final_rl;
     if (model_filename.empty()) {
       final_rl = model->optimize_all();
     } else {
       final_rl = model->optimize_root_location().first;
     }
-    if(final_rl.edge == nullptr){
+    if (final_rl.edge == nullptr) {
       throw std::runtime_error("No root was optimized");
     }
     std::cout << model->rooted_tree(final_rl).newick() << std::endl;

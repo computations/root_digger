@@ -3,10 +3,11 @@
 import datetime
 import math
 import os
+import random
 import shutil
 import subprocess
 import sys
-import random
+
 import numpy
 
 if not shutil.which("indelible"):
@@ -35,17 +36,17 @@ CONTROL_FILE= """
 [EVOLVE] p1 1 seqs
 """
 
-RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --model {model} --freqs {freqs}"
+RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --fast"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
 IQTREE_RF = "iqtree -rf_all {trees}"
 IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
-TAXA_STEPS = [10, 100, 1000, 10000]
-SITE_STEPS = [10, 100, 1000, 10000]
+TAXA_STEPS = [10, 100, 1000]
+SITE_STEPS = [100, 1000, 10000]
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
-TOTAL_ITERS = 100
+TOTAL_ITERS = 10
 
 class directory_guard:
     def __init__(self, path):
@@ -118,11 +119,6 @@ class exp:
             with open(self._seed_file) as sf:
                 self._seed = int(sf.read())
 
-        for taxa in TAXA_STEPS:
-            tree_file = os.path.join(self._run_path, '{}.tree'.format(taxa))
-            subprocess.run(IQTREE_R.format(random_seed = self._seed, taxa =
-                taxa, outfile = tree_file).split(' '))
-
     @staticmethod
     def check_done_indel(path):
         if os.path.exists(os.path.join(path, '.done')):
@@ -170,15 +166,14 @@ class exp:
             control_txt.write(self.make_indel_control_file(freqs, subst, tree,
                 sites))
         if not self.check_done_indel('.'):
-            subprocess.run("indelible", shell=True, check=True)
+            subprocess.run("indelible", stdout=subprocess.DEVNULL)
             self.set_indel_done('.')
 
         if not self.check_done_rd('.'):
             rd_output = subprocess.run(RD.format(msa="seqs_TRUE.phy",
                 tree=os.path.join("../", tree_filename),
-                model=os.path.join("../",model_file),
-                freqs=os.path.join("../", freqs_file)).split(' '),
-                capture_output=True)
+                seed=self._seed).split(' '),
+                stdout=subprocess.PIPE)
             with open('rd_output', 'w') as rd_outfile:
                 rd_outfile.write(rd_output.stdout.decode('utf-8'))
             self.set_rd_done('.')
@@ -211,14 +206,38 @@ class exp:
             result_tree_file = "result_trees_{}_taxa".format(taxa)
             with open(result_tree_file, 'w') as rt:
                rt.write(''.join(all_trees))
-            subprocess.run(IQTREE_RF.format(trees=result_tree_file).split(' '))
+            subprocess.run(IQTREE_RF.format(trees=result_tree_file).split(' '),
+                    stdout=subprocess.DEVNULL)
         os.chdir(old_dir)
+
+def summarize_results(path):
+    with directory_guard(path):
+        for taxa in TAXA_STEPS:
+            leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
+            nrows = len(SITE_STEPS)
+            totals = numpy.zeros((nrows, nrows))
+            for i in range(TOTAL_ITERS):
+                result_tree_file = os.path.join(RUN_TEMPLATE.format(run_iter=i,
+                    leading_zeroes = leading_zeroes),
+                        "result_trees_{taxa}_taxa.rfdist".format(taxa=taxa))
+                tree_count = len(SITE_STEPS)
+                with open(result_tree_file) as rfdist_file:
+                    lines = rfdist_file.readlines()
+                    for j in range(nrows):
+                        line = [s for s in lines[j+1].split(' ') if len(s) != 0]
+                        for k in range(nrows):
+                            totals[j,k] = int(line[k+1])
+            totals /= TOTAL_ITERS
+            with open('summary_{}_taxa'.format(taxa), 'w') as outfile:
+                numpy.savetxt(outfile, totals)
 
 if not os.path.exists('active_exp'):
     os.mkdir('active_exp')
 
 with directory_guard('active_exp'):
     for i in range(TOTAL_ITERS):
-        print(i)
+        print("[", datetime.datetime.now().isoformat(), "]", sep = '', end = '')
+        print(" trial:", i)
         e = exp('.', i)
         e.run_all()
+    summarize_results('.')

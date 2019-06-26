@@ -199,17 +199,13 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
   }
 }
 
-TEST_CASE("model_t Benchmarks", "[model_t][benchmarks]") {
-  SECTION("LH Computation") {
-    auto p = params[0];
-    msa_t msa{data_files_dna[0].first};
-    rooted_tree_t tree{data_files_dna[0].second};
-    model_params_t f = freqs[0];
-    uint64_t seed = std::rand();
-    model_t model{p, tree, msa, f, seed};
-    auto rl = tree.root_location(0);
-    BENCHMARK("model_t LH Computation root 0") { model.compute_lh(rl); }
-    rl = tree.root_location(1);
-    BENCHMARK("model_t LH Computation root 1") { model.compute_lh(rl); }
-  }
+TEST_CASE("model_t optimize all", "[model_t]"){
+  auto ds = data_files_dna[1];
+  msa_t msa{ds.first};
+  rooted_tree_t tree{ds.second};
+  uint64_t seed = std::rand();
+  model_t model{tree, msa,seed};
+  auto initial_rl = model.optimize_root_location();
+  auto final_rl = model.optimize_all();
+  CHECK(model.calculate_lh(final_rl) >= initial_rl.second);
 }

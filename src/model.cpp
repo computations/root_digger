@@ -166,6 +166,7 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
 
   _subst_params = std::move(rate_parameters);
   _seed = seed;
+  _temp_ratio = 0.8;
 }
 
 model_t::~model_t() { pll_partition_destroy(_partition); }
@@ -496,7 +497,7 @@ root_location_t model_t::optimize_all() {
     auto next_freq{sample_diriclet(engine, 1.0 / _partition->states, 1.0,
                                    _partition->states)};
 
-    for(auto f: next_freq){
+    for (auto f : next_freq) {
       if (f <= 0) {
         throw std::runtime_error("Got a invalid frequency");
       }
@@ -508,7 +509,7 @@ root_location_t model_t::optimize_all() {
       cur = next;
       _subst_params = next_subst;
     }
-    temp *= 0.8;
+    temp *= _temp_ratio;
   }
   return cur.first;
 }
@@ -516,4 +517,9 @@ root_location_t model_t::optimize_all() {
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
   _tree.root_by(root);
   return _tree;
+}
+
+
+void model_t::set_temp_ratio(double t){
+  _temp_ratio = t;
 }

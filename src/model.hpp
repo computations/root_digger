@@ -51,6 +51,8 @@ public:
   root_location_t optimize_all();
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
+  void set_temp_ratio(double);
+
 private:
   std::pair<root_location_t, double>
   bisect(const root_location_t &beg, dlh_t d_beg, const root_location_t &end,
@@ -60,6 +62,7 @@ private:
   rooted_tree_t _tree;
   pll_partition_t *_partition;
   uint64_t _seed;
+  double _temp_ratio;
 };
 
 #endif
