@@ -78,7 +78,7 @@ class subst_params:
                          [0,1,0,0],
                          [1,0,0,0],
                          [0,0,1,0]])
-        tmp = P.T @ self._params @ P
+        tmp = numpy.inner(numpy.inner(P.T,self._params), P)
         p = []
         for i in range(4):
             for j in range(4):
@@ -97,7 +97,7 @@ class freq_params:
                          [0,1,0,0],
                          [1,0,0,0],
                          [0,0,1,0]])
-        p = self._params @ P
+        p = numpy.inner(self._params, P)
         return ','.join([str(f) for f in p])
 
 class exp:
