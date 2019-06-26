@@ -526,11 +526,11 @@ root_location_t model_t::optimize_all() {
   }
 
   temp = 1.0;
-  /*
-  if(initial_lh < cur.second){
-    throw std::runtime_error("Simulated Annealing Failed");
+  if (initial_lh > cur.second) {
+    throw std::runtime_error(
+        "Simulated Annealing Failed :" + std::to_string(initial_lh) + " vs. " +
+        std::to_string(cur.second));
   }
-  */
   return cur.first;
 }
 
