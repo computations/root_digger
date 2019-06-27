@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import argparse
+import csv
 import datetime
 import math
 import os
@@ -8,6 +10,7 @@ import shutil
 import subprocess
 import sys
 
+import ete3
 import numpy
 
 if not shutil.which("indelible"):
@@ -36,17 +39,17 @@ CONTROL_FILE= """
 [EVOLVE] p1 1 seqs
 """
 
-RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --fast"
+RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --slow"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
 IQTREE_RF = "iqtree -rf_all {trees}"
 IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
-TAXA_STEPS = [10, 100, 1000]
-SITE_STEPS = [100, 1000, 10000]
+TAXA_STEPS = [10, 100]
+SITE_STEPS = [100, 1000]
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
-TOTAL_ITERS = 10
+TOTAL_ITERS = 100
 
 class directory_guard:
     def __init__(self, path):
@@ -64,7 +67,6 @@ class subst_params:
         self._params -= numpy.diag(numpy.diag(self._params))
         self._params -= numpy.diagflat(numpy.dot(self._params, 
             numpy.ones((4,1))))
-        print(self._params)
     def indel_repr(self):
         p = []
         for i in range(4):
@@ -208,38 +210,63 @@ class exp:
             result_tree_file = "result_trees_{}_taxa".format(taxa)
             with open(result_tree_file, 'w') as rt:
                rt.write(''.join(all_trees))
-            subprocess.run(IQTREE_RF.format(trees=result_tree_file).split(' '),
-                    stdout=subprocess.DEVNULL)
+
+            parsed_trees = [ete3.Tree(t) for t in all_trees]
+            true_tree = parsed_trees[0]
+
+            rfdists = []
+            for i in range(1, len(parsed_trees)):
+                rfdists.append(compute_root_distance(true_tree,
+                    parsed_trees[i]))
+            with open('rfdists_{taxa}_taxa'.format(taxa=taxa), 'w')\
+                    as rf_outfile:
+                rf_outfile.write(','.join([str(i) for i in SITE_STEPS]))
+                rf_outfile.write('\n')
+                rf_outfile.write(','.join([str(f) for f in rfdists]))
+                rf_outfile.write('\n')
         os.chdir(old_dir)
+
+def compute_root_distance(t1, t2):
+    result = t1.robinson_foulds(t2)
+    return result[0]
 
 def summarize_results(path):
     with directory_guard(path):
         for taxa in TAXA_STEPS:
             leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
             nrows = len(SITE_STEPS)
-            totals = numpy.zeros((nrows, nrows))
+            totals = numpy.zeros((nrows,))
             for i in range(TOTAL_ITERS):
                 result_tree_file = os.path.join(RUN_TEMPLATE.format(run_iter=i,
                     leading_zeroes = leading_zeroes),
-                        "result_trees_{taxa}_taxa.rfdist".format(taxa=taxa))
-                tree_count = len(SITE_STEPS)
+                        "rfdists_{taxa}_taxa".format(taxa=taxa))
                 with open(result_tree_file) as rfdist_file:
-                    lines = rfdist_file.readlines()
-                    for j in range(nrows):
-                        line = [s for s in lines[j+1].split(' ') if len(s) != 0]
-                        for k in range(nrows):
-                            totals[j,k] = int(line[k+1])
+                    rfdists = csv.DictReader(rfdist_file)
+                    for row in rfdists:
+                        for i in range(len(SITE_STEPS)):
+                            totals[i] = row[str(SITE_STEPS[i])]
             totals /= TOTAL_ITERS
             with open('summary_{}_taxa'.format(taxa), 'w') as outfile:
-                numpy.savetxt(outfile, totals)
+                outfile.write(','.join([str(i) for i in SITE_STEPS]))
+                outfile.write('\n')
+                outfile.write(','.join([str(f) for f in totals]))
+                outfile.write('\n')
 
-if not os.path.exists('active_exp'):
-    os.mkdir('active_exp')
 
-with directory_guard('active_exp'):
-    for i in range(TOTAL_ITERS):
-        print("[", datetime.datetime.now().isoformat(), "]", sep = '', end = '')
-        print(" trial:", i)
-        e = exp('.', i)
-        e.run_all()
-    summarize_results('.')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, help='Path to store the exp',
+            required=True)
+    args = parser.parse_args()
+    exp_path = os.path.abspath(args.path)
+
+    if not os.path.exists(exp_path):
+        os.mkdir(exp_path)
+
+    with directory_guard(exp_path):
+        for i in range(TOTAL_ITERS):
+            print("[", datetime.datetime.now().isoformat(), "]", sep = '', end = '')
+            print(" trial:", i)
+            e = exp('.', i)
+            e.run_all()
+        summarize_results('.')
