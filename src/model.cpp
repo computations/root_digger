@@ -3,6 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <random>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 extern "C" {
@@ -525,12 +526,13 @@ root_location_t model_t::optimize_all() {
     temp *= _temp_ratio;
   }
 
-  temp = 1.0;
+  /*
   if (initial_lh > cur.second) {
     throw std::runtime_error(
         "Simulated Annealing Failed :" + std::to_string(initial_lh) + " vs. " +
         std::to_string(cur.second));
   }
+  */
   return cur.first;
 }
 
@@ -540,3 +542,14 @@ const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
 }
 
 void model_t::set_temp_ratio(double t) { _temp_ratio = t; }
+
+std::string model_t::subst_string() const {
+  std::ostringstream oss;
+  oss << "{";
+  for (size_t i = 0; i < _subst_params.size(); ++i) {
+    oss << std::to_string(_subst_params[i]);
+    if (i != _subst_params.size() - 1)
+      oss << ",";
+  }
+  return oss.str();
+}
