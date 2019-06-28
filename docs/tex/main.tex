@@ -33,11 +33,36 @@ uses a provided non-reversable model to compute the most likely root location.
 % - What this method is
 % - Why should we use this method
 
-\section{Background}
+In phylogenetic analysis, it is common to infer unrooted trees. This is due in
+part to the simplicity of the models, and the computational savings that come
+from working with unrooted trees. But a having a root on a phylogenetic tree is
+a desirable thing to have. Many phylogenetic studies root the tree after
+inferring an unrooted tree.
 
-% Outline:
-% - What a non-reversable model is
-% - How it roots a tree
+There are several methods to root an existing phylogenetic tree, which fall into
+one of three categories: methods which use "side-band" information; methods
+which utilize some variation of the molecular clock hypothesis; and methods
+which use a non-reversable model.
+
+Methods that use "side-band" information take advantage of prior knowledge about
+the world, which isn't present in the data that is used to infer a tree. For
+example, knowledge about which species are distantly related can be used to add
+an outgroup to phylogenetic analysis. This outgroup can then be used to place
+the root on the tree.
+
+There are challenges to adding  an  outgroup  to  an  analysis.   Gatsey  et.al.
+\cite{gatesy_how_2007} showed that adding a  single  taxa  to  an  analysis  can
+significantly impact the stability of the tree topology, even for the taxa which
+were already present  in  the  analysis.   Holland  \cite{holland_outgroup_2003}
+investigates this phenomenon in simulations, and that  outgroups  effecting  the
+topology of ingroups can be uncomfortably common.
+
+Alternativly, molecular clock analysis can be used to place a root without prior
+knowledge. The molecular clock hypothesis says that base substitution "ticks" at
+stochastically constant rate. Using this assumption, or some variation of it, a
+likely root can be placed on the root.
+
+Molecular clock analysis can also have difficulties. 
 
 To begin with, some definitions: A graph is a collection of objects (vertices)
 and their relationships (edges). A tree is a specific type of graph with exactly
