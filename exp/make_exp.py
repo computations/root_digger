@@ -123,6 +123,14 @@ class exp:
             with open(self._seed_file) as sf:
                 self._seed = int(sf.read())
 
+        for taxa in TAXA_STEPS:
+            t = ete3.Tree()
+            t.populate(taxa)
+            for n in t.traverse():
+                n.dist = numpy.random.exponential(0.1)
+            with open(str(taxa)+".tree", 'w') as tree_file:
+                tree_file.write(t.write())
+
     @staticmethod
     def check_done_indel(path):
         if os.path.exists(os.path.join(path, '.done')):
@@ -195,7 +203,7 @@ class exp:
 
         for taxa in TAXA_STEPS:
             all_trees = []
-            tree_file = os.path.abspath(os.path.join('../..',str(taxa)+".tree"))
+            tree_file = os.path.abspath(os.path.join('..',str(taxa)+".tree"))
             with open(tree_file) as tf:
                 all_trees.append(tf.read())
             for sites in SITE_STEPS:
