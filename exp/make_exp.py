@@ -12,6 +12,7 @@ import sys
 
 import ete3
 import numpy
+import multiprocessing
 
 if not shutil.which("indelible"):
     print("Please add indelible to your path")
@@ -46,10 +47,10 @@ freqs_file = "freqs.model"
 IQTREE_RF = "iqtree -rf_all {trees}"
 IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
-TAXA_STEPS = [10, 100]
-SITE_STEPS = [100, 1000]
+TAXA_STEPS = [10, 100, 1000]
+SITE_STEPS = [100, 200, 400, 1600, 3200, 6400]
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
-TOTAL_ITERS = 100
+TOTAL_ITERS = 64
 
 class directory_guard:
     def __init__(self, path):
@@ -104,6 +105,7 @@ class freq_params:
 
 class exp:
     def __init__(self, root_path, run_iter, seed=None):
+        self._run_iter = run_iter
         leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
         self._run_path = os.path.abspath(os.path.join(root_path,
             RUN_TEMPLATE.format(run_iter= run_iter, leading_zeroes =
@@ -127,8 +129,8 @@ class exp:
             t = ete3.Tree()
             t.populate(taxa)
             for n in t.traverse():
-                n.dist = numpy.random.exponential(0.1)
-            with open(str(taxa)+".tree", 'w') as tree_file:
+                n.dist = numpy.random.exponential(0.1) + 0.005
+            with open(os.path.join(self._run_path, str(taxa)+".tree"), 'w') as tree_file:
                 tree_file.write(t.write())
 
     @staticmethod
@@ -203,7 +205,7 @@ class exp:
 
         for taxa in TAXA_STEPS:
             all_trees = []
-            tree_file = os.path.abspath(os.path.join('..',str(taxa)+".tree"))
+            tree_file = os.path.abspath(os.path.join(self._run_path,str(taxa)+".tree"))
             with open(tree_file) as tf:
                 all_trees.append(tf.read())
             for sites in SITE_STEPS:
@@ -232,6 +234,8 @@ class exp:
                 rf_outfile.write('\n')
                 rf_outfile.write(','.join([str(f) for f in rfdists]))
                 rf_outfile.write('\n')
+        print("[", datetime.datetime.now().isoformat(), "]", sep = '', end = '')
+        print(" trial done:", self._run_iter)
         os.chdir(old_dir)
 
 def compute_root_distance(t1, t2):
@@ -272,9 +276,12 @@ if __name__ == "__main__":
         os.mkdir(exp_path)
 
     with directory_guard(exp_path):
+        experiments = []
         for i in range(TOTAL_ITERS):
             print("[", datetime.datetime.now().isoformat(), "]", sep = '', end = '')
             print(" trial:", i)
-            e = exp('.', i)
-            e.run_all()
+            experiments.append(exp('.', i))
+
+        with multiprocessing.Pool() as tp:
+            tp.map(exp.run_all, experiments)
         summarize_results('.')
