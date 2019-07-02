@@ -269,8 +269,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, help='Path to store the exp',
             required=True)
+    parser.add_argument('--site-steps', nargs='+', type=int, required=True)
+    parser.add_argument('--taxa-steps', nargs='+', type=int, required=True)
+    parser.add_argument('--iters', type=int, required=True)
     args = parser.parse_args()
     exp_path = os.path.abspath(args.path)
+    SITE_STEPS = args.site_steps
+    TAXA_STEPS = args.taxa_steps
+    TOTAL_ITERS = args.iters
 
     if not os.path.exists(exp_path):
         os.mkdir(exp_path)
