@@ -4,6 +4,7 @@ import argparse
 import csv
 import datetime
 import math
+import multiprocessing
 import os
 import random
 import shutil
@@ -12,7 +13,6 @@ import sys
 
 import ete3
 import numpy
-import multiprocessing
 
 if not shutil.which("indelible"):
     print("Please add indelible to your path")
@@ -64,7 +64,7 @@ class directory_guard:
 
 class subst_params:
     def __init__(self):
-        self._params = numpy.random.rand(4,4)
+        self._params = numpy.random.rand(4,4) + 1e-2
         self._params -= numpy.diag(numpy.diag(self._params))
         self._params -= numpy.diagflat(numpy.dot(self._params, 
             numpy.ones((4,1))))
@@ -282,6 +282,6 @@ if __name__ == "__main__":
             print(" trial:", i)
             experiments.append(exp('.', i))
 
-        with multiprocessing.Pool() as tp:
+        with multiprocessing.Pool(2) as tp:
             tp.map(exp.run_all, experiments)
         summarize_results('.')
