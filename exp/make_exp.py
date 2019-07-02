@@ -48,7 +48,7 @@ IQTREE_RF = "iqtree -rf_all {trees}"
 IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
 TAXA_STEPS = [10, 100]
-SITE_STEPS = [100, 200]
+SITE_STEPS = [100, 200, 400, 800]
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
 TOTAL_ITERS = 4
 
@@ -240,7 +240,7 @@ class exp:
 
 def compute_root_distance(t1, t2):
     result = t1.robinson_foulds(t2)
-    return result[0]
+    return result[0]/2
 
 def summarize_results(path):
     with directory_guard(path):
