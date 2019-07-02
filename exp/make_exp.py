@@ -47,10 +47,10 @@ freqs_file = "freqs.model"
 IQTREE_RF = "iqtree -rf_all {trees}"
 IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
-TAXA_STEPS = [10, 100, 1000]
-SITE_STEPS = [100, 200, 400, 1600, 3200, 6400]
+TAXA_STEPS = [10, 100]
+SITE_STEPS = [100, 200]
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
-TOTAL_ITERS = 64
+TOTAL_ITERS = 4
 
 class directory_guard:
     def __init__(self, path):
@@ -247,7 +247,7 @@ def summarize_results(path):
         for taxa in TAXA_STEPS:
             leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
             nrows = len(SITE_STEPS)
-            totals = numpy.zeros((nrows,))
+            totals = numpy.zeros(nrows)
             for i in range(TOTAL_ITERS):
                 result_tree_file = os.path.join(RUN_TEMPLATE.format(run_iter=i,
                     leading_zeroes = leading_zeroes),
@@ -256,7 +256,7 @@ def summarize_results(path):
                     rfdists = csv.DictReader(rfdist_file)
                     for row in rfdists:
                         for i in range(len(SITE_STEPS)):
-                            totals[i] = row[str(SITE_STEPS[i])]
+                            totals[i] += float(row[str(SITE_STEPS[i])])
             totals /= TOTAL_ITERS
             with open('summary_{}_taxa'.format(taxa), 'w') as outfile:
                 outfile.write(','.join([str(i) for i in SITE_STEPS]))
