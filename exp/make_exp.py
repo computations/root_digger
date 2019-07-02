@@ -13,6 +13,7 @@ import sys
 
 import ete3
 import numpy
+import progressbar
 
 if not shutil.which("indelible"):
     print("Please add indelible to your path")
@@ -21,6 +22,11 @@ if not shutil.which("indelible"):
 if not shutil.which("iqtree"):
     print("Please add iqtree to your path")
     sys.exit()
+
+progressbar.streams.flush()
+
+PROGRESS_BAR = None
+PROGRESS_BAR_ITER = multiprocessing.Value('i', 0)
 
 CONTROL_FILE= """
 [TYPE] NUCLEOTIDE 1
@@ -47,8 +53,8 @@ freqs_file = "freqs.model"
 IQTREE_RF = "iqtree -rf_all {trees}"
 IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
-TAXA_STEPS = [10, 100]
-SITE_STEPS = [100, 200, 400, 800]
+TAXA_STEPS = []
+SITE_STEPS = []
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
 TOTAL_ITERS = 4
 
@@ -234,8 +240,8 @@ class exp:
                 rf_outfile.write('\n')
                 rf_outfile.write(','.join([str(f) for f in rfdists]))
                 rf_outfile.write('\n')
-        print("[", datetime.datetime.now().isoformat(), "]", sep = '', end = '')
-        print(" trial done:", self._run_iter)
+        PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
+        PROGRESS_BAR_ITER.value += 1
         os.chdir(old_dir)
 
 def compute_root_distance(t1, t2):
@@ -278,16 +284,18 @@ if __name__ == "__main__":
     TAXA_STEPS = args.taxa_steps
     TOTAL_ITERS = args.iters
 
+    PROGRESS_BAR = progressbar.ProgressBar(max_value = TOTAL_ITERS)
+
     if not os.path.exists(exp_path):
         os.mkdir(exp_path)
 
     with directory_guard(exp_path):
         experiments = []
         for i in range(TOTAL_ITERS):
-            print("[", datetime.datetime.now().isoformat(), "]", sep = '', end = '')
-            print(" trial:", i)
             experiments.append(exp('.', i))
 
+        PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
+        PROGRESS_BAR_ITER.value += 1
         with multiprocessing.Pool(2) as tp:
             tp.map(exp.run_all, experiments)
         summarize_results('.')
