@@ -20,10 +20,6 @@ if not shutil.which("indelible"):
     print("Please add indelible to your path")
     sys.exit()
 
-if not shutil.which("iqtree"):
-    print("Please add iqtree to your path")
-    sys.exit()
-
 progressbar.streams.flush()
 
 PROGRESS_BAR = None
@@ -97,6 +93,8 @@ class subst_params:
 class freq_params:
     def __init__(self):
         self._params = numpy.random.dirichlet([1.0 for _ in range(4)])
+        self._params += .001
+        self._params /= numpy.linalg.norm(self._params, 1)
     def indel_repr(self):
         return ' '.join([str(f) for f in self._params])
     def rd_repr(self):
@@ -368,6 +366,6 @@ if __name__ == "__main__":
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
-        with multiprocessing.Pool(2) as tp:
+        with multiprocessing.Pool(4) as tp:
             tp.map(exp.run_all, experiments)
         summarize_results('.', experiments[0].tree_names(), trees)
