@@ -10,6 +10,7 @@ import random
 import shutil
 import subprocess
 import sys
+import string
 
 import ete3
 import numpy
@@ -49,9 +50,6 @@ CONTROL_FILE= """
 RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --slow"
 model_file = "subst.model"
 freqs_file = "freqs.model"
-
-IQTREE_RF = "iqtree -rf_all {trees}"
-IQTREE_R  = "iqtree -seed {random_seed} -r {taxa} {outfile}"
 
 TAXA_STEPS = []
 SITE_STEPS = []
@@ -110,7 +108,7 @@ class freq_params:
         return ','.join([str(f) for f in p])
 
 class exp:
-    def __init__(self, root_path, run_iter, seed=None):
+    def __init__(self, root_path, run_iter, trees, site_steps, seed=None):
         self._run_iter = run_iter
         leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
         self._run_path = os.path.abspath(os.path.join(root_path,
@@ -131,13 +129,28 @@ class exp:
             with open(self._seed_file) as sf:
                 self._seed = int(sf.read())
 
-        for taxa in TAXA_STEPS:
-            t = ete3.Tree()
-            t.populate(taxa)
-            for n in t.traverse():
-                n.dist = numpy.random.exponential(0.1) + 0.005
-            with open(os.path.join(self._run_path, str(taxa)+".tree"), 'w') as tree_file:
-                tree_file.write(t.write())
+        self._site_steps = site_steps
+        self._tree_names = []
+        tree_name_counter = 0
+        for tree in trees:
+            if type(tree) == int:
+                t = ete3.Tree()
+                t.populate(tree)
+                for n in t.traverse():
+                    n.dist = numpy.random.exponential(0.1) + 0.005
+                with open(os.path.join(self._run_path, str(tree)+".tree"), 'w') as tree_file:
+                    tree_file.write(t.write())
+                self._tree_names.append(str(tree))
+            elif type(tree) == ete3.Tree:
+                i = tree_name_counter
+                tree_name = ''
+                while i >= 0:
+                    tree_name += string.ascii_lowercase[tree_name_counter]
+                    i -= len(string.ascii_lowercase)
+                tree_filename = os.path.join(self._run_path, str(tree_name) + ".tree")
+                with open(tree_filename,'w') as tree_file:
+                    tree_file.write(tree.write())
+                self._tree_names.append(tree_name)
 
     @staticmethod
     def check_done_indel(path):
@@ -209,13 +222,13 @@ class exp:
         with open('freqs.model', 'w') as model_file:
             model_file.write(freqs.rd_repr())
 
-        for taxa in TAXA_STEPS:
+        for tree_name in self._tree_names:
             all_trees = []
-            tree_file = os.path.abspath(os.path.join(self._run_path,str(taxa)+".tree"))
+            tree_file = os.path.join(self._run_path, str(tree_name) + ".tree")
             with open(tree_file) as tf:
                 all_trees.append(tf.read())
-            for sites in SITE_STEPS:
-                exp_dir = "{taxa}taxa_{sites}sites".format(taxa=taxa,
+            for sites in self._site_steps:
+                exp_dir = "{taxa}tree_{sites}sites".format(taxa=tree_name,
                             sites=sites)
                 if not os.path.exists(exp_dir):
                     os.mkdir(exp_dir)
@@ -223,7 +236,7 @@ class exp:
                     self.run_exp(sites, freqs, subst, tree_file)
                     with open('rd_output') as tf:
                         all_trees.append(tf.read())
-            result_tree_file = "result_trees_{}_taxa".format(taxa)
+            result_tree_file = "result_trees_{}_tree".format(tree_name)
             with open(result_tree_file, 'w') as rt:
                rt.write(''.join(all_trees))
 
@@ -234,7 +247,7 @@ class exp:
             for i in range(1, len(parsed_trees)):
                 rfdists.append(compute_root_distance(true_tree,
                     parsed_trees[i]))
-            with open('rfdists_{taxa}_taxa'.format(taxa=taxa), 'w')\
+            with open('rfdists_{taxa}_tree'.format(taxa=tree_name), 'w')\
                     as rf_outfile:
                 rf_outfile.write(','.join([str(i) for i in SITE_STEPS]))
                 rf_outfile.write('\n')
@@ -243,32 +256,37 @@ class exp:
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         os.chdir(old_dir)
+    def tree_names(self):
+        return self._tree_names
 
 def compute_root_distance(t1, t2):
     result = t1.robinson_foulds(t2)
     return result[0]/2
 
-def summarize_results(path):
+def compute_average_distance(tree_names):
+    for tree in tree_names:
+        leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
+        nrows = len(SITE_STEPS)
+        totals = numpy.zeros(nrows)
+        for i in range(TOTAL_ITERS):
+            result_tree_file = os.path.join(RUN_TEMPLATE.format(run_iter=i,
+                leading_zeroes = leading_zeroes),
+                    "rfdists_{taxa}_tree".format(taxa=tree))
+            with open(result_tree_file) as rfdist_file:
+                rfdists = csv.DictReader(rfdist_file)
+                for row in rfdists:
+                    for i in range(len(SITE_STEPS)):
+                        totals[i] += float(row[str(SITE_STEPS[i])])
+        totals /= TOTAL_ITERS
+        with open('summary_{}_tree'.format(tree), 'w') as outfile:
+            outfile.write(','.join([str(i) for i in SITE_STEPS]))
+            outfile.write('\n')
+            outfile.write(','.join([str(f) for f in totals]))
+            outfile.write('\n')
+
+def summarize_results(path, tree_names):
     with directory_guard(path):
-        for taxa in TAXA_STEPS:
-            leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
-            nrows = len(SITE_STEPS)
-            totals = numpy.zeros(nrows)
-            for i in range(TOTAL_ITERS):
-                result_tree_file = os.path.join(RUN_TEMPLATE.format(run_iter=i,
-                    leading_zeroes = leading_zeroes),
-                        "rfdists_{taxa}_taxa".format(taxa=taxa))
-                with open(result_tree_file) as rfdist_file:
-                    rfdists = csv.DictReader(rfdist_file)
-                    for row in rfdists:
-                        for i in range(len(SITE_STEPS)):
-                            totals[i] += float(row[str(SITE_STEPS[i])])
-            totals /= TOTAL_ITERS
-            with open('summary_{}_taxa'.format(taxa), 'w') as outfile:
-                outfile.write(','.join([str(i) for i in SITE_STEPS]))
-                outfile.write('\n')
-                outfile.write(','.join([str(f) for f in totals]))
-                outfile.write('\n')
+        compute_average_distance(tree_names)
 
 
 if __name__ == "__main__":
@@ -276,12 +294,25 @@ if __name__ == "__main__":
     parser.add_argument('--path', type=str, help='Path to store the exp',
             required=True)
     parser.add_argument('--site-steps', nargs='+', type=int, required=True)
-    parser.add_argument('--taxa-steps', nargs='+', type=int, required=True)
+    parser.add_argument('--taxa-steps', nargs='+', type=int)
+    parser.add_argument('--trees', type=str)
     parser.add_argument('--iters', type=int, required=True)
     args = parser.parse_args()
+
+    if args.taxa_steps is None and args.trees is None:
+        print("either trees or taxa steps is required")
+        sys.exit(1)
+
+    if args.taxa_steps:
+        TAXA_STEPS = args.taxa_steps
+
+    else:
+        with open(args.trees) as tree_file:
+            trees = [ete3.Tree(s) for s in tree_file]
+        TAXA_STEPS = list(range(len(trees)))
+
     exp_path = os.path.abspath(args.path)
     SITE_STEPS = args.site_steps
-    TAXA_STEPS = args.taxa_steps
     TOTAL_ITERS = args.iters
 
     PROGRESS_BAR = progressbar.ProgressBar(max_value = TOTAL_ITERS)
@@ -292,10 +323,13 @@ if __name__ == "__main__":
     with directory_guard(exp_path):
         experiments = []
         for i in range(TOTAL_ITERS):
-            experiments.append(exp('.', i))
+            if args.taxa_steps:
+                experiments.append(exp('.', i, TAXA_STEPS, SITE_STEPS))
+            else:
+                experiments.append(exp('.', i, trees, SITE_STEPS))
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         with multiprocessing.Pool(2) as tp:
             tp.map(exp.run_all, experiments)
-        summarize_results('.')
+        summarize_results('.', experiments[0].tree_names())
