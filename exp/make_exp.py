@@ -151,6 +151,7 @@ class exp:
                 with open(tree_filename,'w') as tree_file:
                     tree_file.write(tree.write())
                 self._tree_names.append(tree_name)
+                tree_name_counter += 1
 
     @staticmethod
     def check_done_indel(path):
@@ -226,7 +227,7 @@ class exp:
             all_trees = []
             tree_file = os.path.join(self._run_path, str(tree_name) + ".tree")
             with open(tree_file) as tf:
-                all_trees.append(tf.read())
+                all_trees.append(tf.read()+'\n')
             for sites in self._site_steps:
                 exp_dir = "{taxa}tree_{sites}sites".format(taxa=tree_name,
                             sites=sites)
@@ -242,6 +243,7 @@ class exp:
 
             parsed_trees = [ete3.Tree(t) for t in all_trees]
             true_tree = parsed_trees[0]
+            self._result_trees = parsed_trees[1:]
 
             rfdists = []
             for i in range(1, len(parsed_trees)):
@@ -256,8 +258,12 @@ class exp:
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         os.chdir(old_dir)
+
     def tree_names(self):
         return self._tree_names
+
+    def result_trees(self):
+        return self._result_trees
 
 def compute_root_distance(t1, t2):
     result = t1.robinson_foulds(t2)
@@ -284,22 +290,48 @@ def compute_average_distance(tree_names):
             outfile.write(','.join([str(f) for f in totals]))
             outfile.write('\n')
 
-def tree_map(trees):
+def tree_map(tree_names, trees):
     with open('tree_map', 'w') as outfile:
-        for tree in trees:
-            if type(tree) == ete3.Tree:
-                i = tree_name_counter
-                tree_name = ''
-                while i >= 0:
-                    tree_name += string.ascii_lowercase[tree_name_counter]
-                    i -= len(string.ascii_lowercase)
-                outfile.write(tree_name + ": " + tree.write())
+        for tn, t in zip(tree_names, trees):
+            if type(t) != ete3.Tree:
+                continue
+            outfile.write(tn + ": " + t.write() + "\n")
+
+def get_root_clade(tree):
+    return sorted([n.name for n in tree.get_tree_root().children[0].traverse() if 
+            n.name != ''])
+
+def map_root_onto_main(tree_names, trees):
+    leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
+    for tn, true_tree in zip(tree_names, trees):
+        if type(true_tree) != ete3.Tree:
+            continue
+        #true_tree.unroot()
+        for sites in SITE_STEPS:
+            for n in true_tree.traverse():
+                n.add_features(root_placement = 0)
+            for i in range(TOTAL_ITERS):
+                result_tree_file = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
+                    leading_zeroes, run_iter=i),
+                 "{taxa}tree_{sites}sites".format(taxa=tn, sites=sites),
+                 "rd_output")
+                with open(result_tree_file) as infile:
+                    result_tree = ete3.Tree(infile.readline())
+                clade = get_root_clade(result_tree)
+                if len(clade) == 1:
+                    (true_tree & clade[0]).root_placement+=1
+                else:
+                    true_tree.get_common_ancestor(clade).root_placement+= 1;
+            with open("{tree_name}tree_{sites}sites_mapped_tree".format(
+                tree_name = tn, sites=sites), 'w') as outfile:
+                outfile.write(true_tree.write(format=9, features=['root_placement']))
 
 
-def summarize_results(path, tree_names):
+def summarize_results(path, tree_names, trees):
     with directory_guard(path):
-        tree_map(tree_names)
+        tree_map(tree_names, trees)
         compute_average_distance(tree_names)
+        map_root_onto_main(tree_names, trees)
 
 
 if __name__ == "__main__":
@@ -337,5 +369,4 @@ if __name__ == "__main__":
         PROGRESS_BAR_ITER.value += 1
         with multiprocessing.Pool(2) as tp:
             tp.map(exp.run_all, experiments)
-        tree_map(trees)
-        summarize_results('.', experiments[0].tree_names())
+        summarize_results('.', experiments[0].tree_names(), trees)
