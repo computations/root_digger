@@ -139,7 +139,7 @@ class exp:
                 for n in t.traverse():
                     n.dist = numpy.random.exponential(0.1) + 0.005
                 with open(os.path.join(self._run_path, str(tree)+".tree"), 'w') as tree_file:
-                    tree_file.write(t.write())
+                    tree_file.write(t.write(format=5))
                 self._tree_names.append(str(tree))
             elif type(tree) == ete3.Tree:
                 i = tree_name_counter
@@ -149,7 +149,7 @@ class exp:
                     i -= len(string.ascii_lowercase)
                 tree_filename = os.path.join(self._run_path, str(tree_name) + ".tree")
                 with open(tree_filename,'w') as tree_file:
-                    tree_file.write(tree.write())
+                    tree_file.write(tree.write(format=5))
                 self._tree_names.append(tree_name)
                 tree_name_counter += 1
 
@@ -307,6 +307,7 @@ def map_root_onto_main(tree_names, trees):
         if type(true_tree) != ete3.Tree:
             continue
         #true_tree.unroot()
+        true_tree.get_tree_root().add_features(true_root=True)
         for sites in SITE_STEPS:
             for n in true_tree.traverse():
                 n.add_features(root_placement = 0)
@@ -324,8 +325,8 @@ def map_root_onto_main(tree_names, trees):
                     true_tree.get_common_ancestor(clade).root_placement+= 1;
             with open("{tree_name}tree_{sites}sites_mapped_tree".format(
                 tree_name = tn, sites=sites), 'w') as outfile:
-                outfile.write(true_tree.write(format=9, features=['root_placement']))
-
+                outfile.write(true_tree.write(format=9,
+                    features=['root_placement', 'true_root']))
 
 def summarize_results(path, tree_names, trees):
     with directory_guard(path):
