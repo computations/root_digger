@@ -2,3 +2,4 @@ bin/*
 test/bin/*
 obj/*
 build/*
+tags
