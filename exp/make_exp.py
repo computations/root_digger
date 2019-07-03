@@ -284,8 +284,21 @@ def compute_average_distance(tree_names):
             outfile.write(','.join([str(f) for f in totals]))
             outfile.write('\n')
 
+def tree_map(trees):
+    with open('tree_map', 'w') as outfile:
+        for tree in trees:
+            if type(tree) == ete3.Tree:
+                i = tree_name_counter
+                tree_name = ''
+                while i >= 0:
+                    tree_name += string.ascii_lowercase[tree_name_counter]
+                    i -= len(string.ascii_lowercase)
+                outfile.write(tree_name + ": " + tree.write())
+
+
 def summarize_results(path, tree_names):
     with directory_guard(path):
+        tree_map(tree_names)
         compute_average_distance(tree_names)
 
 
@@ -294,22 +307,17 @@ if __name__ == "__main__":
     parser.add_argument('--path', type=str, help='Path to store the exp',
             required=True)
     parser.add_argument('--site-steps', nargs='+', type=int, required=True)
-    parser.add_argument('--taxa-steps', nargs='+', type=int)
-    parser.add_argument('--trees', type=str)
+    parser.add_argument('--trees', nargs='+', type=str)
     parser.add_argument('--iters', type=int, required=True)
     args = parser.parse_args()
 
-    if args.taxa_steps is None and args.trees is None:
-        print("either trees or taxa steps is required")
-        sys.exit(1)
-
-    if args.taxa_steps:
-        TAXA_STEPS = args.taxa_steps
-
-    else:
-        with open(args.trees) as tree_file:
-            trees = [ete3.Tree(s) for s in tree_file]
-        TAXA_STEPS = list(range(len(trees)))
+    trees = []
+    for tree in args.trees:
+        try:
+            trees.append(int(tree))
+        except ValueError:
+            with open(tree) as tree_file:
+                trees.extend([ete3.Tree(s) for s in tree_file])
 
     exp_path = os.path.abspath(args.path)
     SITE_STEPS = args.site_steps
@@ -323,13 +331,11 @@ if __name__ == "__main__":
     with directory_guard(exp_path):
         experiments = []
         for i in range(TOTAL_ITERS):
-            if args.taxa_steps:
-                experiments.append(exp('.', i, TAXA_STEPS, SITE_STEPS))
-            else:
-                experiments.append(exp('.', i, trees, SITE_STEPS))
+            experiments.append(exp('.', i, trees, SITE_STEPS))
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         with multiprocessing.Pool(2) as tp:
             tp.map(exp.run_all, experiments)
+        tree_map(trees)
         summarize_results('.', experiments[0].tree_names())
