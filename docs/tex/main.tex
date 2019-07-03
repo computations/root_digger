@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage{multirow}
 
 \title{Root Digger: a root placement program for phylogenetic trees}
 \author{Ben Bettisworth, Alexandros Stamatakis}
@@ -62,35 +63,75 @@ knowledge. The molecular clock hypothesis says that base substitution "ticks" at
 stochastically constant rate. Using this assumption, or some variation of it, a
 likely root can be placed on the root.
 
-Molecular clock analysis can also have difficulties. 
+Molecular clock analysis can also have difficulties. In particular, the clock
+does not "tick" at a constant rate all over the tree as shown in
+\cite{steiper_primate_2006} and \cite{li_molecular_1987}. Relaxed clock models
+exist which can help with this problem, but are not always successful
+\cite{battistuzzi_performance_2010}.
 
-To begin with, some definitions: A graph is a collection of objects (vertices)
-and their relationships (edges). A tree is a specific type of graph with exactly
-one path between any two nodes. A phylogenetic tree is a tree with verticies
-representing species, and edges representing an evolutionary process. Thus, a
-phylogenetic tree is a representation of evolutionary history and relationships. 
+The final method that can place a root on a tree is to perform the phylogenetic
+analysis using a non reversable model. By using a reversable model, we can place
+a direction of time for the branches on a tree \cite{yap_rooting_2005}.Several
+software packages are able to infer a phylogenetic tree under an unreversable
+model, thereby inferring a root \cite{nguyen_iq-tree:_2015}
+\cite{ronquist_mrbayes_2003}. Unfortunatly, these packages are not capible of
+taking an existing tree, and placing a root via a non-reversable model. This is
+the method we use in Root Digger to infer a root.
 
+\section{Methods}
+
+To begin with, some definitions: A {\em graph} is a collection of objects ({\em
+  vertices}) and their relationships ({\em edges}). A {\em tree} is a specific
+  type of graph with exactly one unique path between any two nodes. A {\em
+    phylogenetic tree} is a tree with verticies representing species, and edges
+    representing an evolutionary process.  Thus, a phylogenetic tree is a
+    representation of evolutionary history and relationships.
+
+{\bf TODO: Rework this, avoid the use of *valent}
 Generally, phylogenetic trees have an additional constraint: every node is
-either trivalent, or univalent. This is to say, every vertex is a leaf,
-sometimes called a tip, or an interior node with exactly 3 adjacent vertices.
-The exception to this is a specially designated node called the root. The root
-is a bivalent vertex, i.e. it has two adjacent vertices. These vertices are the
-children of the root.
+either {\em trivalent}, i.e. has exactly 3 edges adjacent to it, or {\em
+univalent}, i.e. exactly 1 edge adjacent . This is to say, every vertex is a
+leaf, sometimes called a tip, or an interior node with exactly 3 adjacent
+vertices. The exception to this is a specially designated node called the root.
+The root is a {\em bivalent} vertex, i.e. it has two adjacent edges. These
+vertices are the children of the root.
 
 In addition to a phylogenetic tree, phylogenetic inference requires a model of
 evolution. Commonly, a Markov substution process is used
-\cite{yang_computational_2006}, along with molecular data such as DNA sequences.
+\cite{yang_computational_2006}, along with sequence data such as DNA sequences.
 Using this model of evolution, a probability of one species evolving into
-another in a specified amount of time can be calcluated. By representing each
-edge of the tree as one of these Markov processes, we can calculate the
-liklihood of both the subsutution processes, and the choosen topology of the
-tree.
+another in a specified amount of time can be calcluated as the probability of
+one sequence evolving into another. By representing each edge of the tree as one
+of these Markov processes, we can calculate the liklihood of both the
+subsutution processes, and the choosen topology of the tree.
 
 Phylogenetic inference often does not seek to find a root. The reasons for this
-are many, but a large reason is the pully principle
-\cite{felsenstein_evolutionary_1981}. To summarize, the pully priniciple shows
-that on a phylogenetic model with a reversable markov process, the root
-placement doesn't affect the final likelihood of the tree.
+are many, but a large reason is the increased amount of effort required to
+perform analysis. In molecular clock and outgroup rooting, the rooting step is
+performed after the initial tree inference. If a nonreversable model is used,
+then the pully principle \cite{felsenstein_evolutionary_1981} cannot be used. To
+summarize, the pully priniciple shows that on a phylogenetic model with a
+reversable markov process, the root placement doesn't affect the final
+likelihood of the tree. If a nonreversable model is used, then the root
+placement needs to be taken into account. To exhaustivly search for the root, we
+must place a root at every possible location, and then optimize model
+parameters. If we have $n$ taxa, then doing this addtional work requires on the
+order of $2n$ additional steps {\em per tree}.
+
+Instead attempting to find the root for every tree, we can instead infer an
+unrooted tree using a reversable model, and then infer the root with a
+reversble model, using an exhaustive search. While this is faster, there are
+still challenges with optimizing the model parameters
+\cite{huelsenbeck_inferring_2002}. Specifically, there are many local optima to
+the likelihood function, which makes find maximum likelihood model parameters
+difficult.
+
+Root Digger proceeds like so: First, it places a root in a location, and then
+calculates its likelihood. Then, in order to optimize the model parameters, we
+use that likelihood to perform simulated annealing. Simulated annealing is used
+for several purposes. Primarily, it is used to avoid challenges with many
+optima, but it is also used to avoid the computation of a derivative with
+respect to the model parameters.
 
 \section{The Software}
 
@@ -102,9 +143,26 @@ placement doesn't affect the final likelihood of the tree.
 
 % Experiments:
 % - Run tests on 2 dimensions: Taxa and Sites
-% - Taxa: 10, 100, 1,000, 10,000
-% - Sites: 100, 1,000, 10,000, 100,000
-% - Ultrametric versions?
+
+To validate we ran experiments using the following pipeline:
+
+\begin{enumerate}
+\item Generate random tree with ETE3 \cite{huerta-cepas_ete_2016}
+\item Generate MSA with indelible \cite{fletcher_indelible:_2009}
+\item Run Root Digger
+\item Calculate rooted RF distance with ETE3 \cite{robinson_comparison_1981}
+\end{enumerate}
+
+Additionally, we repeat the pipeline for a specified number of iterations. We
+could vary two parameters: sites and taxa. The results from these experiements
+are summarized in table \ref{table:results}.
+
+\begin{table}
+\begin{center}
+  \include{tables/results}
+  \label{table:results}
+\end{center}
+\end{table}
 
 % Outline:
 % - indel data generation
