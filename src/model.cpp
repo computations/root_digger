@@ -478,6 +478,7 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
 root_location_t model_t::optimize_all() {
   auto cur = optimize_root_location();
   double initial_lh = cur.second;
+  auto initial_rl = cur.first;
   double final_temp = 1e-8;
   std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
@@ -486,7 +487,9 @@ root_location_t model_t::optimize_all() {
   std::vector<double> next_freq(_partition->frequencies[0],
                                 _partition->frequencies[0] +
                                     _partition->states);
-  while (true) {
+  model_params_t inital_subst {_subst_params};
+  model_params_t inital_freqs {next_freq};
+  for(size_t sa_iters = 0; sa_iters < 10; ++sa_iters){
     double temp = 1.0;
     while (temp > final_temp) {
       auto next_subst{_subst_params};
@@ -531,6 +534,9 @@ root_location_t model_t::optimize_all() {
     }
     return cur.first;
   }
+  pll_set_subst_params(_partition, 0, inital_subst.data());
+  pll_set_frequencies(_partition, 0, inital_freqs.data());
+  return initial_rl;
 }
 
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
