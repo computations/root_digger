@@ -99,7 +99,7 @@ int main(int argv, char **argc) {
     uint64_t seed = std::random_device()();
     unsigned int states = 0;
     bool silent = false;
-    double temp_param = 0.7;
+    double temp_param = 0.8;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
       case 0: // msa
@@ -127,10 +127,10 @@ int main(int argv, char **argc) {
         silent = true;
         break;
       case 8: // fast
-        temp_param = 0.6;
+        temp_param = 0.7;
         break;
       case 9: // slow
-        temp_param = 0.8;
+        temp_param = 0.9;
         break;
       case 10: // version
         print_version();
@@ -203,6 +203,7 @@ int main(int argv, char **argc) {
     if (final_rl.edge == nullptr) {
       throw std::runtime_error("No root was optimized");
     }
+    std::cout << model->compute_lh(final_rl) << std::endl;
     std::cout << model->rooted_tree(final_rl).newick() << std::endl;
 
   } catch (const std::exception &e) {

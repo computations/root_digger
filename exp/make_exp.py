@@ -206,8 +206,11 @@ class exp:
                 tree=os.path.join("../", tree_filename),
                 seed=self._seed).split(' '),
                 stdout=subprocess.PIPE)
+            lh, tree, _= rd_output.stdout.decode('utf-8').split('\n')
             with open('rd_output', 'w') as rd_outfile:
-                rd_outfile.write(rd_output.stdout.decode('utf-8'))
+                rd_outfile.write(tree)
+            with open('rd_output_lh', 'w') as rd_outfile:
+                rd_outfile.write(lh)
             self.set_rd_done('.')
 
     def run_all(self):
@@ -223,6 +226,7 @@ class exp:
 
         for tree_name in self._tree_names:
             all_trees = []
+            all_lh = [0.0]
             tree_file = os.path.join(self._run_path, str(tree_name) + ".tree")
             with open(tree_file) as tf:
                 all_trees.append(tf.read()+'\n')
@@ -234,12 +238,21 @@ class exp:
                 with directory_guard(exp_dir):
                     self.run_exp(sites, freqs, subst, tree_file)
                     with open('rd_output') as tf:
-                        all_trees.append(tf.read())
+                        all_trees.append(tf.readline())
+                    with open('rd_output_lh') as tf:
+                        all_lh.append(tf.readline())
             result_tree_file = "result_trees_{}_tree".format(tree_name)
             with open(result_tree_file, 'w') as rt:
                rt.write(''.join(all_trees))
+            result_tree_lh = "result_trees_{}_lh".format(tree_name)
+            with open(result_tree_lh, 'w') as rt:
+               rt.write('\n'.join([str(f) for f in all_lh]))
 
-            parsed_trees = [ete3.Tree(t) for t in all_trees]
+            try:
+                parsed_trees = [ete3.Tree(t) for t in all_trees]
+            except:
+                print(all_trees)
+                sys.exit(1)
             true_tree = parsed_trees[0]
             self._result_trees = parsed_trees[1:]
 
@@ -366,6 +379,6 @@ if __name__ == "__main__":
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
-        with multiprocessing.Pool(4) as tp:
+        with multiprocessing.Pool(2) as tp:
             tp.map(exp.run_all, experiments)
         summarize_results('.', experiments[0].tree_names(), trees)

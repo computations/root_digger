@@ -478,62 +478,59 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
 root_location_t model_t::optimize_all() {
   auto cur = optimize_root_location();
   double initial_lh = cur.second;
-  double temp = 1.0;
   double final_temp = 1e-8;
   std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
   std::normal_distribution<> err_subst(0.0, 0.01);
-  std::normal_distribution<> err_freqs(0.0, 0.0001);
+  std::normal_distribution<> err_freqs(0.0, 0.01);
   std::vector<double> next_freq(_partition->frequencies[0],
                                 _partition->frequencies[0] +
                                     _partition->states);
-
-  while (temp > final_temp) {
-    auto next_subst{_subst_params};
-    for (auto &r : next_subst) {
-      r += err_subst(engine);
-      if (r <= 0) {
-        r = 1e-4;
+  while (true) {
+    double temp = 1.0;
+    while (temp > final_temp) {
+      auto next_subst{_subst_params};
+      for (auto &r : next_subst) {
+        r += err_subst(engine);
+        if (r <= 0) {
+          r = 1e-4;
+        }
       }
-    }
-    pll_set_subst_params(_partition, 0, next_subst.data());
+      pll_set_subst_params(_partition, 0, next_subst.data());
 
-    for (auto &f : next_freq) {
-      f += err_subst(engine);
-      if (f <= 0) {
-        f = 1e-4;
+      for (auto &f : next_freq) {
+        f += err_subst(engine);
+        if (f <= 0) {
+          f = 1e-4;
+        }
       }
+
+      double sum = 0.0;
+      for (auto f : next_freq) {
+        sum += f;
+      }
+      for (auto &f : next_freq) {
+        sum /= f;
+      }
+
+      pll_set_frequencies(_partition, 0, next_freq.data());
+
+      auto next = optimize_root_location();
+      if (next.second > cur.second) {
+        cur = next;
+        _subst_params = next_subst;
+      } else if (exp((next.second - cur.second) / temp) > roller(engine)) {
+        cur = next;
+        _subst_params = next_subst;
+      }
+      temp *= _temp_ratio;
     }
 
-    double sum = 0.0;
-    for (auto f : next_freq) {
-      sum += f;
+    if (initial_lh > cur.second) {
+      continue;
     }
-
-    for (auto &f : next_freq) {
-      sum /= f;
-    }
-    pll_set_frequencies(_partition, 0, next_freq.data());
-
-    auto next = optimize_root_location();
-    if (next.second > cur.second) {
-      cur = next;
-      _subst_params = next_subst;
-    } else if (exp((next.second - cur.second) / temp) > roller(engine)) {
-      cur = next;
-      _subst_params = next_subst;
-    }
-    temp *= _temp_ratio;
+    return cur.first;
   }
-
-  /*
-  if (initial_lh > cur.second) {
-    throw std::runtime_error(
-        "Simulated Annealing Failed :" + std::to_string(initial_lh) + " vs. " +
-        std::to_string(cur.second));
-  }
-  */
-  return cur.first;
 }
 
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
