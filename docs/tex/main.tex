@@ -1,5 +1,7 @@
 \documentclass{article}
 \usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{graphicx}
 
 \title{Root Digger: a root placement program for phylogenetic trees}
 \author{Ben Bettisworth, Alexandros Stamatakis}
@@ -59,9 +61,9 @@ investigates this phenomenon in simulations, and that  outgroups  effecting  the
 topology of ingroups can be uncomfortably common.
 
 Alternativly, molecular clock analysis can be used to place a root without prior
-knowledge. The molecular clock hypothesis says that base substitution "ticks" at
-stochastically constant rate. Using this assumption, or some variation of it, a
-likely root can be placed on the root.
+knowledge\cite{yang_computational_2006}. The molecular clock hypothesis says
+that base substitution "ticks" at stochastically constant rate. Using this
+assumption, or some variant, a likely root can be placed on the root.
 
 Molecular clock analysis can also have difficulties. In particular, the clock
 does not "tick" at a constant rate all over the tree as shown in
@@ -80,12 +82,12 @@ the method we use in Root Digger to infer a root.
 
 \section{Methods}
 
-To begin with, some definitions: A {\em graph} is a collection of objects ({\em
-  vertices}) and their relationships ({\em edges}). A {\em tree} is a specific
-  type of graph with exactly one unique path between any two nodes. A {\em
-    phylogenetic tree} is a tree with verticies representing species, and edges
-    representing an evolutionary process.  Thus, a phylogenetic tree is a
-    representation of evolutionary history and relationships.
+To begin with, some definitions: A \textit{graph} is a collection of objects
+(\textit{vertices}) and their relationships ({\em edges}). A {\em tree} is a
+specific type of graph with exactly one unique path between any two nodes. A
+{\em phylogenetic tree} is a tree with verticies representing species, and edges
+representing an evolutionary process.  Thus, a phylogenetic tree is a
+representation of evolutionary history and relationships.
 
 {\bf TODO: Rework this, avoid the use of *valent}
 Generally, phylogenetic trees have an additional constraint: every node is
@@ -130,19 +132,25 @@ Root Digger proceeds like so: First, it places a root in a location, and then
 calculates its likelihood. Then, in order to optimize the model parameters, we
 use that likelihood to perform simulated annealing. Simulated annealing is used
 for several purposes. Primarily, it is used to avoid challenges with many
-optima, but it is also used to avoid the computation of a derivative with
-respect to the model parameters.
+optima, (see \cite{huelsenbeck_inferring_2002}) but it is also used to avoid the
+computation of a derivative with respect to the model parameters.
 
 \section{The Software}
 
-% Outline:
-% - Options
-% - How the software works (maybe)
+In order to implement both phylogenetic inference and non-reverable models, Root
+Digger has two major dependancies: GNU Scientific Library (GSL)
+\cite{gough_gnu_2009} and the Phylogenetic Likelihood Library (LibPLL)
+\cite{flouri_phylogenetic_2015}. GSL is used to assist in the decomposition of
+a non-symmetric rate matrix, and LibPLL is used for efficient likelihood
+calculation.
+
+Usage of Root Digger is simple. All that is required is a metric tree in newick
+format, and an alignment in either phylip or fasta format.  The code,
+documentation, experiments scripts, as well as any modifications to existing
+library can be found at
+github\footnote{\url{https://github.com/computations/root_digger}}.
 
 \section{Experiment and Results}
-
-% Experiments:
-% - Run tests on 2 dimensions: Taxa and Sites
 
 To validate we ran experiments using the following pipeline:
 
@@ -150,12 +158,20 @@ To validate we ran experiments using the following pipeline:
 \item Generate random tree with ETE3 \cite{huerta-cepas_ete_2016}
 \item Generate MSA with indelible \cite{fletcher_indelible:_2009}
 \item Run Root Digger
-\item Calculate rooted RF distance with ETE3 \cite{robinson_comparison_1981}
+\item Compute comparisons
+\begin{enumerate}
+  \item Calculate rooted RF distance with ETE3 \cite{robinson_comparison_1981}
+  \item Map root placement onto original tree.
+\end{enumerate}
+
 \end{enumerate}
 
 Additionally, we repeat the pipeline for a specified number of iterations. We
 could vary two parameters: sites and taxa. The results from these experiements
-are summarized in table \ref{table:results}.
+are summarized in table \ref{table:results}. The distance given is the average
+distance from the branch with the true root to the infered root location over
+512 trials. {\bf TODO: better summary statistic? This isn't a symmetric
+distribution, so the mean is biased}.
 
 \begin{table}
 \begin{center}
@@ -163,6 +179,31 @@ are summarized in table \ref{table:results}.
   \label{table:results}
 \end{center}
 \end{table}
+
+
+\begin{figure}
+  \includegraphics[width=.9\linewidth]{figs/random_tree_6400_sites.png}
+  \caption{Tree displaying the frequency of root mappings onto the true tree.
+  Total trials $n=100$.}
+  \label{fig:mapped_tree}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=.9\linewidth]{figs/uniform_tree_6400_sites.png}
+  \caption{Tree displaying the frequency of root mappings onto the true tree.
+    This tree has uniform branch lengths. Total trials $n=100$.}
+  \label{fig:mapped_uniform_tree}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=.9\linewidth]{figs/lba_tree2.png}
+  \caption{Tree displaying the frequency of root mappings onto the true tree.
+  This tree has a long branch leading from a, which is 50 times larger than the
+  other two branches. Total trials $n=100$.}
+  \label{fig:lba_tree}
+\end{figure}
+
+\textbf{TODO?: Time benchmarks}
 
 % Outline:
 % - indel data generation
@@ -173,8 +214,17 @@ are summarized in table \ref{table:results}.
 
 \section{Conclusion}
 
-% Outline:
-% - Tell 'em what you told 'em
+Placing a root by a non-reversable model is challenging. Traditional
+optimization methods have many difficulties finding true optima in a space with
+many local optima. Nevertheless, a root can be placed efficiently and accuratly.
+
+We found that with our method, the root was reasonably stable for various
+lengths of alignments. This suggests that the placement of a root on a tree can
+be done even when large quantities of data are not present.
+
+There are several improvements to the software that can be done. First is
+implementing an analytical derivative for the likelihood of a placement of a
+root along a given branch.
 
 \bibliographystyle{acm}
 \bibliography{main}
