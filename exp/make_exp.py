@@ -353,6 +353,7 @@ if __name__ == "__main__":
     parser.add_argument('--site-steps', nargs='+', type=int, required=True)
     parser.add_argument('--trees', nargs='+', type=str)
     parser.add_argument('--iters', type=int, required=True)
+    parser.add_argument('--procs', type=int, default=None)
     args = parser.parse_args()
 
     trees = []
@@ -379,6 +380,6 @@ if __name__ == "__main__":
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
-        with multiprocessing.Pool(2) as tp:
+        with multiprocessing.Pool(args.procs) as tp:
             tp.map(exp.run_all, experiments)
         summarize_results('.', experiments[0].tree_names(), trees)
