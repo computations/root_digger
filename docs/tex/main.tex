@@ -155,15 +155,15 @@ github\footnote{\url{https://github.com/computations/root_digger}}.
 To validate we ran experiments using the following pipeline:
 
 \begin{enumerate}
-\item Generate random tree with ETE3 \cite{huerta-cepas_ete_2016}
-\item Generate MSA with indelible \cite{fletcher_indelible:_2009}
-\item Run Root Digger
+\item Generate a random tree with ETE3 \cite{huerta-cepas_ete_2016} and random
+  model parameters.
+\item Simulate an MSA with indelible \cite{fletcher_indelible:_2009}
+\item Run Root Digger on the simulated MSA, given the generated random tree.
 \item Compute comparisons
 \begin{enumerate}
   \item Calculate rooted RF distance with ETE3 \cite{robinson_comparison_1981}
   \item Map root placement onto original tree.
 \end{enumerate}
-
 \end{enumerate}
 
 Additionally, we repeat the pipeline for a specified number of iterations. We
@@ -173,13 +173,16 @@ distance from the branch with the true root to the infered root location over
 512 trials. {\bf TODO: better summary statistic? This isn't a symmetric
 distribution, so the mean is biased}.
 
+Furthermore, we also mapped the root back onto the original tree so that we
+could gain insight to where the root was placed. These mappings are shown in
+figures \ref{fig:mapped_tree}~-~\ref{fig:lba_tree2}.
+
 \begin{table}
 \begin{center}
   \include{tables/results}
   \label{table:results}
 \end{center}
 \end{table}
-
 
 \begin{figure}
   \includegraphics[width=.9\linewidth]{figs/random_tree_6400_sites.png}
@@ -198,9 +201,17 @@ distribution, so the mean is biased}.
 \begin{figure}
   \includegraphics[width=.9\linewidth]{figs/lba_tree2.png}
   \caption{Tree displaying the frequency of root mappings onto the true tree.
-  This tree has a long branch leading from a, which is 50 times larger than the
+  This tree has a long branch leading from d, which is 50 times larger than the
   other two branches. Total trials $n=100$.}
   \label{fig:lba_tree}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=.9\linewidth]{figs/lba_tree4.png}
+  \caption{Tree displaying the frequency of root mappings onto the true tree.
+  This tree has a long branch leading from e, which is 50 times larger than the
+  other two branches. Total trials $n=100$.}
+  \label{fig:lba_tree2}
 \end{figure}
 
 \textbf{TODO?: Time benchmarks}
@@ -218,13 +229,34 @@ Placing a root by a non-reversable model is challenging. Traditional
 optimization methods have many difficulties finding true optima in a space with
 many local optima. Nevertheless, a root can be placed efficiently and accuratly.
 
+We did find evidence of a form of long branch attraction. In figures
+\ref{fig:lba_tree} and \ref{fig:lba_tree2} we can see examples of this. In these
+cases, an interior branch is exceptionally (50x) longer than the rest of the
+braches. We claim that while this is concerning, it is also a pathalogical case.
+Normally, a taxa with such a long branch length leading to it would be
+considered an outgroup.
+
+Other than the pathelogical cases of extremely long branches, we found that Root
+Digger manages to place the root with good accuracy, normally exceeding 60\%,
+more often falling in the 75\% range. This suggests a good convergence, where
+multiple runs of Root Digger strongly reinforce the true location of the root.
+
 We found that with our method, the root was reasonably stable for various
 lengths of alignments. This suggests that the placement of a root on a tree can
 be done even when large quantities of data are not present.
 
-There are several improvements to the software that can be done. First is
-implementing an analytical derivative for the likelihood of a placement of a
-root along a given branch.
+Going forward, there are several improvements to the software that can be done.
+First is implementing an analytical derivative for the likelihood of a placement
+of a root along a given branch. Root digger spends \~ 40\% of its time,
+calculating this derivative. While computing the derivative analyticallly
+wouldn't eliminate the time spent on calculating derivatives, it will likely
+reduce it by at least half.
+
+Secondly, there are feature improvements that could be made. Currently, Root
+Digger only supports single partition models with the UNREST (called 12.12 in IQ
+tree) model. An obvious improvement is to increase the number of models that are
+supported, particularly those models which are a part of the Lie Group
+\cite{woodhams_new_2015}.
 
 \bibliographystyle{acm}
 \bibliography{main}
