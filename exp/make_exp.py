@@ -351,7 +351,7 @@ if __name__ == "__main__":
     parser.add_argument('--path', type=str, help='Path to store the exp',
             required=True)
     parser.add_argument('--site-steps', nargs='+', type=int, required=True)
-    parser.add_argument('--trees', nargs='+', type=str)
+    parser.add_argument('--trees', nargs='+', type=str, required=True)
     parser.add_argument('--iters', type=int, required=True)
     parser.add_argument('--procs', type=int, default=None)
     args = parser.parse_args()
