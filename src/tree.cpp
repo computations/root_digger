@@ -3,6 +3,7 @@
 extern "C" {
 #include <libpll/pll_tree.h>
 }
+#include <algorithm>
 #include <iostream>
 #include <unordered_set>
 
@@ -226,8 +227,8 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   debug_string("traversal after root");
   for (auto node : trav_buf) {
     debug_print("traversal node label: %s, pmatrix index: %d, clv index: %d",
-                 (node->label != nullptr ? node->label : "null"),
-                 node->pmatrix_index, node->clv_index);
+                (node->label != nullptr ? node->label : "null"),
+                node->pmatrix_index, node->clv_index);
   }
 
   std::vector<pll_operation_t> ops(trav_buf.size());
@@ -299,4 +300,18 @@ std::string rooted_tree_t::newick() const {
 void rooted_tree_t::show_tree() const {
   pll_utree_show_ascii(_tree->vroot,
                        PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH);
+}
+
+bool rooted_tree_t::sanity_check() const {
+  auto nodes = full_traverse();
+  std::sort(nodes.begin(), nodes.end(), [](pll_unode_t *a, pll_unode_t *b) {
+    return a->length < b->length;
+  });
+  double median = (nodes[nodes.size() / 2]->length +
+                   nodes[(nodes.size() + 1) / 2]->length) /
+                  2.0;
+  if (median * 10 < (*(nodes.end()-1))->length) {
+    return false;
+  }
+  return true;
 }

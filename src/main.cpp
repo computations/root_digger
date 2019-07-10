@@ -77,12 +77,19 @@ void print_usage() {
 int main(int argv, char **argc) {
   auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
-      {"msa", required_argument, 0, 0},   {"tree", required_argument, 0, 0},
-      {"model", required_argument, 0, 0}, {"freqs", required_argument, 0, 0},
-      {"seed", required_argument, 0, 0},  {"states", required_argument, 0, 0},
-      {"verbose", no_argument, 0, 0},     {"silent", no_argument, 0, 0},
-      {"fast", no_argument, 0, 0},        {"slow", no_argument, 0, 0},
-      {"version", no_argument, 0, 0},     {0, 0, 0, 0},
+      {"msa", required_argument, 0, 0},
+      {"tree", required_argument, 0, 0},
+      {"model", required_argument, 0, 0},
+      {"freqs", required_argument, 0, 0},
+      {"seed", required_argument, 0, 0},
+      {"states", required_argument, 0, 0},
+      {"verbose", no_argument, 0, 0},
+      {"silent", no_argument, 0, 0},
+      {"fast", no_argument, 0, 0},
+      {"slow", no_argument, 0, 0},
+      {"force", no_argument, 0, 0},
+      {"version", no_argument, 0, 0},
+      {0, 0, 0, 0},
   };
 
   if (argv == 1) {
@@ -100,6 +107,7 @@ int main(int argv, char **argc) {
     unsigned int states = 0;
     bool silent = false;
     double temp_param = 0.8;
+    bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
       case 0: // msa
@@ -132,7 +140,10 @@ int main(int argv, char **argc) {
       case 9: // slow
         temp_param = 0.9;
         break;
-      case 10: // version
+      case 10: // force
+        sanity_checks = false;
+        break;
+      case 11: // version
         print_version();
         return 0;
       default:
@@ -180,6 +191,17 @@ int main(int argv, char **argc) {
 
     msa_t msa{msa_filename, map, states};
     rooted_tree_t tree{tree_filename};
+
+    if (sanity_checks) {
+      if (!tree.sanity_check()) {
+        std::cout << "WARNING: Refusing to run. An extremely long branch is "
+                     "present in the provided tree. Roots are extremely likely "
+                     "to be erronously placed on this branch. Use '--force' to "
+                     "override this warning"
+                  << std::endl;
+      }
+    }
+
     std::shared_ptr<model_t> model;
     if (freqs_filename.empty() && model_filename.empty()) {
       model.reset(new model_t{tree, msa, seed});
@@ -193,6 +215,7 @@ int main(int argv, char **argc) {
                               parse_model_file(freqs_filename), seed});
     }
     model->set_temp_ratio(temp_param);
+
 
     root_location_t final_rl;
     if (model_filename.empty()) {

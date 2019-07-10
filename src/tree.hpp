@@ -79,6 +79,7 @@ public:
   void update_root(root_location_t);
   void unroot();
   bool rooted() const;
+  bool sanity_check() const;
 
   std::string newick() const;
 
