@@ -310,7 +310,7 @@ bool rooted_tree_t::sanity_check() const {
   double median = (nodes[nodes.size() / 2]->length +
                    nodes[(nodes.size() + 1) / 2]->length) /
                   2.0;
-  if (median * 10 < (*(nodes.end()-1))->length) {
+  if (median * 10 < (*(nodes.end() - 1))->length) {
     return false;
   }
   return true;

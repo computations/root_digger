@@ -130,9 +130,15 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
   auto label_map = _tree.label_map();
 
   /* use the label map to assign tip states in the partition */
+
   for (int i = 0; i < msa.count(); ++i) {
-    pll_set_tip_states(_partition, label_map.at(msa.label(i)), msa.map(),
-                       msa.sequence(i));
+    try {
+      pll_set_tip_states(_partition, label_map.at(msa.label(i)), msa.map(),
+                         msa.sequence(i));
+    } catch (const std::exception &e) {
+      throw std::runtime_error(std::string("Could not find taxa ") +
+                               msa.label(i) + " in tree");
+    }
   }
 
   /* set pattern weights */
@@ -487,9 +493,9 @@ root_location_t model_t::optimize_all() {
   std::vector<double> next_freq(_partition->frequencies[0],
                                 _partition->frequencies[0] +
                                     _partition->states);
-  model_params_t inital_subst {_subst_params};
-  model_params_t inital_freqs {next_freq};
-  for(size_t sa_iters = 0; sa_iters < 10; ++sa_iters){
+  model_params_t inital_subst{_subst_params};
+  model_params_t inital_freqs{next_freq};
+  for (size_t sa_iters = 0; sa_iters < 10; ++sa_iters) {
     double temp = 1.0;
     while (temp > final_temp) {
       auto next_subst{_subst_params};
