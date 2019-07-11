@@ -15,6 +15,8 @@ import string
 import ete3
 import numpy
 import progressbar
+from Bio import SeqIO
+import Bio
 
 if not shutil.which("indelible"):
     print("Please add indelible to your path")
@@ -47,8 +49,6 @@ RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --see
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
-TAXA_STEPS = []
-SITE_STEPS = []
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
 TOTAL_ITERS = 4
 
@@ -106,7 +106,7 @@ class freq_params:
         return ','.join([str(f) for f in p])
 
 class exp:
-    def __init__(self, root_path, run_iter, trees, site_steps, seed=None):
+    def __init__(self, root_path, run_iter, trees, aligns, seed=None):
         self._run_iter = run_iter
         leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
         self._run_path = os.path.abspath(os.path.join(root_path,
@@ -127,7 +127,6 @@ class exp:
             with open(self._seed_file) as sf:
                 self._seed = int(sf.read())
 
-        self._site_steps = site_steps
         self._tree_names = []
         tree_name_counter = 0
         for tree in trees:
@@ -140,16 +139,23 @@ class exp:
                     tree_file.write(t.write(format=5))
                 self._tree_names.append(str(tree))
             elif type(tree) == ete3.Tree:
-                i = tree_name_counter
-                tree_name = ''
-                while i >= 0:
-                    tree_name += string.ascii_lowercase[tree_name_counter]
-                    i -= len(string.ascii_lowercase)
+                tree_name = base26_encode(tree_name_counter, len(trees))
+                tree_name_counter += 1
                 tree_filename = os.path.join(self._run_path, str(tree_name) + ".tree")
                 with open(tree_filename,'w') as tree_file:
                     tree_file.write(tree.write(format=5))
                 self._tree_names.append(tree_name)
-                tree_name_counter += 1
+
+        self._site_steps = []
+        self._aligns = []
+        align_name_counter = 0
+        for align in aligns:
+            if type(align) == int:
+                self._site_steps.append(align)
+            elif type(align) == list:
+                align_name = base26_encode(align_name_counter, len(aligns))
+                align_name_counter += 1
+                self._aligns.append((align_name, align))
 
     @staticmethod
     def check_done_indel(path):
@@ -191,7 +197,7 @@ class exp:
                 sites = sites,
                 randomseed = self._seed)
 
-    def run_exp(self, sites, freqs, subst, tree_filename):
+    def gen_indel_alignment(self, sites, freqs, subst, tree_filename):
         with open(tree_filename) as treef:
             tree = treef.read()
         with open('control.txt', 'w') as control_txt:
@@ -201,8 +207,9 @@ class exp:
             subprocess.run("indelible", stdout=subprocess.DEVNULL)
             self.set_indel_done('.')
 
+    def run_exp(self, tree_filename, msa):
         if not self.check_done_rd('.'):
-            rd_output = subprocess.run(RD.format(msa="seqs_TRUE.phy",
+            rd_output = subprocess.run(RD.format(msa=msa,
                 tree=os.path.join("../", tree_filename),
                 seed=self._seed).split(' '),
                 stdout=subprocess.PIPE)
@@ -236,7 +243,22 @@ class exp:
                 if not os.path.exists(exp_dir):
                     os.mkdir(exp_dir)
                 with directory_guard(exp_dir):
-                    self.run_exp(sites, freqs, subst, tree_file)
+                    self.gen_indel_alignment(sites, freqs, subst, tree_file)
+                    self.run_exp(tree_file, 'seqs_TRUE.phy')
+                    with open('rd_output') as tf:
+                        all_trees.append(tf.readline())
+                    with open('rd_output_lh') as tf:
+                        all_lh.append(tf.readline())
+            for align_name, align in self._aligns:
+                exp_dir = "{taxa}tree_{align_name}align".format(taxa=tree_name,
+                        align_name=align_name)
+                if not os.path.exists(exp_dir):
+                    os.mkdir(exp_dir)
+                with directory_guard(exp_dir):
+                    align_filename = str(align_name) + ".fasta"
+                    with open(align_filename,'w') as align_file:
+                        SeqIO.write(align, align_file, 'fasta')
+                    self.run_exp(tree_file, msa=align_filename)
                     with open('rd_output') as tf:
                         all_trees.append(tf.readline())
                     with open('rd_output_lh') as tf:
@@ -262,7 +284,8 @@ class exp:
                     parsed_trees[i]))
             with open('rfdists_{taxa}_tree'.format(taxa=tree_name), 'w')\
                     as rf_outfile:
-                rf_outfile.write(','.join([str(i) for i in SITE_STEPS]))
+                rf_outfile.write(','.join([str(i) for i in self._site_steps] +
+                    [a for a, _ in self._aligns]))
                 rf_outfile.write('\n')
                 rf_outfile.write(','.join([str(f) for f in rfdists]))
                 rf_outfile.write('\n')
@@ -276,11 +299,18 @@ class exp:
     def result_trees(self):
         return self._result_trees
 
+    def align_names(self):
+        return [a for a, _ in self._aligns]
+
+    def site_steps(self):
+        return [str(s) for s in self._site_steps]
+
 def compute_root_distance(t1, t2):
     result = t1.robinson_foulds(t2)
     return result[0]/2
 
-def compute_average_distance(tree_names):
+"""
+def compute_average_distance(tree_names, aligns):
     for tree in tree_names:
         leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
         nrows = len(SITE_STEPS)
@@ -300,6 +330,7 @@ def compute_average_distance(tree_names):
             outfile.write('\n')
             outfile.write(','.join([str(f) for f in totals]))
             outfile.write('\n')
+"""
 
 def tree_map(tree_names, trees):
     with open('tree_map', 'w') as outfile:
@@ -312,14 +343,13 @@ def get_root_clade(tree):
     return sorted([n.name for n in tree.get_tree_root().children[0].traverse() if 
             n.name != ''])
 
-def map_root_onto_main(tree_names, trees):
+def map_root_onto_main(tree_names, trees, site_steps, aligns):
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
     for tn, true_tree in zip(tree_names, trees):
         if type(true_tree) != ete3.Tree:
             continue
-        #true_tree.unroot()
         true_tree.get_tree_root().add_features(true_root=True)
-        for sites in SITE_STEPS:
+        for sites in site_steps:
             for n in true_tree.traverse():
                 n.add_features(root_placement = 0)
             for i in range(TOTAL_ITERS):
@@ -338,19 +368,47 @@ def map_root_onto_main(tree_names, trees):
                 tree_name = tn, sites=sites), 'w') as outfile:
                 outfile.write(true_tree.write(format=9,
                     features=['root_placement', 'true_root']))
+        for align in aligns:
+            for n in true_tree.traverse():
+                n.add_features(root_placement = 0)
+            for i in range(TOTAL_ITERS):
+                result_tree_file = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
+                    leading_zeroes, run_iter=i),
+                 "{taxa}tree_{align}align".format(taxa=tn, align=align),
+                 "rd_output")
+                with open(result_tree_file) as infile:
+                    result_tree = ete3.Tree(infile.readline())
+                clade = get_root_clade(result_tree)
+                if len(clade) == 1:
+                    (true_tree & clade[0]).root_placement+=1
+                else:
+                    true_tree.get_common_ancestor(clade).root_placement+= 1;
+            with open("{tree_name}tree_{align}align_mapped_tree".format(
+                tree_name = tn, align=align), 'w') as outfile:
+                outfile.write(true_tree.write(format=9,
+                    features=['root_placement', 'true_root']))
 
-def summarize_results(path, tree_names, trees):
+def summarize_results(path, tree_names, trees, site_steps, aligns):
     with directory_guard(path):
         tree_map(tree_names, trees)
-        compute_average_distance(tree_names)
-        map_root_onto_main(tree_names, trees)
+        #compute_average_distance(tree_names)
+        map_root_onto_main(tree_names, trees, site_steps, aligns)
 
+
+def base26_encode(index, maximum):
+    if index == 0:
+        return 'a'
+    iters = math.ceil(math.log(maximum, 26))
+    bases = [string.ascii_lowercase[(index % ( 26 ** (e +1))) // (26 ** e)] for
+        e in range(iters)]
+    bases.reverse()
+    return ''.join(bases)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, help='Path to store the exp',
             required=True)
-    parser.add_argument('--site-steps', nargs='+', type=int, required=True)
+    parser.add_argument('--msa', nargs='+', type=str, required=True)
     parser.add_argument('--trees', nargs='+', type=str, required=True)
     parser.add_argument('--iters', type=int, required=True)
     parser.add_argument('--procs', type=int, default=None)
@@ -364,8 +422,14 @@ if __name__ == "__main__":
             with open(tree) as tree_file:
                 trees.extend([ete3.Tree(s) for s in tree_file])
 
+    aligns = []
+    for align in args.msa:
+        try:
+            aligns.append(int(align))
+        except ValueError:
+            aligns.append(list(SeqIO.parse(align, os.path.splitext(align)[1].strip('.'))))
+
     exp_path = os.path.abspath(args.path)
-    SITE_STEPS = args.site_steps
     TOTAL_ITERS = args.iters
 
     PROGRESS_BAR = progressbar.ProgressBar(max_value = TOTAL_ITERS)
@@ -376,10 +440,11 @@ if __name__ == "__main__":
     with directory_guard(exp_path):
         experiments = []
         for i in range(TOTAL_ITERS):
-            experiments.append(exp('.', i, trees, SITE_STEPS))
+            experiments.append(exp('.', i, trees, aligns))
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         with multiprocessing.Pool(args.procs) as tp:
             tp.map(exp.run_all, experiments)
-        summarize_results('.', experiments[0].tree_names(), trees)
+        summarize_results('.', experiments[0].tree_names(), trees,
+                experiments[0].site_steps(), experiments[0].align_names())
