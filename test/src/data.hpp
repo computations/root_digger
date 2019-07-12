@@ -5,5 +5,6 @@
 #include <vector>
 
 extern std::vector<std::pair<std::string, std::string>> data_files_dna;
+extern std::vector<std::string> check_trees;
 
 #endif

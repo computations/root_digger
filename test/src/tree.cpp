@@ -268,3 +268,14 @@ TEST_CASE("rooted_tree_t check derivative vs regular operations",
     CHECK(op_root.child2_matrix_index == regular_end_op.child2_matrix_index);
   }
 }
+
+TEST_CASE("rooted_tree_t sanity check", "[rooted_tree_t]"){
+  rooted_tree_t t1(check_trees[0]);
+  CHECK(!t1.sanity_check());
+
+  rooted_tree_t t2(check_trees[1]);
+  CHECK(!t2.sanity_check());
+
+  rooted_tree_t t3(check_trees[2]);
+  CHECK(t3.sanity_check());
+}
