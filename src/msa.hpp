@@ -7,6 +7,7 @@ extern "C" {
 
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename);
 
@@ -27,6 +28,8 @@ public:
   unsigned int states() const;
   int count() const;
   int length() const;
+
+  bool constiency_check(std::unordered_set<std::string>) const;
 
   ~msa_t();
 

@@ -1,6 +1,7 @@
 #include "msa.hpp"
 #include <stdexcept>
 #include <vector>
+
 extern "C"{
 #include <libpll/pll_msa.h>
 }
@@ -87,6 +88,28 @@ int msa_t::count() const{
 
 int msa_t::length() const{
   return _msa->length;
+}
+
+bool msa_t::constiency_check(std::unordered_set<std::string> labels) const{
+  std::unordered_set<std::string> taxa;
+  for(int i = 0 ; i < _msa->count; ++i){
+    taxa.insert(_msa->label[i]);
+  }
+
+  // labels subset taxa
+  for (const std::string& k : labels){
+    if(taxa.find(k) == taxa.end()){
+      return false;
+    }
+  }
+
+  // taxa subset labels
+  for (const std::string& k : taxa){
+    if(labels.find(k) == labels.end()){
+      return false;
+    }
+  }
+  return true;
 }
 
 msa_t::~msa_t(){

@@ -88,6 +88,11 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
 
   _tree = std::move(tree);
 
+  if (!msa.constiency_check(_tree.label_set())) {
+    throw std::invalid_argument(
+        "Taxa on the tree and in the MSA are inconsistient");
+  }
+
   /*
    * Only one submodel will be used for the time being. If there is desire for
    * more, we can add support for more models..

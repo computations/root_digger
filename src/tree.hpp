@@ -7,6 +7,7 @@ extern "C" {
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -67,6 +68,7 @@ public:
   unsigned int root_scaler_index() const;
 
   std::unordered_map<std::string, unsigned int> label_map() const;
+  std::unordered_set<std::string> label_set() const;
 
   std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
              std::vector<double>>
@@ -79,6 +81,7 @@ public:
   void update_root(root_location_t);
   void unroot();
   bool rooted() const;
+  bool branch_length_sanity_check() const;
   bool sanity_check() const;
 
   std::string newick() const;

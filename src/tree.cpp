@@ -61,11 +61,25 @@ unsigned int rooted_tree_t::root_scaler_index() const {
 
 std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
   std::unordered_map<std::string, unsigned int> label_map;
+  if(_tree == nullptr){
+    return label_map;
+  }
   for (unsigned int i = 0; i < tip_count(); ++i) {
     auto cur_node = _tree->nodes[i];
     label_map[cur_node->label] = cur_node->clv_index;
   }
   return label_map;
+}
+
+std::unordered_set<std::string> rooted_tree_t::label_set() const{
+  std::unordered_set<std::string> label_set;
+  if(_tree == nullptr){
+    return label_set;
+  }
+  for (unsigned int i = 0; i < tip_count(); ++i) {
+    label_set.insert(_tree->nodes[i]->label);
+  }
+  return label_set;
 }
 
 void rooted_tree_t::generate_root_locations() {
@@ -222,7 +236,6 @@ std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_operations(const root_location_t &new_root) {
   root_by(new_root);
-
   auto trav_buf = full_traverse();
   debug_string("traversal after root");
   for (auto node : trav_buf) {
@@ -302,16 +315,25 @@ void rooted_tree_t::show_tree() const {
                        PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH);
 }
 
-bool rooted_tree_t::sanity_check() const {
+bool rooted_tree_t::branch_length_sanity_check() const {
   auto nodes = full_traverse();
+  nodes.pop_back();
   std::sort(nodes.begin(), nodes.end(), [](pll_unode_t *a, pll_unode_t *b) {
     return a->length < b->length;
   });
-  double median = (nodes[nodes.size() / 2]->length +
-                   nodes[(nodes.size() + 1) / 2]->length) /
-                  2.0;
-  if (median * 10 < (*(nodes.end() - 1))->length) {
+
+  size_t median_index1 = (nodes.size() - 1) / 2;
+  size_t median_index2 = (nodes.size()) / 2;
+  double median =
+      (nodes[median_index1]->length + nodes[median_index2]->length) / 2.0;
+
+  if (median * 10.0 < (*(nodes.end() - 1))->length ||
+      ((*nodes.begin())->length) < median / 10.0) {
     return false;
   }
   return true;
+}
+
+bool rooted_tree_t::sanity_check() const {
+  return branch_length_sanity_check();
 }
