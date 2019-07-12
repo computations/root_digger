@@ -4,3 +4,4 @@ obj/*
 build/*
 tags
 *.tar.gz
+exp/*
