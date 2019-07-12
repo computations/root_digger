@@ -177,6 +177,8 @@ Furthermore, we also mapped the root back onto the original tree so that we
 could gain insight to where the root was placed. These mappings are shown in
 figures \ref{fig:mapped_tree}~-~\ref{fig:lba_tree2}.
 
+{\bf TODO: add a reverse LBA example}
+
 \begin{table}
 \begin{center}
   \include{tables/results}
@@ -213,6 +215,22 @@ figures \ref{fig:mapped_tree}~-~\ref{fig:lba_tree2}.
   other two branches. Total trials $n=100$.}
   \label{fig:lba_tree2}
 \end{figure}
+
+\begin{figure}
+  \includegraphics[width=.9\linewidth]{figs/reverse_lba1.png}
+  \caption{Tree displaying the frequency of root mappings onto the true tree.
+  This tree has a short branch leading from e, which is 50 times shorter than
+  the other two branches. Total trials $n=100$.}
+  \label{fig:reverse_lba_tree}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=.9\linewidth]{figs/lba_control.png}
+  \caption{Tree displaying the frequency of root mappings onto the true tree.
+  This tree has uniform branch lengths. Total trials $n=100$.}
+  \label{fig:reverse_lba_tree}
+\end{figure}
+
 
 \textbf{TODO?: Time benchmarks}
 
