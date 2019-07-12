@@ -1,8 +1,9 @@
 #include "msa.hpp"
+#include "debug.h"
 #include <stdexcept>
 #include <vector>
 
-extern "C"{
+extern "C" {
 #include <libpll/pll_msa.h>
 }
 
@@ -56,64 +57,60 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
   throw std::invalid_argument("Could not parse msa file");
 }
 
-char* msa_t::sequence(int index) const{
-  if(index < _msa->count && !(index<0))
+char *msa_t::sequence(int index) const {
+  if (index < _msa->count && !(index < 0))
     return _msa->sequence[index];
   throw std::out_of_range("Requested sequence does not exist");
 }
 
-char* msa_t::label(int index) const{
-  if(index < _msa->count && !(index<0))
+char *msa_t::label(int index) const {
+  if (index < _msa->count && !(index < 0))
     return _msa->label[index];
   throw std::out_of_range("Requested label does not exist");
 }
 
-unsigned int* msa_t::weights() const{
+unsigned int *msa_t::weights() const {
   if (_weights)
     return _weights;
   throw std::runtime_error("msa_t has no weights");
 }
 
-const pll_state_t* msa_t::map() const{
-  return _map;
-}
+const pll_state_t *msa_t::map() const { return _map; }
 
-unsigned int msa_t::states() const{
-  return _states;
-}
+unsigned int msa_t::states() const { return _states; }
 
-int msa_t::count() const{
-  return _msa->count;
-}
+int msa_t::count() const { return _msa->count; }
 
-int msa_t::length() const{
-  return _msa->length;
-}
+int msa_t::length() const { return _msa->length; }
 
-bool msa_t::constiency_check(std::unordered_set<std::string> labels) const{
+bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   std::unordered_set<std::string> taxa;
-  for(int i = 0 ; i < _msa->count; ++i){
+  for (int i = 0; i < _msa->count; ++i) {
     taxa.insert(_msa->label[i]);
   }
 
+  bool ret = true;
+
   // labels subset taxa
-  for (const std::string& k : labels){
-    if(taxa.find(k) == taxa.end()){
-      return false;
+  for (const std::string &k : labels) {
+    if (taxa.find(k) == taxa.end()) {
+      debug_print("Taxa %s in msa is not present on the tree", k.c_str());
+      ret = false;
     }
   }
 
   // taxa subset labels
-  for (const std::string& k : taxa){
-    if(labels.find(k) == labels.end()){
-      return false;
+  for (const std::string &k : taxa) {
+    if (labels.find(k) == labels.end()) {
+      debug_print("Taxa %s on tree is not present in the msa", k.c_str());
+      ret = false;
     }
   }
-  return true;
+  return ret;
 }
 
-msa_t::~msa_t(){
-  if(_msa)
+msa_t::~msa_t() {
+  if (_msa)
     pll_msa_destroy(_msa);
   if (_weights)
     free(_weights);

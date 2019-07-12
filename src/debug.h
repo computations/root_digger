@@ -29,8 +29,7 @@ extern bool __VERBOSE__;
   do {                                                                         \
     if (DEBUG_IF_FLAG && EMIT_DEBUG_FLAG) {                                    \
       print_clock;                                                             \
-      fprintf(stderr, "[%s:%s:%d]: " fmt "\n", __FILE__, __func__, __LINE__,   \
-              __VA_ARGS__);                                                    \
+      fprintf(stderr, "[%s:%d]: " fmt "\n", __func__, __LINE__, __VA_ARGS__);  \
     }                                                                          \
   } while (0)
 
