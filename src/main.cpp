@@ -199,6 +199,7 @@ int main(int argv, char **argc) {
                      "to be erronously placed on this branch. Use '--force' to "
                      "override this warning"
                   << std::endl;
+        return 1;
       }
     }
 
