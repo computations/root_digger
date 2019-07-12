@@ -3,3 +3,4 @@ test/bin/*
 obj/*
 build/*
 tags
+*.tar.gz
