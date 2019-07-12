@@ -6,4 +6,5 @@ Dryad: https://www.datadryad.org/resource/doi:10.5061/dryad.t5v58
 
 # Modifications
 
-None.
+The outgroup was present in the MSA, but not in the tree, so the outgroup was
+removed from the MSA after conversion.

@@ -25,3 +25,4 @@ spiders/ml_primary.tree filter=lfs diff=lfs merge=lfs -text
 spiders/primary.nex filter=lfs diff=lfs merge=lfs -text
 spiders/original/Leduc-Robert&Maddison_Habronattus-AlignedMatrices.tgz filter=lfs diff=lfs merge=lfs -text
 spiders/original/Leduc-Robert&Maddison_Habronattus-Trees.nex filter=lfs diff=lfs merge=lfs -text
+grasses/plastid245.fasta filter=lfs diff=lfs merge=lfs -text
