@@ -51,6 +51,7 @@ public:
   root_location_t optimize_all();
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
+
   void set_temp_ratio(double);
   std::string subst_string() const;
 

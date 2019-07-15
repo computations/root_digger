@@ -98,12 +98,8 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
    * more, we can add support for more models..
    */
   constexpr unsigned int submodels = 1;
+  constexpr unsigned int n_rate_cat = 4;
 
-  /*
-   * For now, nonrev only supports the "generic" cpu case. I might be able to
-   * boost it up to the other simd architectures for CLVS, but that is untested
-   * at this moment.
-   */
   unsigned int attributes = 0;
   if (PLL_STAT(avx2_present)) {
     attributes |= PLL_ATTRIB_ARCH_AVX2;
@@ -117,12 +113,12 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
 
   _partition = pll_partition_create(_tree.tip_count(), _tree.branch_count(),
                                     msa.states(), msa.length(), submodels,
-                                    _tree.branch_count(), submodels,
+                                    _tree.branch_count(), n_rate_cat,
                                     _tree.branch_count(), attributes);
   pll_set_subst_params(_partition, 0, rate_parameters.data());
 
-  double rate_cats[submodels] = {0};
-  pll_compute_gamma_cats(1, 4, rate_cats, PLL_GAMMA_RATES_MEAN);
+  double rate_cats[n_rate_cat] = {0};
+  pll_compute_gamma_cats(1, n_rate_cat, rate_cats, PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partition, rate_cats);
   debug_print("rate: %f", rate_cats[0]);
 
@@ -191,7 +187,7 @@ double model_t::compute_lh(const root_location_t &root_location) {
   GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
                           branch_lengths);
 
-  unsigned int params[] = {0};
+  unsigned int params[4] = {0,0,0,0};
 
   int result =
       pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
@@ -221,7 +217,7 @@ double model_t::compute_lh_root(const root_location_t &root) {
     branch_lengths = std::move(std::get<2>(result));
   }
 
-  unsigned int params[] = {0};
+  unsigned int params[] = {0,0,0,0};
 
   int result =
       pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
@@ -493,8 +489,8 @@ root_location_t model_t::optimize_all() {
   double final_temp = 1e-8;
   std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
-  std::normal_distribution<> err_subst(0.0, 0.01);
-  std::normal_distribution<> err_freqs(0.0, 0.01);
+  std::normal_distribution<> err_subst(0.0, 0.001);
+  std::normal_distribution<> err_freqs(0.0, 0.001);
   std::vector<double> next_freq(_partition->frequencies[0],
                                 _partition->frequencies[0] +
                                     _partition->states);
