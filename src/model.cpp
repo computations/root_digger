@@ -98,7 +98,7 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
    * more, we can add support for more models..
    */
   constexpr unsigned int submodels = 1;
-  constexpr unsigned int n_rate_cat = 4;
+  constexpr unsigned int n_rate_cat = 1;
 
   unsigned int attributes = 0;
   if (PLL_STAT(avx2_present)) {
@@ -489,8 +489,8 @@ root_location_t model_t::optimize_all() {
   double final_temp = 1e-8;
   std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
-  std::normal_distribution<> err_subst(0.0, 0.001);
-  std::normal_distribution<> err_freqs(0.0, 0.001);
+  std::normal_distribution<> err_subst(0.0, 0.005);
+  std::normal_distribution<> err_freqs(0.0, 0.005);
   std::vector<double> next_freq(_partition->frequencies[0],
                                 _partition->frequencies[0] +
                                     _partition->states);
