@@ -45,7 +45,7 @@ CONTROL_FILE= """
 [EVOLVE] p1 1 seqs
 """
 
-RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --slow"
+RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --slow --force"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
@@ -213,6 +213,8 @@ class exp:
                 tree=os.path.join("../", tree_filename),
                 seed=self._seed).split(' '),
                 stdout=subprocess.PIPE)
+            with open('rd_output_all', 'w') as logfile:
+                logfile.write(rd_output.stdout.decode('utf-8'))
             lh, tree, _= rd_output.stdout.decode('utf-8').split('\n')
             with open('rd_output', 'w') as rd_outfile:
                 rd_outfile.write(tree)
