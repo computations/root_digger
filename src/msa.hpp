@@ -6,10 +6,21 @@ extern "C" {
 }
 
 #include <string>
-#include <vector>
 #include <unordered_set>
+#include <vector>
+
+struct partition_info_t {
+  size_t begin;
+  size_t end;
+  std::string model_name;
+  std::string partition_name;
+};
+
+typedef std::vector<partition_info_t> msa_partitions_t;
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename);
+msa_partitions_t parse_partition_file(const std::string &filename);
+partition_info_t parse_partition_info(const std::string &line);
 
 class msa_t {
 public:

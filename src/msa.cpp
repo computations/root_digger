@@ -1,5 +1,8 @@
-#include "msa.hpp"
 #include "debug.h"
+#include "msa.hpp"
+#include <cctype>
+#include <fstream>
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 
@@ -55,6 +58,101 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
     return pll_msa;
   }
   throw std::invalid_argument("Could not parse msa file");
+}
+
+std::string::const_iterator expect_next(std::string::const_iterator itr,
+                                        char c) {
+  while (std::isspace(*itr)) {
+    itr++;
+  }
+  if (c != *itr) {
+    throw std::runtime_error(
+        std::string("Failed to parse partition file, expected '") + c +
+        "' got '" + *itr + "' instead");
+  }
+  ++itr;
+  while (std::isspace(*itr)) {
+    itr++;
+  }
+  return itr;
+}
+
+partition_info_t parse_partition_info(const std::string &line) {
+  partition_info_t pi;
+  auto itr = line.begin();
+
+  /* skip spaces */
+  while (std::isspace(*itr)) {
+    itr++;
+  }
+
+  /* parse model name */
+  auto start = itr;
+  while (std::isalnum(*itr)) {
+    itr++;
+  }
+  pi.model_name = std::string(start, itr);
+
+  /* check for comma */
+  itr = expect_next(itr, ',');
+
+  /* parse partition name */
+  start = itr;
+  while (std::isalnum(*itr) || *itr == '_') {
+    itr++;
+  }
+  pi.partition_name = std::string(start, itr);
+
+  /* check for = */
+  itr = expect_next(itr, '=');
+
+  /* parse begin */
+  start = itr;
+  while (std::isdigit(*itr)) {
+    itr++;
+  }
+  try {
+    pi.begin = std::stol(std::string(start, itr));
+  } catch (...) {
+    throw std::runtime_error(
+        std::string("Failed to parse beginning partition number") +
+        std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr +
+        "'");
+  }
+
+  /* check for - */
+  itr = expect_next(itr, '-');
+
+  /* parse begin */
+  start = itr;
+  while (std::isdigit(*itr)) {
+    itr++;
+  }
+  pi.end = std::stol(std::string(start, itr));
+
+  if (pi.end <= pi.begin) {
+    throw std::runtime_error(std::string("The end index of the partition '") +
+                             pi.partition_name +
+                             "' comes before the beginning");
+  }
+
+  if(pi.model_name.empty()){
+    throw std::runtime_error("Error, partition is missing a model name");
+  }
+
+  return pi;
+}
+
+/* Grammer:
+ * <MODEL_NAME> , <PARTITION_NAME> = <BEGIN> - <END>
+ */
+msa_partitions_t parse_partition_file(const std::string &filename) {
+  std::ifstream partition_file{filename};
+  msa_partitions_t parts;
+  for (std::string line; std::getline(partition_file, line);) {
+    parts.push_back(parse_partition_info(line));
+  }
+  return parts;
 }
 
 char *msa_t::sequence(int index) const {
