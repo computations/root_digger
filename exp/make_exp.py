@@ -18,9 +18,6 @@ import progressbar
 from Bio import SeqIO
 import Bio
 
-if not shutil.which("indelible"):
-    print("Please add indelible to your path")
-    sys.exit()
 
 progressbar.streams.flush()
 
@@ -427,6 +424,9 @@ if __name__ == "__main__":
     aligns = []
     for align in args.msa:
         try:
+            if not shutil.which("indelible"):
+                print("Please add indelible to your path")
+                sys.exit()
             aligns.append(int(align))
         except ValueError:
             aligns.append(list(SeqIO.parse(align, os.path.splitext(align)[1].strip('.'))))
