@@ -48,7 +48,7 @@ public:
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root);
   std::pair<root_location_t, double> optimize_root_location();
-  root_location_t optimize_all();
+  root_location_t optimize_all(double final_temp);
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
 

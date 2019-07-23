@@ -207,6 +207,6 @@ TEST_CASE("model_t optimize all", "[model_t]") {
   model_t model{tree, msa, seed};
   auto initial_rl = model.optimize_root_location();
   model.set_temp_ratio(0.8);
-  auto final_rl = model.optimize_all();
+  auto final_rl = model.optimize_all(1e-6);
   CHECK(model.compute_lh(final_rl) >= initial_rl.second);
 }

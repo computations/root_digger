@@ -482,11 +482,10 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
 }
 
 /* Optimize the substitution parameters by simulated annealing */
-root_location_t model_t::optimize_all() {
+root_location_t model_t::optimize_all(double final_temp) {
   auto cur = optimize_root_location();
   double initial_lh = cur.second;
   auto initial_rl = cur.first;
-  double final_temp = 1e-8;
   std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
   std::normal_distribution<> err_subst(0.0, 0.005);

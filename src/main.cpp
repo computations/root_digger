@@ -69,6 +69,11 @@ void print_usage() {
       << "    --slow\n"
       << "           Use a slow annealing schedule. Gives results slowly, \n"
       << "           but results are more likely to be optimial.\n"
+      << "    --tfinal [NUMBER]\n"
+      << "           Threshold to end the simulated annealing at.\n"
+      << "           Default is 1e-6\n"
+      << "    --force\n"
+      << "           Disable Saftey checks.\n"
       << "    --verbose\n"
       << "           Enable debug output. Warning, extremely noisy\n"
       << std::endl;
@@ -88,6 +93,7 @@ int main(int argv, char **argc) {
       {"fast", no_argument, 0, 0},
       {"slow", no_argument, 0, 0},
       {"force", no_argument, 0, 0},
+      {"tfinal", no_argument, 0, 0},
       {"version", no_argument, 0, 0},
       {0, 0, 0, 0},
   };
@@ -107,6 +113,7 @@ int main(int argv, char **argc) {
     unsigned int states = 0;
     bool silent = false;
     double temp_param = 0.8;
+    double final_temp = 1e-8;
     bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
@@ -143,7 +150,10 @@ int main(int argv, char **argc) {
       case 10: // force
         sanity_checks = false;
         break;
-      case 11: // version
+      case 11: // force
+        final_temp = atof(optarg);
+        break;
+      case 12: // version
         print_version();
         return 0;
       default:
@@ -220,7 +230,7 @@ int main(int argv, char **argc) {
 
     root_location_t final_rl;
     if (model_filename.empty()) {
-      final_rl = model->optimize_all();
+      final_rl = model->optimize_all(final_temp);
     } else {
       final_rl = model->optimize_root_location().first;
     }

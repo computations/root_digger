@@ -46,4 +46,8 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
     std::string line{"DNA, PART_0 = 123=4123"};
     CHECK_THROWS(parse_partition_info(line));
   }
+  SECTION("error: missing model name") {
+    std::string line{", PART_0 = 123-4123"};
+    CHECK_THROWS(parse_partition_info(line));
+  }
 }
