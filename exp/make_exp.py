@@ -43,6 +43,7 @@ CONTROL_FILE= """
 """
 
 RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --fast --silent --force"
+IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
@@ -130,6 +131,7 @@ class exp:
             if type(tree) == int:
                 t = ete3.Tree()
                 t.populate(tree)
+                t.unroot()
                 for n in t.traverse():
                     n.dist = numpy.random.exponential(0.1) + 0.005
                 with open(os.path.join(self._run_path, str(tree)+".tree"), 'w') as tree_file:
@@ -139,8 +141,10 @@ class exp:
                 tree_name = base26_encode(tree_name_counter, len(trees))
                 tree_name_counter += 1
                 tree_filename = os.path.join(self._run_path, str(tree_name) + ".tree")
+                unrooted_tree = tree.copy()
+                unrooted_tree.unroot()
                 with open(tree_filename,'w') as tree_file:
-                    tree_file.write(tree.write(format=5))
+                    tree_file.write(unrooted_tree.write(format=5))
                 self._tree_names.append(tree_name)
 
         self._site_steps = []
@@ -169,11 +173,25 @@ class exp:
             done_file.write("indel:" + datetime.datetime.now().isoformat())
 
     @staticmethod
+    def set_iqtree_done(path):
+        with open(os.path.join(path, ".done"), 'a') as done_file:
+            done_file.write("iqtree:" + datetime.datetime.now().isoformat())
+
+    @staticmethod
     def check_done_rd(path):
         if os.path.exists(os.path.join(path, '.done')):
             with open(os.path.join(path, ".done")) as done_file:
                 for line in done_file:
                     if line.find('rd') != -1:
+                        return True
+        return False
+
+    @staticmethod
+    def check_done_iqtree(path):
+        if os.path.exists(os.path.join(path, '.done')):
+            with open(os.path.join(path, ".done")) as done_file:
+                for line in done_file:
+                    if line.find('iqtree') != -1:
                         return True
         return False
 
@@ -204,20 +222,30 @@ class exp:
             subprocess.run("indelible", stdout=subprocess.DEVNULL)
             self.set_indel_done('.')
 
+    def run_rd(self, tree_filename, msa):
+        rd_output = subprocess.run(RD.format(msa=msa,
+            tree=os.path.join("../", tree_filename),
+            seed=self._seed).split(' '),
+            stdout=subprocess.PIPE)
+        with open('rd_output_all', 'w') as logfile:
+            logfile.write(rd_output.stdout.decode('utf-8'))
+        lh, tree, _= rd_output.stdout.decode('utf-8').split('\n')
+        with open('rd_output', 'w') as rd_outfile:
+            rd_outfile.write(tree)
+        with open('rd_output_lh', 'w') as rd_outfile:
+            rd_outfile.write(lh)
+        self.set_rd_done('.')
+
+    def run_iqtree(self, tree_filename, msa):
+        subprocess.run(IQTREE.format(msa=msa, tree=tree_filename).split(),
+                stdout=subprocess.DEVNULL)
+        self.set_iqtree_done('.')
+
     def run_exp(self, tree_filename, msa):
         if not self.check_done_rd('.'):
-            rd_output = subprocess.run(RD.format(msa=msa,
-                tree=os.path.join("../", tree_filename),
-                seed=self._seed).split(' '),
-                stdout=subprocess.PIPE)
-            with open('rd_output_all', 'w') as logfile:
-                logfile.write(rd_output.stdout.decode('utf-8'))
-            lh, tree, _= rd_output.stdout.decode('utf-8').split('\n')
-            with open('rd_output', 'w') as rd_outfile:
-                rd_outfile.write(tree)
-            with open('rd_output_lh', 'w') as rd_outfile:
-                rd_outfile.write(lh)
-            self.set_rd_done('.')
+            self.run_rd(tree_filename, msa)
+        if not self.check_done_iqtree('.'):
+            self.run_iqtree(tree_filename, msa)
 
     def run_all(self):
         old_dir = os.getcwd()
@@ -231,11 +259,12 @@ class exp:
             model_file.write(freqs.rd_repr())
 
         for tree_name in self._tree_names:
-            all_trees = []
-            all_lh = [0.0]
+            all_trees_rd = []
+            all_trees_iqtree = []
+            all_lh_rd = [0.0]
             tree_file = os.path.join(self._run_path, str(tree_name) + ".tree")
             with open(tree_file) as tf:
-                all_trees.append(tf.read()+'\n')
+                true_tree_newick = tf.read()
             for sites in self._site_steps:
                 exp_dir = "{taxa}tree_{sites}sites".format(taxa=tree_name,
                             sites=sites)
@@ -245,9 +274,9 @@ class exp:
                     self.gen_indel_alignment(sites, freqs, subst, tree_file)
                     self.run_exp(tree_file, 'seqs_TRUE.phy')
                     with open('rd_output') as tf:
-                        all_trees.append(tf.readline())
+                        all_trees_rd.append(tf.readline())
                     with open('rd_output_lh') as tf:
-                        all_lh.append(tf.readline())
+                        all_lh_rd.append(tf.readline())
             for align_name, align in self._aligns:
                 exp_dir = "{taxa}tree_{align_name}align".format(taxa=tree_name,
                         align_name=align_name)
@@ -259,23 +288,28 @@ class exp:
                         SeqIO.write(align, align_file, 'fasta')
                     self.run_exp(tree_file, msa=align_filename)
                     with open('rd_output') as tf:
-                        all_trees.append(tf.readline())
+                        all_trees_rd.append(tf.readline())
                     with open('rd_output_lh') as tf:
-                        all_lh.append(tf.readline())
-            result_tree_file = "result_trees_{}_tree".format(tree_name)
-            with open(result_tree_file, 'w') as rt:
-               rt.write(''.join(all_trees))
-            result_tree_lh = "result_trees_{}_lh".format(tree_name)
+                        all_lh_rd.append(tf.readline())
+                    with open('{}.treefile'.format(align_filename)) as iqtree_treefile:
+                        all_trees_iqtree.append(iqtree_treefile.read())
+            result_tree_file_rd = "result_trees_{}_tree_rd".format(tree_name)
+            result_tree_file_iqtree = "result_trees_{}_tree_iqtree".format(tree_name)
+            with open(result_tree_file_rd, 'w') as rt:
+               rt.write(''.join(all_trees_rd))
+            with open(result_tree_file_iqtree, 'w') as rt:
+               rt.write(''.join(all_trees_iqtree))
+            result_tree_lh = "result_trees_{}_lh_rd".format(tree_name)
             with open(result_tree_lh, 'w') as rt:
-               rt.write('\n'.join([str(f) for f in all_lh]))
+               rt.write('\n'.join([str(f) for f in all_lh_rd]))
 
             try:
-                parsed_trees = [ete3.Tree(t) for t in all_trees]
+                parsed_trees = [ete3.Tree(t) for t in all_trees_rd]
             except:
-                print(all_trees)
+                print(all_trees_rd)
                 sys.exit(1)
-            true_tree = parsed_trees[0]
-            self._result_trees = parsed_trees[1:]
+            true_tree = ete3.Tree(true_tree_newick)
+            self._result_trees = parsed_trees
 
             rfdists = []
             for i in range(1, len(parsed_trees)):
@@ -336,9 +370,22 @@ def tree_map(tree_names, trees):
                 continue
             outfile.write(tn + ": " + t.write() + "\n")
 
-def get_root_clade(tree):
+
+def get_left_clade(tree):
     return sorted([n.name for n in tree.get_tree_root().children[0].traverse() if 
             n.name != ''])
+
+def get_right_clade(tree):
+    return sorted([n.name for n in tree.get_tree_root().children[1].traverse() if 
+            n.name != ''])
+
+def get_root_clades(tree):
+    left_clade = get_left_clade(tree)
+    right_clade = get_right_clade(tree)
+    if len(left_clade) <= len(right_clade):
+        return left_clade
+    return right_clade
+
 
 def map_root_onto_main(tree_names, trees, site_steps, aligns):
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
@@ -348,42 +395,66 @@ def map_root_onto_main(tree_names, trees, site_steps, aligns):
         true_tree.get_tree_root().add_features(true_root=True)
         for sites in site_steps:
             for n in true_tree.traverse():
-                n.add_features(root_placement = 0)
+                n.add_features(root_placement_rd = 0)
+                n.add_features(root_placement_iqtree = 0)
             for i in range(TOTAL_ITERS):
-                result_tree_file = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
+                result_tree_file_rd = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
                     leading_zeroes, run_iter=i),
                  "{taxa}tree_{sites}sites".format(taxa=tn, sites=sites),
                  "rd_output")
-                with open(result_tree_file) as infile:
-                    result_tree = ete3.Tree(infile.readline())
-                clade = get_root_clade(result_tree)
-                if len(clade) == 1:
-                    (true_tree & clade[0]).root_placement+=1
+                result_tree_file_iqtree = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
+                    leading_zeroes, run_iter=i),
+                 "{taxa}tree_{sites}sites".format(taxa=tn, sites=sites),
+                 "seqs_TRUE.phy.treefile")
+                with open(result_tree_file_rd) as infile:
+                    result_tree_rd = ete3.Tree(infile.readline())
+                with open(result_tree_file_iqtree) as infile:
+                    result_tree_iqtree = ete3.Tree(infile.readline())
+                clade_rd = get_root_clades(result_tree_rd)
+                clade_iqtree = get_root_clades(result_tree_iqtree)
+                if len(clade_rd) == 1:
+                    (true_tree & clade_rd[0]).root_placement_rd +=1
                 else:
-                    true_tree.get_common_ancestor(clade).root_placement+= 1;
+                    true_tree.get_common_ancestor(clade_rd).root_placement_rd+= 1;
+                if len(clade_iqtree) == 1:
+                    (true_tree & clade_iqtree[0]).root_placement_iqtree +=1
+                else:
+                    true_tree.get_common_ancestor(clade_iqtree).root_placement_iqtree+= 1;
             with open("{tree_name}tree_{sites}sites_mapped_tree".format(
                 tree_name = tn, sites=sites), 'w') as outfile:
                 outfile.write(true_tree.write(format=9,
-                    features=['root_placement', 'true_root']))
+                    features=['root_placement_rd', 'root_placement_iqtree']))
         for align in aligns:
             for n in true_tree.traverse():
-                n.add_features(root_placement = 0)
+                n.add_features(root_placement_rd = 0)
+                n.add_features(root_placement_iqtree = 0)
             for i in range(TOTAL_ITERS):
-                result_tree_file = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
+                result_tree_file_rd = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
                     leading_zeroes, run_iter=i),
                  "{taxa}tree_{align}align".format(taxa=tn, align=align),
                  "rd_output")
-                with open(result_tree_file) as infile:
-                    result_tree = ete3.Tree(infile.readline())
-                clade = get_root_clade(result_tree)
-                if len(clade) == 1:
-                    (true_tree & clade[0]).root_placement+=1
+                result_tree_file_iqtree = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
+                    leading_zeroes, run_iter=i),
+                 "{taxa}tree_{align}align".format(taxa=tn, align=align),
+                 "{align}.fasta.treefile".format(align=align))
+                with open(result_tree_file_rd) as infile:
+                    result_tree_rd = ete3.Tree(infile.readline())
+                with open(result_tree_file_iqtree) as infile:
+                    result_tree_iqtree = ete3.Tree(infile.readline())
+                clade_rd = get_root_clade(result_tree_rd)
+                clade_iqtree = get_root_clade(result_tree_iqtree)
+                if len(clade_rd) == 1:
+                    (true_tree & clade_rd[0]).root_placement_rd+=1
                 else:
-                    true_tree.get_common_ancestor(clade).root_placement+= 1;
+                    true_tree.get_common_ancestor(clade_rd).root_placement_rd+= 1;
+                if len(clade_iqtree) == 1:
+                    (true_tree & clade_rd[0]).root_placement_iqtree+=1
+                else:
+                    true_tree.get_common_ancestor(clade_iqtree).root_placement_iqtree+= 1;
             with open("{tree_name}tree_{align}align_mapped_tree".format(
                 tree_name = tn, align=align), 'w') as outfile:
                 outfile.write(true_tree.write(format=9,
-                    features=['root_placement', 'true_root']))
+                    features=['root_placement_rd', 'root_placement_iqtree']))
 
 def summarize_results(path, tree_names, trees, site_steps, aligns):
     with directory_guard(path):
@@ -410,6 +481,10 @@ if __name__ == "__main__":
     parser.add_argument('--iters', type=int, required=True)
     parser.add_argument('--procs', type=int, default=None)
     args = parser.parse_args()
+
+    if not shutil.which("iqtree"):
+        print("Please add iqtree to your path")
+        sys.exit();
 
     trees = []
     for tree in args.trees:
