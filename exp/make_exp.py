@@ -42,7 +42,7 @@ CONTROL_FILE= """
 [EVOLVE] p1 1 seqs
 """
 
-RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --slow --force"
+RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --fast --silent --force"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
@@ -308,7 +308,6 @@ def compute_root_distance(t1, t2):
     result = t1.robinson_foulds(t2)
     return result[0]/2
 
-"""
 def compute_average_distance(tree_names, aligns):
     for tree in tree_names:
         leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
@@ -329,7 +328,6 @@ def compute_average_distance(tree_names, aligns):
             outfile.write('\n')
             outfile.write(','.join([str(f) for f in totals]))
             outfile.write('\n')
-"""
 
 def tree_map(tree_names, trees):
     with open('tree_map', 'w') as outfile:
