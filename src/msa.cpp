@@ -106,35 +106,54 @@ partition_info_t parse_partition_info(const std::string &line) {
   /* check for = */
   itr = expect_next(itr, '=');
 
-  /* parse begin */
-  start = itr;
-  while (std::isdigit(*itr)) {
-    itr++;
-  }
-  try {
-    pi.begin = std::stol(std::string(start, itr));
-  } catch (...) {
-    throw std::runtime_error(
-        std::string("Failed to parse beginning partition number") +
-        std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr +
-        "'");
-  }
+  do{
+    if(*itr == ',') ++itr;
+    while (std::isspace(*itr)) {
+      itr++;
+    }
 
-  /* check for - */
-  itr = expect_next(itr, '-');
+    /* parse begin */
+    size_t begin = 0;
+    size_t end = 0;
+    start = itr;
+    while (std::isdigit(*itr)) {
+      itr++;
+    }
+    try {
+      begin = std::stol(std::string(start, itr));
+    } catch (...) {
+      throw std::runtime_error(
+          std::string("Failed to parse beginning partition number") +
+          std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr +
+          "'");
+    }
 
-  /* parse begin */
-  start = itr;
-  while (std::isdigit(*itr)) {
-    itr++;
-  }
-  pi.end = std::stol(std::string(start, itr));
+    /* check for - */
+    itr = expect_next(itr, '-');
 
-  if (pi.end <= pi.begin) {
-    throw std::runtime_error(std::string("The end index of the partition '") +
-                             pi.partition_name +
-                             "' comes before the beginning");
-  }
+    /* parse begin */
+    start = itr;
+    while (std::isdigit(*itr)) {
+      itr++;
+    }
+    try {
+      end = std::stol(std::string(start, itr));
+    } catch (...) {
+      throw std::runtime_error(
+          std::string("Failed to parse beginning partition number") +
+          std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr +
+          "'");
+    }
+    if (end < begin) {
+      throw std::runtime_error(std::string("The end index of the partition '") +
+                               pi.partition_name +
+                               "' comes before the beginning");
+    }
+    pi.parts.emplace_back(begin, end);
+    while (std::isspace(*itr)) {
+      itr++;
+    }
+  } while(*itr == ',');
 
   if(pi.model_name.empty()){
     throw std::runtime_error("Error, partition is missing a model name");
@@ -144,7 +163,7 @@ partition_info_t parse_partition_info(const std::string &line) {
 }
 
 /* Grammer:
- * <MODEL_NAME> , <PARTITION_NAME> = <BEGIN> - <END>
+ * <MODEL_NAME> , <PARTITION_NAME> = <BEGIN> - <END>[, <BEGIN> - <END>]*
  */
 msa_partitions_t parse_partition_file(const std::string &filename) {
   std::ifstream partition_file{filename};
@@ -153,6 +172,9 @@ msa_partitions_t parse_partition_file(const std::string &filename) {
     parts.push_back(parse_partition_info(line));
   }
   return parts;
+}
+
+void msa_t::partition(const msa_partitions_t& parts){
 }
 
 char *msa_t::sequence(int index) const {

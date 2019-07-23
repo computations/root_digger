@@ -10,8 +10,7 @@ extern "C" {
 #include <vector>
 
 struct partition_info_t {
-  size_t begin;
-  size_t end;
+  std::vector<std::pair<size_t, size_t>> parts;
   std::string model_name;
   std::string partition_name;
 };
@@ -39,6 +38,7 @@ public:
   unsigned int states() const;
   int count() const;
   int length() const;
+  void partition(const msa_partitions_t& parts);
 
   bool constiency_check(std::unordered_set<std::string>) const;
 

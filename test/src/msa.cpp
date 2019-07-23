@@ -19,16 +19,26 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
     auto pi = parse_partition_info(line);
     CHECK("DNA" == pi.model_name);
     CHECK("PART_0" == pi.partition_name);
-    CHECK(123 == pi.begin);
-    CHECK(4123 == pi.end);
+    CHECK(123 == pi.parts[0].first);
+    CHECK(4123 == pi.parts[0].second);
   }
   SECTION("no spaces") {
     std::string line{"DNA,PART_0=123-4123"};
     auto pi = parse_partition_info(line);
     CHECK("DNA" == pi.model_name);
     CHECK("PART_0" == pi.partition_name);
-    CHECK(123 == pi.begin);
-    CHECK(4123 == pi.end);
+    CHECK(123 == pi.parts[0].first);
+    CHECK(4123 == pi.parts[0].second);
+  }
+  SECTION("multiple ranges") {
+    std::string line{"DNA,PART_0=123-4123, 5122-12411"};
+    auto pi = parse_partition_info(line);
+    CHECK("DNA" == pi.model_name);
+    CHECK("PART_0" == pi.partition_name);
+    CHECK(123 == pi.parts[0].first);
+    CHECK(4123 == pi.parts[0].second);
+    CHECK(5122 == pi.parts[1].first);
+    CHECK(12411 == pi.parts[1].second);
   }
   SECTION("error: missing comma") {
     std::string line{"DNA PART_0 = 123-4123"};
