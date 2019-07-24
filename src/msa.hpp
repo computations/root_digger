@@ -24,12 +24,24 @@ partition_info_t parse_partition_info(const std::string &line);
 class msa_t {
 public:
   msa_t(const std::string &msa_filename, const pll_state_t *map = pll_map_nt,
-        unsigned int states = 4)
+        unsigned int states = 4, bool compress = true)
       : _msa{0}, _map(map), _weights{0}, _states(states) {
     _msa = parse_msa_file(msa_filename);
-    _weights = pll_compress_site_patterns(_msa->sequence, map, _msa->count,
-                                          &(_msa->length));
+    if (compress) {
+      _weights = pll_compress_site_patterns(_msa->sequence, map, _msa->count,
+                                            &(_msa->length));
+    } else {
+      _weights = (unsigned int *)malloc(sizeof(unsigned int) * _msa->length);
+      for (int i = 0; i < _msa->length; ++i) {
+        _weights[i] = 1;
+      }
+    }
   };
+  msa_t(const msa_t &other, const partition_info_t &part);
+  msa_t(const msa_t &) = delete;
+  msa_t(msa_t &&other)
+      : _msa(other._msa), _map(other._map), _weights(other._weights),
+        _states(other._states) {}
 
   char *sequence(int) const;
   char *label(int) const;
@@ -38,7 +50,8 @@ public:
   unsigned int states() const;
   int count() const;
   int length() const;
-  void partition(const msa_partitions_t& parts);
+  void compress();
+  std::vector<msa_t> partition(const msa_partitions_t &) const;
 
   bool constiency_check(std::unordered_set<std::string>) const;
 
