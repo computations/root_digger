@@ -441,8 +441,8 @@ def map_root_onto_main(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                clade_rd = get_root_clade(result_tree_rd)
-                clade_iqtree = get_root_clade(result_tree_iqtree)
+                clade_rd = get_root_clades(result_tree_rd)
+                clade_iqtree = get_root_clades(result_tree_iqtree)
                 if len(clade_rd) == 1:
                     (true_tree & clade_rd[0]).root_placement_rd+=1
                 else:
