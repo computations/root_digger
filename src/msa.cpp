@@ -106,8 +106,9 @@ partition_info_t parse_partition_info(const std::string &line) {
   /* check for = */
   itr = expect_next(itr, '=');
 
-  do{
-    if(*itr == ',') ++itr;
+  do {
+    if (*itr == ',')
+      ++itr;
     while (std::isspace(*itr)) {
       itr++;
     }
@@ -153,9 +154,9 @@ partition_info_t parse_partition_info(const std::string &line) {
     while (std::isspace(*itr)) {
       itr++;
     }
-  } while(*itr == ',');
+  } while (*itr == ',');
 
-  if(pi.model_name.empty()){
+  if (pi.model_name.empty()) {
     throw std::runtime_error("Error, partition is missing a model name");
   }
 
@@ -174,7 +175,41 @@ msa_partitions_t parse_partition_file(const std::string &filename) {
   return parts;
 }
 
-void msa_t::partition(const msa_partitions_t& parts){
+msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
+  _msa = (pll_msa_t *)malloc(sizeof(pll_msa_t));
+  _msa->count = other.count();
+  _msa->length = 0;
+  for (auto range : partition.parts) {
+    /*
+     * Since the range specification is [first, second], we have to add one to
+     * include the endpoint
+     */
+    _msa->length += (range.second - range.first) + 1;
+    debug_print("%d",_msa->length);
+  }
+  _msa->sequence = (char **)malloc(sizeof(char *) * other.count());
+
+  for (int i = 0; i < other.count(); ++i) {
+    _msa->sequence[i] = (char *)malloc(sizeof(char) * _msa->length);
+    size_t cur_idx = 0;
+    char *other_sequence = other.sequence(i);
+    for (auto range : partition.parts) {
+      for (size_t j = range.first; j <= range.second; ++j) {
+        _msa->sequence[i][cur_idx++] = other_sequence[j];
+      }
+    }
+  }
+
+  _msa->label = (char **)calloc(sizeof(char *), _msa->count);
+  for (int i = 0; i < _msa->count; ++i) {
+    size_t label_size = strlen(other.label(i)) + 1;
+    _msa->label[i] = (char *)malloc(sizeof(char) * label_size);
+    strncpy(_msa->label[i], other.label(i), label_size);
+  }
+  _map = other.map();
+  _states = other.states();
+  _weights = nullptr;
+  compress();
 }
 
 char *msa_t::sequence(int index) const {
@@ -202,6 +237,23 @@ unsigned int msa_t::states() const { return _states; }
 int msa_t::count() const { return _msa->count; }
 
 int msa_t::length() const { return _msa->length; }
+
+void msa_t::compress() {
+  if (_weights != nullptr) {
+    free(_weights);
+  }
+  _weights = pll_compress_site_patterns(_msa->sequence, _map, _msa->count,
+                                        &(_msa->length));
+}
+
+std::vector<msa_t> msa_t::partition(const msa_partitions_t &ps) const {
+  std::vector<msa_t> parted_msa;
+  parted_msa.reserve(ps.size());
+  for (auto p : ps) {
+    parted_msa.emplace_back(*this, p);
+  }
+  return parted_msa;
+}
 
 bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   std::unordered_set<std::string> taxa;
