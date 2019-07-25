@@ -230,6 +230,14 @@ unsigned int *msa_t::weights() const {
   throw std::runtime_error("msa_t has no weights");
 }
 
+unsigned int msa_t::total_weight() const{
+  unsigned int total = 0;
+  for(int i = 0; i < _msa->length; ++i){
+    total += _weights[i];
+  }
+  return total;
+}
+
 const pll_state_t *msa_t::map() const { return _map; }
 
 unsigned int msa_t::states() const { return _states; }
