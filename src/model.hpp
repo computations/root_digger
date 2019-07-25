@@ -17,6 +17,11 @@ struct dlh_t {
   double dlh;
 };
 
+struct invalid_emperical_frequencies_exception : public std::runtime_error {
+  invalid_emperical_frequencies_exception(const char *m)
+      : std::runtime_error(m){};
+};
+
 std::string read_file_contents(std::ifstream &infile);
 
 double parse_param(std::string::const_iterator begin,
@@ -30,18 +35,7 @@ model_params_t random_params(size_t size, uint64_t seed);
 
 class model_t {
 public:
-  model_t(model_params_t, rooted_tree_t, const msa_t &, const model_params_t &,
-          uint64_t);
-  model_t(model_params_t p, rooted_tree_t t, const msa_t &msa, uint64_t seed)
-      : model_t(p, t, msa, model_params_t(), seed){};
-  model_t(rooted_tree_t t, const msa_t &msa, model_params_t f, uint64_t seed)
-      : model_t(std::move(random_params(
-                    msa.states() * msa.states() - msa.states(), seed)),
-                t, msa, f, seed){};
-  model_t(rooted_tree_t t, const msa_t &msa, uint64_t seed)
-      : model_t(std::move(random_params(
-                    msa.states() * msa.states() - msa.states(), seed)),
-                t, msa, model_params_t(), seed) {}
+  model_t(rooted_tree_t t, const std::vector<msa_t> &msa, uint64_t seed);
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
@@ -51,7 +45,8 @@ public:
   root_location_t optimize_all(double final_temp);
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
-
+  void initialize_partitions(const std::vector<msa_t> &);
+  void initialize_partitions_uniform_freqs(const std::vector<msa_t> &);
   void set_temp_ratio(double);
   std::string subst_string() const;
 
@@ -59,10 +54,18 @@ private:
   std::pair<root_location_t, double>
   bisect(const root_location_t &beg, dlh_t d_beg, const root_location_t &end,
          dlh_t d_end, double atol, size_t depth);
+  void set_subst_rates(size_t, const model_params_t &);
+  void set_subst_rates_random(size_t, const msa_t &);
+  void set_gamma_rates(size_t);
+  void update_invariant_sites(size_t);
+  void set_tip_states(size_t, const msa_t &);
+  void set_emperical_freqs(size_t);
+  void set_freqs(size_t, const model_params_t &);
 
-  model_params_t _subst_params;
+  std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;
-  pll_partition_t *_partition;
+  std::vector<pll_partition_t *> _partitions;
+  std::vector<unsigned int> _partition_weights;
   uint64_t _seed;
   double _temp_ratio;
 };

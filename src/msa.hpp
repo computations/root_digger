@@ -46,6 +46,7 @@ public:
   char *sequence(int) const;
   char *label(int) const;
   unsigned int *weights() const;
+  unsigned int total_weight() const;
   const pll_state_t *map() const;
   unsigned int states() const;
   int count() const;

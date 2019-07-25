@@ -59,6 +59,9 @@ void print_usage() {
       << "    --freqs [FILE]\n"
       << "           Optional file containing the frequencies. If not\n"
       << "           given, then empirical frequencies are used instead.\n"
+      << "    --partition [FILE]\n"
+      << "           Optional file containing the partition specification.\n"
+      << "           Format is the same as RAxML-NG partition file.\n"
       << "    --seed [NUMBER]\n"
       << "           Random seed to use. Optional"
       << "    --silent\n"
@@ -94,6 +97,7 @@ int main(int argv, char **argc) {
       {"slow", no_argument, 0, 0},
       {"force", no_argument, 0, 0},
       {"tfinal", no_argument, 0, 0},
+      {"partition", required_argument, 0, 0},
       {"version", no_argument, 0, 0},
       {0, 0, 0, 0},
   };
@@ -109,6 +113,7 @@ int main(int argv, char **argc) {
     std::string tree_filename;
     std::string model_filename;
     std::string freqs_filename;
+    std::string partition_filename;
     uint64_t seed = std::random_device()();
     unsigned int states = 0;
     bool silent = false;
@@ -153,7 +158,10 @@ int main(int argv, char **argc) {
       case 11: // force
         final_temp = atof(optarg);
         break;
-      case 12: // version
+      case 12: // force
+        partition_filename = optarg;
+        break;
+      case 13: // version
         print_version();
         return 0;
       default:
@@ -199,7 +207,15 @@ int main(int argv, char **argc) {
           "Root digger only supports protein and nucleotide data");
     }
 
-    msa_t msa{msa_filename, map, states};
+    std::vector<msa_t> msa;
+    if (partition_filename.empty()){
+      msa.emplace_back(msa_filename, map, states);
+    }
+    else{
+      msa_t unparted_msa{msa_filename, map, states};
+      msa = unparted_msa.partition(parse_partition_file(partition_filename));
+    }
+
     rooted_tree_t tree{tree_filename};
 
     if (sanity_checks) {
@@ -213,32 +229,17 @@ int main(int argv, char **argc) {
       }
     }
 
-    std::shared_ptr<model_t> model;
-    if (freqs_filename.empty() && model_filename.empty()) {
-      model.reset(new model_t{tree, msa, seed});
-    } else if (!freqs_filename.empty() && model_filename.empty()) {
-      model.reset(
-          new model_t{tree, msa, parse_model_file(freqs_filename), seed});
-    } else if (freqs_filename.empty() && !model_filename.empty()) {
-      model.reset(new model_t{model_params, tree, msa, seed});
-    } else {
-      model.reset(new model_t{model_params, tree, msa,
-                              parse_model_file(freqs_filename), seed});
+    model_t model{tree, msa, seed};
+    try {
+      model.initialize_partitions(msa);
+    } catch (const invalid_emperical_frequencies_exception &) {
+      model.initialize_partitions_uniform_freqs(msa);
     }
-    model->set_temp_ratio(temp_param);
-
-
-    root_location_t final_rl;
-    if (model_filename.empty()) {
-      final_rl = model->optimize_all(final_temp);
-    } else {
-      final_rl = model->optimize_root_location().first;
-    }
-    if (final_rl.edge == nullptr) {
-      throw std::runtime_error("No root was optimized");
-    }
-    std::cout << model->compute_lh(final_rl) << std::endl;
-    std::cout << model->rooted_tree(final_rl).newick() << std::endl;
+    model.set_temp_ratio(temp_param);
+    auto final_rl = model.optimize_all(final_temp);
+    double final_lh = model.compute_lh(final_rl);
+    std::cout << final_lh << std::endl;
+    std::cout << model.rooted_tree(final_rl).newick() << std::endl;
 
   } catch (const std::exception &e) {
     std::cout << "There was an error during processing:\n"

@@ -83,14 +83,83 @@ std::vector<double> sample_diriclet(std::minstd_rand engine, double alpha,
   return rand_sample;
 }
 
-model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
-                 const msa_t &msa, const model_params_t &freqs, uint64_t seed) {
+void model_t::set_subst_rates(size_t p_index, const model_params_t &mp) {
+  pll_set_subst_params(_partitions[p_index], 0, mp.data());
+  _subst_params[p_index] = mp;
+}
 
+void model_t::set_subst_rates_random(size_t p_index, const msa_t &msa) {
+  set_subst_rates(
+      p_index,
+      random_params(msa.states() * msa.states() - msa.states(), _seed));
+}
+
+void model_t::set_gamma_rates(size_t p_index) {
+  constexpr size_t n_rate_cat = 1;
+  double rate_cats[n_rate_cat] = {0};
+  pll_compute_gamma_cats(1.0, n_rate_cat, rate_cats, PLL_GAMMA_RATES_MEAN);
+  pll_set_category_rates(_partitions[p_index], rate_cats);
+}
+
+void model_t::update_invariant_sites(size_t p_index) {
+  pll_update_invariant_sites(_partitions[p_index]);
+}
+
+void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
+  /* make a label map */
+  auto label_map = _tree.label_map();
+
+  /* use the label map to assign tip states in the partition */
+
+  for (int i = 0; i < msa.count(); ++i) {
+    try {
+      pll_set_tip_states(_partitions[p_index], label_map.at(msa.label(i)),
+                         msa.map(), msa.sequence(i));
+    } catch (const std::exception &e) {
+      throw std::runtime_error(std::string("Could not find taxa ") +
+                               msa.label(i) + " in tree");
+    }
+  }
+
+  /* set pattern weights */
+  pll_set_pattern_weights(_partitions[p_index], msa.weights());
+}
+
+void model_t::set_emperical_freqs(size_t p_index) {
+  pll_partition_t *partition = _partitions[p_index];
+  double *emp_freqs = pllmod_msa_empirical_frequencies(partition);
+  for (size_t i = 0; i < partition->states; ++i) {
+    if (emp_freqs[i] <= 0) {
+      throw invalid_emperical_frequencies_exception(
+          "One of the state frequenices is zero while using emperical "
+          "frequencies");
+    }
+  }
+  pll_set_frequencies(partition, 0, emp_freqs);
+  free(emp_freqs);
+}
+
+void model_t::set_freqs(size_t p_index, const model_params_t &freqs) {
+  for (auto f : freqs) {
+    if (f <= 0.0) {
+      throw std::runtime_error("Frequencies with 0 entries are not allowed");
+    }
+  }
+  pll_set_frequencies(_partitions[p_index], 0, freqs.data());
+}
+
+model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
+                 uint64_t seed) {
+
+  _seed = seed;
   _tree = std::move(tree);
+  _temp_ratio = 0.8;
 
-  if (!msa.constiency_check(_tree.label_set())) {
-    throw std::invalid_argument(
-        "Taxa on the tree and in the MSA are inconsistient");
+  for (auto &msa : msas) {
+    if (!msa.constiency_check(_tree.label_set())) {
+      throw std::invalid_argument(
+          "Taxa on the tree and in the MSA are inconsistient");
+    }
   }
 
   /*
@@ -111,73 +180,25 @@ model_t::model_t(model_params_t rate_parameters, rooted_tree_t tree,
 
   attributes |= PLL_ATTRIB_NONREV;
 
-  _partition = pll_partition_create(_tree.tip_count(), _tree.branch_count(),
-                                    msa.states(), msa.length(), submodels,
-                                    _tree.branch_count(), n_rate_cat,
-                                    _tree.branch_count(), attributes);
-  pll_set_subst_params(_partition, 0, rate_parameters.data());
-
-  double rate_cats[n_rate_cat] = {0};
-  pll_compute_gamma_cats(1, n_rate_cat, rate_cats, PLL_GAMMA_RATES_MEAN);
-  pll_set_category_rates(_partition, rate_cats);
-  debug_print("rate: %f", rate_cats[0]);
-
-  /* update the invariant sites */
-  pll_update_invariant_sites(_partition);
-
-  /* no need to set rates and rate weights, only 1 category */
-
-  /* make a label map */
-  auto label_map = _tree.label_map();
-
-  /* use the label map to assign tip states in the partition */
-
-  for (int i = 0; i < msa.count(); ++i) {
-    try {
-      pll_set_tip_states(_partition, label_map.at(msa.label(i)), msa.map(),
-                         msa.sequence(i));
-    } catch (const std::exception &e) {
-      throw std::runtime_error(std::string("Could not find taxa ") +
-                               msa.label(i) + " in tree");
-    }
+  for (size_t partition_index = 0; partition_index < msas.size();
+       ++partition_index) {
+    auto &msa = msas[partition_index];
+    _partitions.push_back(pll_partition_create(
+        _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
+        submodels, _tree.branch_count(), n_rate_cat, _tree.branch_count(),
+        attributes));
+    _partition_weights.push_back(msa.total_weight());
   }
 
-  /* set pattern weights */
-  pll_set_pattern_weights(_partition, msa.weights());
-
-  /* set the frequencies
-   *
-   * For now we are going to just use emperical frequencies, but in the future,
-   * we can do something more clever.
-   */
-  if (freqs.size() == 0) {
-    double *emp_freqs = pllmod_msa_empirical_frequencies(_partition);
-    for (size_t i = 0; i < msa.states(); ++i) {
-      if (emp_freqs[i] <= 0) {
-        free(emp_freqs);
-        pll_partition_destroy(_partition);
-        throw std::runtime_error("One of the state frequenices is zero while "
-                                 "using emperical frequenices");
-      }
-    }
-    pll_set_frequencies(_partition, 0, emp_freqs);
-    free(emp_freqs);
-  } else {
-    for (auto f : freqs) {
-      if (f <= 0.0) {
-        pll_partition_destroy(_partition);
-        throw std::runtime_error("Frequencies with 0 entries are not allowed");
-      }
-    }
-    pll_set_frequencies(_partition, 0, freqs.data());
-  }
-
-  _subst_params = std::move(rate_parameters);
-  _seed = seed;
-  _temp_ratio = 0.8;
+  _subst_params.resize(_partitions.size());
 }
 
-model_t::~model_t() { pll_partition_destroy(_partition); }
+model_t::~model_t() {
+  for (auto p : _partitions) {
+    if (p)
+      pll_partition_destroy(p);
+  }
+}
 
 double model_t::compute_lh(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
@@ -187,21 +208,26 @@ double model_t::compute_lh(const root_location_t &root_location) {
   GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
                           branch_lengths);
 
-  unsigned int params[4] = {0,0,0,0};
+  unsigned int params[4] = {0, 0, 0, 0};
+  double lh = 0.0;
 
-  int result =
-      pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
-                               branch_lengths.data(), pmatrix_indices.size());
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    auto &partition = _partitions[i];
+    int result =
+        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
+                                 branch_lengths.data(), pmatrix_indices.size());
 
-  if (result == PLL_FAILURE) {
-    throw std::runtime_error(pll_errmsg);
+    if (result == PLL_FAILURE) {
+      throw std::runtime_error(pll_errmsg);
+    }
+
+    pll_update_partials(partition, ops.data(), ops.size());
+
+    lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
+                                         _tree.root_scaler_index(), params,
+                                         nullptr) *
+          _partition_weights[i];
   }
-
-  pll_update_partials(_partition, ops.data(), ops.size());
-
-  double lh = pll_compute_root_loglikelihood(_partition, _tree.root_clv_index(),
-                                             _tree.root_scaler_index(), params,
-                                             nullptr);
   return lh;
 }
 
@@ -217,20 +243,24 @@ double model_t::compute_lh_root(const root_location_t &root) {
     branch_lengths = std::move(std::get<2>(result));
   }
 
-  unsigned int params[] = {0,0,0,0};
+  unsigned int params[] = {0, 0, 0, 0};
+  double lh = 0.0;
 
-  int result =
-      pll_update_prob_matrices(_partition, params, pmatrix_indices.data(),
-                               branch_lengths.data(), pmatrix_indices.size());
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    auto &partition = _partitions[i];
+    int result =
+        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
+                                 branch_lengths.data(), pmatrix_indices.size());
 
-  if (result == PLL_FAILURE) {
-    throw std::runtime_error(pll_errmsg);
+    if (result == PLL_FAILURE) {
+      throw std::runtime_error(pll_errmsg);
+    }
+    pll_update_partials(partition, &op, 1);
+    lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
+                                         _tree.root_scaler_index(), params,
+                                         nullptr) *
+          _partition_weights[i];
   }
-  pll_update_partials(_partition, &op, 1);
-  std::vector<double> persite(_partition->sites);
-  double lh = pll_compute_root_loglikelihood(_partition, _tree.root_clv_index(),
-                                             _tree.root_scaler_index(), params,
-                                             persite.data());
   if (std::isnan(lh)) {
     throw std::runtime_error("lh at root is not a number: " +
                              std::to_string(lh));
@@ -486,43 +516,60 @@ root_location_t model_t::optimize_all(double final_temp) {
   auto cur = optimize_root_location();
   double initial_lh = cur.second;
   auto initial_rl = cur.first;
+
   std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
   std::normal_distribution<> err_subst(0.0, 0.005);
   std::normal_distribution<> err_freqs(0.0, 0.005);
-  std::vector<double> next_freq(_partition->frequencies[0],
-                                _partition->frequencies[0] +
-                                    _partition->states);
-  model_params_t inital_subst{_subst_params};
-  model_params_t inital_freqs{next_freq};
+
+  std::vector<model_params_t> inital_subst{_subst_params};
+  std::vector<model_params_t> initial_freqs;
+  initial_freqs.reserve(_partitions.size());
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    initial_freqs.emplace_back(_partitions[i]->frequencies[0],
+                               _partitions[i]->frequencies[0] +
+                                   _partitions[i]->states);
+  }
+  auto next_freqs{initial_freqs};
+  auto cur_freqs{initial_freqs};
+  auto next_subst{_subst_params};
+
   for (size_t sa_iters = 0; sa_iters < 10; ++sa_iters) {
     double temp = 1.0;
     while (temp > final_temp) {
-      auto next_subst{_subst_params};
-      for (auto &r : next_subst) {
-        r += err_subst(engine);
-        if (r <= 0) {
-          r = 1e-4;
-        }
-      }
-      pll_set_subst_params(_partition, 0, next_subst.data());
 
-      for (auto &f : next_freq) {
-        f += err_subst(engine);
-        if (f <= 0) {
-          f = 1e-4;
+      for (size_t i = 0; i < next_subst.size(); ++i) {
+        for (size_t j = 0; j < next_subst[i].size(); ++j) {
+          next_subst[i][j] = _subst_params[i][j] + err_subst(engine);
+          if (next_subst[i][j] <= 1e-4) {
+            next_subst[i][j] = 1e-4;
+          }
         }
       }
 
-      double sum = 0.0;
-      for (auto f : next_freq) {
-        sum += f;
-      }
-      for (auto &f : next_freq) {
-        sum /= f;
+      for (size_t i = 0; i < next_freqs.size(); ++i) {
+        for (size_t j = 0; j < next_freqs[i].size(); ++j) {
+          next_freqs[i][j] = cur_freqs[i][j] + err_freqs(engine);
+          if (next_freqs[i][j] <= 1e-4) {
+            next_freqs[i][j] = 1e-4;
+          }
+        }
+        double sum = 0.0;
+        for (auto f : next_freqs[i]) {
+          sum += f;
+        }
+        for (auto &f : next_freqs[i]) {
+          sum /= f;
+        }
       }
 
-      pll_set_frequencies(_partition, 0, next_freq.data());
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        pll_set_subst_params(_partitions[i], 0, next_subst[i].data());
+      }
+
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        pll_set_frequencies(_partitions[i], 0, next_freqs[i].data());
+      }
 
       auto next = optimize_root_location();
       if (next.second > cur.second) {
@@ -540,8 +587,10 @@ root_location_t model_t::optimize_all(double final_temp) {
     }
     return cur.first;
   }
-  pll_set_subst_params(_partition, 0, inital_subst.data());
-  pll_set_frequencies(_partition, 0, inital_freqs.data());
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    pll_set_subst_params(_partitions[i], 0, inital_subst[i].data());
+    pll_set_frequencies(_partitions[i], 0, initial_freqs[i].data());
+  }
   return initial_rl;
 }
 
@@ -550,15 +599,49 @@ const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
   return _tree;
 }
 
+void model_t::initialize_partitions(const std::vector<msa_t> &msa) {
+  for (size_t partition_index = 0; partition_index < _partitions.size();
+       ++partition_index) {
+    set_tip_states(partition_index, msa[partition_index]);
+    update_invariant_sites(partition_index);
+    set_emperical_freqs(partition_index);
+    set_subst_rates_random(partition_index, msa[partition_index]);
+    set_gamma_rates(partition_index);
+  }
+}
+
+void model_t::initialize_partitions_uniform_freqs(
+    const std::vector<msa_t> &msa) {
+  for (size_t partition_index = 0; partition_index < _partitions.size();
+       ++partition_index) {
+    set_tip_states(partition_index, msa[partition_index]);
+    update_invariant_sites(partition_index);
+    std::vector<double> uni_freqs(
+        _partitions[partition_index]->states,
+        1.0 / (double)_partitions[partition_index]->states);
+    set_freqs(partition_index, uni_freqs);
+    set_subst_rates_random(partition_index, msa[partition_index]);
+    set_gamma_rates(partition_index);
+  }
+}
+
 void model_t::set_temp_ratio(double t) { _temp_ratio = t; }
 
 std::string model_t::subst_string() const {
   std::ostringstream oss;
   oss << "{";
-  for (size_t i = 0; i < _subst_params.size(); ++i) {
-    oss << std::to_string(_subst_params[i]);
-    if (i != _subst_params.size() - 1)
+  for (size_t p_index = 0; p_index < _subst_params.size(); ++p_index) {
+    oss << "{";
+    auto &params = _subst_params[p_index];
+    for (size_t i = 0; i < params.size(); ++i) {
+      oss << std::to_string(params[i]);
+      if (i != params.size() - 1)
+        oss << ",";
+    }
+    oss << "}";
+    if (p_index != _subst_params.size() - 1)
       oss << ",";
   }
+  oss << "}";
   return oss.str();
 }
