@@ -63,9 +63,9 @@ void print_usage() {
       << "           Optional file containing the partition specification.\n"
       << "           Format is the same as RAxML-NG partition file.\n"
       << "    --seed [NUMBER]\n"
-      << "           Random seed to use. Optional"
+      << "           Random seed to use. Optional\n"
       << "    --silent\n"
-      << "           Suppress output except for the final tree"
+      << "           Suppress output except for the final tree\n"
       << "    --fast\n"
       << "           Use a fast annealing schedule. Gives results quickly,\n"
       << "           but might be less optimal.\n"
@@ -208,10 +208,9 @@ int main(int argv, char **argc) {
     }
 
     std::vector<msa_t> msa;
-    if (partition_filename.empty()){
+    if (partition_filename.empty()) {
       msa.emplace_back(msa_filename, map, states);
-    }
-    else{
+    } else {
       msa_t unparted_msa{msa_filename, map, states};
       msa = unparted_msa.partition(parse_partition_file(partition_filename));
     }
@@ -240,6 +239,10 @@ int main(int argv, char **argc) {
     double final_lh = model.compute_lh(final_rl);
     std::cout << final_lh << std::endl;
     std::cout << model.rooted_tree(final_rl).newick() << std::endl;
+    auto end_time = std::chrono::system_clock::now();
+    std::chrono::duration<double> duration = end_time - start_time;
+    if (!silent)
+      std::cout << "Inference took: " << duration.count() << "s" << std::endl;
 
   } catch (const std::exception &e) {
     std::cout << "There was an error during processing:\n"
