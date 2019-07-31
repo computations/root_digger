@@ -42,13 +42,13 @@ CONTROL_FILE= """
 [EVOLVE] p1 1 seqs
 """
 
-RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --fast --silent --force"
+RD = os.path.abspath("../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --force"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
 RUN_TEMPLATE = "run_{run_iter:0{leading_zeroes}}"
-TOTAL_ITERS = 4
+TOTAL_ITERS = 0
 
 class directory_guard:
     def __init__(self, path):
@@ -327,10 +327,6 @@ class exp:
     def site_steps(self):
         return [str(s) for s in self._site_steps]
 
-def compute_root_distance(t1, t2):
-    result = t1.robinson_foulds(t2)
-    return result[0]/2
-
 def tree_map(tree_names, trees):
     with open('tree_map', 'w') as outfile:
         for tn, t in zip(tree_names, trees):
@@ -350,10 +346,50 @@ def get_right_clade(tree):
 def get_root_clades(tree):
     left_clade = get_left_clade(tree)
     right_clade = get_right_clade(tree)
-    if len(left_clade) <= len(right_clade):
-        return left_clade
-    return right_clade
+    return (left_clade, right_clade)
 
+def extract_node_with_clade(tree, clade):
+    if len(clade) == 1:
+        return (tree & clade[0])
+    return tree.get_common_ancestor(clade)
+
+def get_mapped_node(true_tree, inferred_tree):
+    left_clade, right_clade = get_root_clades(inferred_tree)
+
+    left_node = extract_node_with_clade(true_tree, left_clade)
+    right_node = extract_node_with_clade(true_tree, right_clade)
+
+    if left_node == right_node:
+        return left_node
+
+    if left_node in right_node.get_descendants():
+        return left_node
+
+    if right_node in left_node.get_descendants():
+        return right_node
+
+    if left_node.is_leaf():
+        return left_node
+    if right_node.is_leaf():
+        return right_node
+
+    raise Exception("failed to find a node for the clade")
+
+def get_root_distance_metric(true_tree, inferred_tree):
+    common_node_tt, _ = true_tree.get_closest_leaf()
+    common_node_it = inferred_tree & common_node_tt.name
+    cn_tt_dist = true_tree.get_distance(common_node_tt, true_tree.get_tree_root())
+    cn_it_dist = inferred_tree.get_distance(common_node_it, inferred_tree.get_tree_root())
+    return numpy.abs(cn_tt_dist - cn_it_dist)
+
+def get_root_distance_toplogical(true_tree, inferred_tree):
+    common_node_tt, _ = true_tree.get_closest_leaf()
+    common_node_it = inferred_tree & common_node_tt.name
+    cn_tt_dist = true_tree.get_distance(common_node_tt,
+            true_tree.get_tree_root(), topology_only = True)
+    cn_it_dist = inferred_tree.get_distance(common_node_it,
+            inferred_tree.get_tree_root(), topology_only = True)
+    return numpy.abs(cn_tt_dist - cn_it_dist)
 
 def compute_distances(tree_names, trees, site_steps, aligns):
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
@@ -380,38 +416,36 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                clade_rd = get_root_clades(result_tree_rd)
-                clade_iqtree = get_root_clades(result_tree_iqtree)
-                if len(clade_rd) == 1:
-                    mapped_root_rd = (true_tree & clade_rd[0])
-                else:
-                    mapped_root_rd = true_tree.get_common_ancestor(clade_rd)
-                average_rf_topo_rd += true_tree.get_distance(mapped_root_rd , topology_only=True)
-                average_rf_metric_rd += true_tree.get_distance(mapped_root_rd)
-                if len(clade_iqtree) == 1:
-                    mapped_root_iqtree = (true_tree & clade_iqtree[0])
-                else:
-                    mapped_root_iqtree = true_tree.get_common_ancestor(clade_iqtree)
-                average_rf_topo_iqtree += true_tree.get_distance(mapped_root_iqtree , topology_only=True)
-                average_rf_metric_iqtree += true_tree.get_distance(mapped_root_iqtree)
+                average_rf_topo_rd += get_root_distance_toplogical(true_tree,
+                        result_tree_rd)
+                average_rf_metric_rd += get_root_distance_metric(true_tree,
+                        result_tree_rd)
+                average_rf_topo_iqtree += get_root_distance_toplogical(true_tree, 
+                        result_tree_iqtree)
+                average_rf_metric_iqtree += get_root_distance_metric(true_tree,
+                        result_tree_iqtree)
             with open("{tree_name}tree_{sites}sites_rf_dists".format(
                 tree_name = tn, sites=sites), 'w') as outfile:
-                outfile.write('method,topo,metric\n')
-                outfile.write('rd,{},{}\n'.format(average_rf_topo_rd/TOTAL_ITERS,
+                outfile.write('method,topo,ntopo,metric\n')
+                outfile.write('rd,{},{},{}\n'.format(
+                    average_rf_topo_rd/TOTAL_ITERS,
+                    average_rf_topo_rd/len(true_tree.get_leaves())/TOTAL_ITERS,
                     average_rf_metric_rd/TOTAL_ITERS))
-                outfile.write('iqtree,{},{}\n'.format(average_rf_topo_iqtree/TOTAL_ITERS,
+                outfile.write('iqtree,{},{},{}\n'.format(
+                    average_rf_topo_iqtree/TOTAL_ITERS,
+                    average_rf_topo_iqtree/len(true_tree.get_leaves())/TOTAL_ITERS,
                     average_rf_metric_iqtree/TOTAL_ITERS))
 
         average_rf_topo_rd = 0.0
         average_rf_topo_iqtree = 0.0
         average_rf_metric_rd = 0.0
         average_rf_metric_iqtree = 0.0
-        for i in range(TOTAL_ITERS):
-            if type(true_tree) != ete3.Tree:
-                with open(os.path.join(RUN_TEMPLATE.format(leading_zeroes = leading_zeroes,
-                    run_iter = i), "{}.tree".format(tn))) as infile:
-                    true_tree = ete3.Tree(infile.read())
-            for align in aligns:
+        if type(true_tree) != ete3.Tree:
+            with open(os.path.join(RUN_TEMPLATE.format(leading_zeroes = leading_zeroes,
+                run_iter = i), "{}.tree".format(tn))) as infile:
+                true_tree = ete3.Tree(infile.read())
+        for align in aligns:
+            for i in range(TOTAL_ITERS):
                 result_tree_file_rd = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
                     leading_zeroes, run_iter=i),
                  "{taxa}tree_{align}align".format(taxa=tn, align=align),
@@ -424,29 +458,25 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                clade_rd = get_root_clades(result_tree_rd)
-                clade_iqtree = get_root_clades(result_tree_iqtree)
-                if len(clade_rd) == 1:
-                    mapped_root_rd = (true_tree & clade_rd[0])
-                else:
-                    mapped_root_rd = true_tree.get_common_ancestor(clade_rd)
-                mapped_root_rd.root_placement_rd += 1
-                average_rf_topo_rd += true_tree.get_distance(mapped_root_rd , topology_only=True)
-                average_rf_metric_rd += true_tree.get_distance(mapped_root_rd)
-                if len(clade_iqtree) == 1:
-                    mapped_root_iqtree = (true_tree & clade_iqtree[0])
-                else:
-                    mapped_root_iqtree = true_tree.get_common_ancestor(clade_iqtree)
-                mapped_root_iqtree.root_placement_iqtree += 1
-                average_rf_topo_iqtree += true_tree.get_distance(mapped_root_iqtree , topology_only=True)
-                average_rf_metric_iqtree += true_tree.get_distance(mapped_root_iqtree)
-                with open("{tree_name}tree_{align}align_rf_dists".format(
-                    tree_name = tn, align=align), 'w') as outfile:
-                    outfile.write('method,topo,metric\n')
-                    outfile.write('rd,{},{}\n'.format(average_rf_topo_rd/TOTAL_ITERS,
-                        average_rf_metric_rd/TOTAL_ITERS))
-                    outfile.write('iqtree,{},{}\n'.format(average_rf_topo_iqtree/TOTAL_ITERS,
-                        average_rf_metric_iqtree/TOTAL_ITERS))
+                average_rf_topo_rd += get_root_distance_toplogical(true_tree,
+                        result_tree_rd)
+                average_rf_metric_rd += get_root_distance_metric(true_tree,
+                        result_tree_rd)
+                average_rf_topo_iqtree += get_root_distance_toplogical(true_tree, 
+                        result_tree_iqtree)
+                average_rf_metric_iqtree += get_root_distance_metric(true_tree,
+                        result_tree_iqtree)
+            with open("{tree_name}tree_{align}align_rf_dists".format(
+                tree_name = tn, align=align), 'w') as outfile:
+                outfile.write('method,topo,ntopo,metric\n')
+                outfile.write('rd,{},{},{}\n'.format(
+                    average_rf_topo_rd/TOTAL_ITERS,
+                    average_rf_topo_rd/len(true_tree.get_leaves())/TOTAL_ITERS,
+                    average_rf_metric_rd/TOTAL_ITERS))
+                outfile.write('iqtree,{},{},{}\n'.format(
+                    average_rf_topo_iqtree/TOTAL_ITERS,
+                    average_rf_topo_iqtree/len(true_tree.get_leaves())/TOTAL_ITERS,
+                    average_rf_metric_iqtree/TOTAL_ITERS))
 
 def map_root_onto_main(tree_names, trees, site_steps, aligns):
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
@@ -470,18 +500,11 @@ def map_root_onto_main(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                clade_rd = get_root_clades(result_tree_rd)
-                clade_iqtree = get_root_clades(result_tree_iqtree)
-                if len(clade_rd) == 1:
-                    mapped_root_rd = (true_tree & clade_rd[0])
-                else:
-                    mapped_root_rd = true_tree.get_common_ancestor(clade_rd)
-                mapped_root_rd.root_placement_rd += 1
-                if len(clade_iqtree) == 1:
-                    mapped_root_iqtree = (true_tree & clade_iqtree[0])
-                else:
-                    mapped_root_iqtree = true_tree.get_common_ancestor(clade_iqtree)
-                mapped_root_iqtree.root_placement_iqtree += 1
+                clade_rd = get_mapped_node(true_tree, result_tree_rd)
+                clade_iqtree = get_mapped_node(true_tree, result_tree_iqtree)
+
+                clade_rd.root_placement_rd += 1
+                clade_iqtree.root_placement_iqtree += 1
             with open("{tree_name}tree_{sites}sites_mapped_tree".format(
                 tree_name = tn, sites=sites), 'w') as outfile:
                 outfile.write(true_tree.write(format=9,
@@ -504,18 +527,12 @@ def map_root_onto_main(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                clade_rd = get_root_clades(result_tree_rd)
-                clade_iqtree = get_root_clades(result_tree_iqtree)
-                if len(clade_rd) == 1:
-                    mapped_root_rd = (true_tree & clade_rd[0])
-                else:
-                    mapped_root_rd = true_tree.get_common_ancestor(clade_rd)
-                mapped_root_rd.root_placement_rd += 1
-                if len(clade_iqtree) == 1:
-                    mapped_root_iqtree = (true_tree & clade_iqtree[0])
-                else:
-                    mapped_root_iqtree = true_tree.get_common_ancestor(clade_iqtree)
-                mapped_root_iqtree.root_placement_iqtree += 1
+                    result_tree_iqtree = ete3.Tree(infile.readline())
+                clade_rd = get_mapped_node(true_tree, result_tree_rd)
+                clade_iqtree = get_mapped_node(true_tree, result_tree_iqtree)
+
+                clade_rd.root_placement_rd += 1
+                clade_iqtree.root_placement_iqtree += 1
             with open("{tree_name}tree_{align}align_mapped_tree".format(
                 tree_name = tn, align=align), 'w') as outfile:
                 outfile.write(true_tree.write(format=9,
