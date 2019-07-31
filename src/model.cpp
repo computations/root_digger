@@ -519,8 +519,8 @@ root_location_t model_t::optimize_all(double final_temp) {
 
   std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
-  std::normal_distribution<> err_subst(0.0, 0.005);
-  std::normal_distribution<> err_freqs(0.0, 0.005);
+  std::normal_distribution<> err_subst(0.0, 0.05);
+  std::normal_distribution<> err_freqs(0.0, 0.01);
 
   std::vector<model_params_t> inital_subst{_subst_params};
   std::vector<model_params_t> initial_freqs;
@@ -530,19 +530,19 @@ root_location_t model_t::optimize_all(double final_temp) {
                                _partitions[i]->frequencies[0] +
                                    _partitions[i]->states);
   }
-  auto next_freqs{initial_freqs};
-  auto cur_freqs{initial_freqs};
-  auto next_subst{_subst_params};
 
   for (size_t sa_iters = 0; sa_iters < 10; ++sa_iters) {
+    auto next_freqs{initial_freqs};
+    auto cur_freqs{initial_freqs};
+    auto next_subst{_subst_params};
     double temp = 1.0;
     while (temp > final_temp) {
 
       for (size_t i = 0; i < next_subst.size(); ++i) {
         for (size_t j = 0; j < next_subst[i].size(); ++j) {
           next_subst[i][j] = _subst_params[i][j] + err_subst(engine);
-          if (next_subst[i][j] <= 1e-4) {
-            next_subst[i][j] = 1e-4;
+          if (next_subst[i][j] <= 1e-7) {
+            next_subst[i][j] = 1e-7;
           }
         }
       }
@@ -550,8 +550,8 @@ root_location_t model_t::optimize_all(double final_temp) {
       for (size_t i = 0; i < next_freqs.size(); ++i) {
         for (size_t j = 0; j < next_freqs[i].size(); ++j) {
           next_freqs[i][j] = cur_freqs[i][j] + err_freqs(engine);
-          if (next_freqs[i][j] <= 1e-4) {
-            next_freqs[i][j] = 1e-4;
+          if (next_freqs[i][j] <= 1e-7) {
+            next_freqs[i][j] = 1e-7;
           }
         }
         double sum = 0.0;
@@ -575,9 +575,12 @@ root_location_t model_t::optimize_all(double final_temp) {
       if (next.second > cur.second) {
         cur = next;
         _subst_params = next_subst;
+        cur_freqs = next_freqs;
+        continue;
       } else if (exp((next.second - cur.second) / temp) > roller(engine)) {
         cur = next;
         _subst_params = next_subst;
+        cur_freqs = next_freqs;
       }
       temp *= _temp_ratio;
     }
