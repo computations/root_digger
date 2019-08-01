@@ -527,7 +527,6 @@ def map_root_onto_main(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                    result_tree_iqtree = ete3.Tree(infile.readline())
                 clade_rd = get_mapped_node(true_tree, result_tree_rd)
                 clade_iqtree = get_mapped_node(true_tree, result_tree_iqtree)
 
