@@ -394,11 +394,11 @@ def get_root_distance_toplogical(true_tree, inferred_tree):
 def compute_distances(tree_names, trees, site_steps, aligns):
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
     for tn, true_tree in zip(tree_names, trees):
-        average_rf_topo_rd = 0.0
-        average_rf_topo_iqtree = 0.0
-        average_rf_metric_rd = 0.0
-        average_rf_metric_iqtree = 0.0
         for sites in site_steps:
+            rf_topo_iqtree = []
+            rf_topo_rd = []
+            rf_metric_iqtree = []
+            rf_metric_rd = []
             for i in range(TOTAL_ITERS):
                 if type(true_tree) != ete3.Tree:
                     with open(os.path.join(RUN_TEMPLATE.format(leading_zeroes = leading_zeroes,
@@ -416,35 +416,43 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                average_rf_topo_rd += get_root_distance_toplogical(true_tree,
-                        result_tree_rd)
-                average_rf_metric_rd += get_root_distance_metric(true_tree,
-                        result_tree_rd)
-                average_rf_topo_iqtree += get_root_distance_toplogical(true_tree, 
-                        result_tree_iqtree)
-                average_rf_metric_iqtree += get_root_distance_metric(true_tree,
-                        result_tree_iqtree)
+
+                rf_topo_rd.append(get_root_distance_toplogical(true_tree,
+                        result_tree_rd))
+                rf_metric_rd.append(get_root_distance_metric(true_tree,
+                        result_tree_rd))
+                rf_topo_iqtree.append(get_root_distance_toplogical(true_tree, 
+                        result_tree_iqtree))
+                rf_metric_iqtree.append(get_root_distance_metric(true_tree,
+                        result_tree_iqtree))
+
+            tree_size = len(true_tree.get_leaves())
             with open("{tree_name}tree_{sites}sites_rf_dists".format(
                 tree_name = tn, sites=sites), 'w') as outfile:
                 outfile.write('method,topo,ntopo,metric\n')
                 outfile.write('rd,{},{},{}\n'.format(
-                    average_rf_topo_rd/TOTAL_ITERS,
-                    average_rf_topo_rd/len(true_tree.get_leaves())/TOTAL_ITERS,
-                    average_rf_metric_rd/TOTAL_ITERS))
+                    numpy.mean(rf_topo_rd),
+                    numpy.mean(rf_topo_rd)/tree_size,
+                    numpy.mean(rf_metric_rd)))
                 outfile.write('iqtree,{},{},{}\n'.format(
-                    average_rf_topo_iqtree/TOTAL_ITERS,
-                    average_rf_topo_iqtree/len(true_tree.get_leaves())/TOTAL_ITERS,
-                    average_rf_metric_iqtree/TOTAL_ITERS))
+                    numpy.mean(rf_topo_iqtree),
+                    numpy.mean(rf_topo_iqtree)/tree_size,
+                    numpy.mean(rf_metric_rd)))
+            with open("{tree_name}tree_{sites}sites_rf_hist".format(tree_name =
+                tn, sites = sites), 'w') as outfile:
+                outfile.write('iqtree_n_dist,rd_n_dist\n')
+                for iq, rd in zip(rf_topo_rd, rf_topo_iqtree):
+                    outfile.write("{},{},{},{}\n".format(iq, iq/tree_size, rd, rd/tree_size))
 
-        average_rf_topo_rd = 0.0
-        average_rf_topo_iqtree = 0.0
-        average_rf_metric_rd = 0.0
-        average_rf_metric_iqtree = 0.0
         if type(true_tree) != ete3.Tree:
             with open(os.path.join(RUN_TEMPLATE.format(leading_zeroes = leading_zeroes,
                 run_iter = i), "{}.tree".format(tn))) as infile:
                 true_tree = ete3.Tree(infile.read())
         for align in aligns:
+            rf_topo_iqtree = []
+            rf_topo_rd = []
+            rf_metric_iqtree = []
+            rf_metric_rd = []
             for i in range(TOTAL_ITERS):
                 result_tree_file_rd = os.path.join(RUN_TEMPLATE.format(leading_zeroes =
                     leading_zeroes, run_iter=i),
@@ -458,25 +466,32 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                     result_tree_rd = ete3.Tree(infile.readline())
                 with open(result_tree_file_iqtree) as infile:
                     result_tree_iqtree = ete3.Tree(infile.readline())
-                average_rf_topo_rd += get_root_distance_toplogical(true_tree,
-                        result_tree_rd)
-                average_rf_metric_rd += get_root_distance_metric(true_tree,
-                        result_tree_rd)
-                average_rf_topo_iqtree += get_root_distance_toplogical(true_tree, 
-                        result_tree_iqtree)
-                average_rf_metric_iqtree += get_root_distance_metric(true_tree,
-                        result_tree_iqtree)
+                rf_topo_rd.append(get_root_distance_toplogical(true_tree,
+                        result_tree_rd))
+                rf_metric_rd.append(get_root_distance_metric(true_tree,
+                        result_tree_rd))
+                rf_topo_iqtree.append(get_root_distance_toplogical(true_tree, 
+                        result_tree_iqtree))
+                rf_metric_iqtree.append(get_root_distance_metric(true_tree,
+                        result_tree_iqtree))
+
+            tree_size = len(true_tree.get_leaves())
             with open("{tree_name}tree_{align}align_rf_dists".format(
                 tree_name = tn, align=align), 'w') as outfile:
                 outfile.write('method,topo,ntopo,metric\n')
                 outfile.write('rd,{},{},{}\n'.format(
-                    average_rf_topo_rd/TOTAL_ITERS,
-                    average_rf_topo_rd/len(true_tree.get_leaves())/TOTAL_ITERS,
-                    average_rf_metric_rd/TOTAL_ITERS))
+                    numpy.mean(rf_topo_rd),
+                    numpy.mean(rf_topo_rd)/tree_size,
+                    numpy.mean(rf_metric_rd)))
                 outfile.write('iqtree,{},{},{}\n'.format(
-                    average_rf_topo_iqtree/TOTAL_ITERS,
-                    average_rf_topo_iqtree/len(true_tree.get_leaves())/TOTAL_ITERS,
-                    average_rf_metric_iqtree/TOTAL_ITERS))
+                    numpy.mean(rf_topo_iqtree),
+                    numpy.mean(rf_topo_iqtree)/tree_size,
+                    numpy.mean(rf_metric_rd)))
+            with open("{tree_name}tree_{align}align_rf_hist".format(tree_name =
+                tn, align = align), 'w') as outfile:
+                outfile.write('iqtree_dist,iqtree_n_dist,rd_dist,rd_n_dist\n')
+                for iq, rd in zip(rf_topo_rd, rf_topo_iqtree):
+                    outfile.write("{},{},{},{}\n".format(iq, iq/tree_size, rd, rd/tree_size))
 
 def map_root_onto_main(tree_names, trees, site_steps, aligns):
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
