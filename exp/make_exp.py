@@ -479,7 +479,7 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                                                                   sites=sites),
                     'w') as outfile:
                 outfile.write('iqtree_n_dist,rd_n_dist\n')
-                for iq, rd in zip(rf_topo_rd, rf_topo_iqtree):
+                for rd, iq in zip(rf_topo_rd, rf_topo_iqtree):
                     outfile.write("{},{},{},{}\n".format(
                         iq, iq / tree_size, rd, rd / tree_size))
 
@@ -538,7 +538,7 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                                                                   align=align),
                     'w') as outfile:
                 outfile.write('iqtree_dist,iqtree_n_dist,rd_dist,rd_n_dist\n')
-                for iq, rd in zip(rf_topo_rd, rf_topo_iqtree):
+                for rd, iq in zip(rf_topo_rd, rf_topo_iqtree):
                     outfile.write("{},{},{},{}\n".format(
                         iq, iq / tree_size, rd, rd / tree_size))
 
