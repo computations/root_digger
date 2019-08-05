@@ -6,7 +6,8 @@ extern "C" {
 #include <msa.hpp>
 
 TEST_CASE("msa_t parse msa", "[msa_t]") {
-  for (auto &&ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     msa_t msa{ds.first};
     REQUIRE(msa.states() == 4);
     REQUIRE(msa.map() == pll_map_nt);
@@ -63,7 +64,7 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
 }
 
 TEST_CASE("msa_t partition datafile", "[msa_t]") {
-  auto ds = data_files_dna[1];
+  auto ds = data_files_dna["101.phy"];
   SECTION("single partition, one range") {
     msa_t msa{ds.first};
     msa_partitions_t parts{parse_partition_info("DNA, PART_0 = 0-100")};

@@ -16,7 +16,8 @@ model_params_t freqs[] = {
 };
 
 TEST_CASE("model_t constructor", "[model_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -27,7 +28,7 @@ TEST_CASE("model_t constructor", "[model_t]") {
 }
 
 TEST_CASE("model_t constructor with partitions", "[model_t]"){
-  auto &ds = data_files_dna[1];
+  auto &ds = data_files_dna["101.phy"];
   msa_t unparted_msa {ds.first};
   rooted_tree_t tree{ds.second};
   msa_partitions_t parts;
@@ -39,7 +40,8 @@ TEST_CASE("model_t constructor with partitions", "[model_t]"){
 }
 
 TEST_CASE("model_t compute lh", "[model_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -58,7 +60,8 @@ TEST_CASE("model_t compute lh", "[model_t]") {
 }
 
 TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -79,7 +82,8 @@ TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
 
 TEST_CASE("model_t optimize root locations on individual roots",
           "[model_t][opt]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -96,7 +100,8 @@ TEST_CASE("model_t optimize root locations on individual roots",
 }
 
 TEST_CASE("model_t optimize root locations with beg points", "[model_t][opt]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -115,7 +120,8 @@ TEST_CASE("model_t optimize root locations with beg points", "[model_t][opt]") {
 }
 
 TEST_CASE("model_t optimize root locations with end points", "[model_t][opt]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -134,7 +140,8 @@ TEST_CASE("model_t optimize root locations with end points", "[model_t][opt]") {
 }
 
 TEST_CASE("model_t optimize whole tree", "[model_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -148,7 +155,8 @@ TEST_CASE("model_t optimize whole tree", "[model_t]") {
 }
 
 TEST_CASE("model_t liklihood computation", "[model_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     std::vector<msa_t> msa;
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
@@ -168,7 +176,7 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
 }
 
 TEST_CASE("model_t optimize all", "[model_t]") {
-  auto ds = data_files_dna[1];
+  auto ds = data_files_dna["101.phy"];
   std::vector<msa_t> msa;
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
