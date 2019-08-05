@@ -2,6 +2,7 @@
 #include "model.hpp"
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <string>
@@ -269,7 +270,7 @@ double model_t::compute_lh_root(const root_location_t &root) {
 }
 
 /*
- * Use a tangent method to compute the derivative
+ * Use a secant method to compute the derivative
  */
 dlh_t model_t::compute_dlh(const root_location_t &root) {
 
@@ -310,17 +311,27 @@ dlh_t model_t::compute_dlh(const root_location_t &root) {
   return ret;
 }
 
+/*
+ * Find the root of dlh w.r.t. alpha in order to find the optimum value.
+ * Technically, this also evalutes lh to find the true maximum, so it isn't
+ * strictly a bisection method.
+ *
+ * Some tunables:
+ *  - depth
+ */
 std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
                                                    dlh_t d_beg,
                                                    const root_location_t &end,
                                                    dlh_t d_end, double atol,
                                                    size_t depth = 0) {
+  assert_string(d_beg.dlh * d_end.dlh > 0,
+                "Bisect called with endpoints which don't bracket");
   root_location_t midpoint{beg};
   midpoint.brlen_ratio = (beg.brlen_ratio + end.brlen_ratio) / 2;
 
   auto d_midpoint = compute_dlh(midpoint);
 
-  if (depth > 64) {
+  if (depth > 32) {
     debug_print(
         "depth exceeded limit, returning midpoint with ratio: %f, lh: %f",
         midpoint.brlen_ratio, d_midpoint.lh);
@@ -377,6 +388,82 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
                            ", midpoint.dlh: " + std::to_string(d_midpoint.dlh));
 }
 
+std::pair<root_location_t, double> model_t::brents(root_location_t beg,
+                                                   dlh_t d_beg,
+                                                   root_location_t end,
+                                                   dlh_t d_end, double atol) {
+
+  assert_string(d_beg.dlh * d_end.dlh > 0,
+                "Brents called with endpoints which don't bracket");
+
+  root_location_t midpoint{end};
+  auto d_midpoint = d_end;
+  double e;
+  double d;
+  d = e = end.brlen_ratio - beg.brlen_ratio;
+
+  for (size_t i = 0; i < 64; ++i) {
+    if (d_end.dlh * d_midpoint.dlh > 0.0) {
+      midpoint = beg;
+      d_midpoint = d_beg;
+      d = e = end.brlen_ratio - beg.brlen_ratio;
+    }
+    if (abs(d_end.dlh) < abs(d_midpoint.dlh)) {
+      beg = end;
+      end = midpoint;
+      midpoint = beg;
+      d_beg = d_end;
+      d_end = d_midpoint;
+      d_midpoint = d_beg;
+    }
+
+    double tol = 2.0 * abs(end.brlen_ratio) *
+                     std::numeric_limits<double>::epsilon() +
+                 0.5 * atol;
+    double e_tol = 0.5 * (midpoint.brlen_ratio - end.brlen_ratio);
+    if (abs(e_tol) <= tol || d_end.dlh == 0)
+      return {end, d_end.lh};
+    if (abs(e) >= tol && abs(d_beg.dlh) > abs(d_end.dlh)) {
+      double s = d_end.dlh / d_beg.dlh;
+      double p, q;
+      if (beg.brlen_ratio == midpoint.brlen_ratio) {
+        p = 2.0 * e_tol * s;
+        q = 1.0 - s;
+      } else {
+        q = d_beg.dlh / d_midpoint.dlh;
+        double r = d_end.dlh / d_midpoint.dlh;
+        p = s * (2.0 * e_tol * q * (q - r) -
+                 (end.brlen_ratio - beg.brlen_ratio) * (r - 1.0));
+        q = (q - 1.0) * (r - 1.0) * (s - 1.0);
+      }
+      if (p > 0.0)
+        q = -q;
+      p = abs(p);
+      double min1 = 3.0 * e_tol * q - abs(e_tol * q);
+      double min2 = abs(e * q);
+      if (2.0 * p < (min1 < min2 ? min1 : min2)) {
+        e = d;
+        d = p / q;
+      } else {
+        d = e_tol;
+        e = d;
+      }
+    } else {
+      d = e_tol;
+      e = d;
+    }
+    beg = end;
+    d_beg = d_end;
+    if (abs(d) > tol)
+      end.brlen_ratio += d;
+    else {
+      end.brlen_ratio += e_tol >= 0.0 ? tol : -tol;
+    }
+    d_end = compute_dlh(end);
+  }
+  throw std::runtime_error("Brents method failed to converge");
+}
+
 /* Find the optimum for the ratio via the bisection method */
 root_location_t model_t::optimize_alpha(const root_location_t &root) {
   constexpr double ATOL = 1e-7;
@@ -418,7 +505,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
 
   if ((d_beg.dlh < 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_end.dlh < 0.0)) {
-    auto mid = bisect(beg, d_beg, end, d_end, ATOL);
+    auto mid = brents(beg, d_beg, end, d_end, ATOL);
     debug_print("mid lh: %f, end lh: %f", mid.second, lh_best_endpoint.lh);
     return lh_best_endpoint.lh > mid.second ? best_endpoint : mid.first;
   }
@@ -457,8 +544,8 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
          * we have a midpoint, so now we need to figure out if it is a min or a
          * maximum.
          */
-        auto r1 = bisect(beg, d_beg, midpoint_root, d_midpoint, ATOL);
-        auto r2 = bisect(midpoint_root, d_midpoint, end, d_end, ATOL);
+        auto r1 = brents(beg, d_beg, midpoint_root, d_midpoint, ATOL);
+        auto r2 = brents(midpoint_root, d_midpoint, end, d_end, ATOL);
         debug_print("r1 lh: %f, r2 lh: %f", r1.second, r2.second);
         if (lh_best_endpoint.lh < best_midpoint_lh.lh) {
           lh_best_endpoint = best_midpoint_lh;
@@ -513,6 +600,8 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
 
 /* Optimize the substitution parameters by simulated annealing */
 root_location_t model_t::optimize_all(double final_temp) {
+  assert_string(final_temp < 1.0, "Starting temperature is too high");
+
   auto cur = optimize_root_location();
   double initial_lh = cur.second;
   auto initial_rl = cur.first;
