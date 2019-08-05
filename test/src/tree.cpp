@@ -16,7 +16,8 @@ root_location_t find_node(const rooted_tree_t &tree, const std::string &label) {
 }
 
 TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     rooted_tree_t tree{ds.second};
     CHECK(tree.root_count() > 0);
     for (size_t i = 0; i < tree.root_count(); ++i) {
@@ -30,7 +31,8 @@ TEST_CASE("rooted_tree string constructor no file", "[rooted_tree_t]") {
 }
 
 TEST_CASE("rooted_tree copy constructor", "[rooted_tree_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     rooted_tree_t tree1{ds.second};
     rooted_tree_t tree2{tree1};
     CHECK(tree1.branch_count() == tree2.branch_count());
@@ -40,7 +42,8 @@ TEST_CASE("rooted_tree copy constructor", "[rooted_tree_t]") {
 }
 
 TEST_CASE("rooted_tree copy asignment constructor", "[rooted_tree_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     rooted_tree_t tree1{ds.second};
     rooted_tree_t tree2 = tree1;
     CHECK(tree1.branch_count() == tree2.branch_count());
@@ -50,7 +53,8 @@ TEST_CASE("rooted_tree copy asignment constructor", "[rooted_tree_t]") {
 }
 
 TEST_CASE("rooted_tree move asignment constructor", "[rooted_tree_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     rooted_tree_t tree1{ds.second};
     rooted_tree_t tree2 = std::move(tree1);
     CHECK(tree2.branch_count() > 0);
@@ -60,7 +64,8 @@ TEST_CASE("rooted_tree move asignment constructor", "[rooted_tree_t]") {
 }
 
 TEST_CASE("rooted_tree_t label map", "[rooted_tree_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     rooted_tree_t tree{ds.second};
     auto lm = tree.label_map();
     CHECK(lm.size() == tree.tip_count());
@@ -71,7 +76,8 @@ TEST_CASE("rooted_tree_t label map", "[rooted_tree_t]") {
 }
 
 TEST_CASE("rooted_tree_t generate operations", "[rooted_tree_t]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     rooted_tree_t tree{ds.second};
     std::vector<pll_operation_t> ops;
     std::vector<unsigned int> pmatrices;
@@ -92,7 +98,7 @@ TEST_CASE("rooted_tree_t generate operations", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree_t generate operations, known tree",
           "[rooted_tree_t][regression]") {
-  rooted_tree_t tree{data_files_dna[0].second};
+  rooted_tree_t tree{data_files_dna["single"].second};
   std::vector<pll_operation_t> ops;
   std::vector<unsigned int> pmatrices;
   std::vector<double> branches;
@@ -131,7 +137,7 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
 }
 
 TEST_CASE("rooted_tree_t generate root operations", "[rooted_tree_t]") {
-  rooted_tree_t tree{data_files_dna[0].second};
+  rooted_tree_t tree{data_files_dna["single"].second};
   pll_operation_t op;
   std::vector<unsigned int> pmatrices;
   std::vector<double> branches;
@@ -163,7 +169,8 @@ TEST_CASE("rooted_tree_t generate root operations", "[rooted_tree_t]") {
 }
 
 TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
-  for (auto &ds : data_files_dna) {
+  for (auto &kv : data_files_dna) {
+    auto &ds = kv.second;
     rooted_tree_t tree{ds.second};
     for (size_t i = 0; i < tree.root_count(); ++i) {
       tree.root_by(tree.root_location(i));
@@ -173,7 +180,7 @@ TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
 }
 
 TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
-  rooted_tree_t tree{data_files_dna[0].second};
+  rooted_tree_t tree{data_files_dna["single"].second};
   REQUIRE(tree.root_count() == 5);
   auto rl1 = find_node(tree, "b");
   rl1.brlen_ratio = 0.25;
@@ -233,7 +240,7 @@ TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree_t check derivative vs regular operations",
           "[rooted_tree_t]") {
-  rooted_tree_t tree{data_files_dna[0].second};
+  rooted_tree_t tree{data_files_dna["single"].second};
   for (size_t i = 0; i < tree.root_count(); ++i) {
     auto root_location = tree.root_location(i);
     std::vector<pll_operation_t> ops_regular;
@@ -270,12 +277,12 @@ TEST_CASE("rooted_tree_t check derivative vs regular operations",
 }
 
 TEST_CASE("rooted_tree_t sanity check", "[rooted_tree_t]"){
-  rooted_tree_t t1(check_trees[0]);
+  rooted_tree_t t1(check_trees["sanity_check1"]);
   CHECK(!t1.sanity_check());
 
-  rooted_tree_t t2(check_trees[1]);
+  rooted_tree_t t2(check_trees["sanity_check2"]);
   CHECK(!t2.sanity_check());
 
-  rooted_tree_t t3(check_trees[2]);
+  rooted_tree_t t3(check_trees["sanity_check3"]);
   CHECK(t3.sanity_check());
 }

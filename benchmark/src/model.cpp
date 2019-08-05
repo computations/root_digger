@@ -4,8 +4,8 @@
 
 static void BM_model_constructor(benchmark::State &state) {
   std::vector<msa_t> msa;
-  msa.emplace_back(data_files_dna[state.range(0)].first);
-  rooted_tree_t tree{data_files_dna[state.range(0)].second};
+  msa.emplace_back(data_files_dna[data_keys[state.range(0)]].first);
+  rooted_tree_t tree{data_files_dna[data_keys[state.range(0)]].second};
   uint64_t seed = std::rand();
   model_params_t freqs{.25, .25, .25, .25};
   for (auto _ : state) {
@@ -17,8 +17,8 @@ BENCHMARK(BM_model_constructor)->Arg(0)->Arg(1);
 
 static void BM_LH_computation(benchmark::State &state) {
   std::vector<msa_t> msa;
-  msa.emplace_back(data_files_dna[state.range(0)].first);
-  rooted_tree_t tree{data_files_dna[state.range(0)].second};
+  msa.emplace_back(data_files_dna[data_keys[state.range(0)]].first);
+  rooted_tree_t tree{data_files_dna[data_keys[state.range(0)]].second};
   uint64_t seed = std::rand();
   model_params_t freqs{.25, .25, .25, .25};
   model_t model{tree, msa, seed};
@@ -38,8 +38,8 @@ BENCHMARK(BM_LH_computation)
 
 static void BM_DLH_computation(benchmark::State &state) {
   std::vector<msa_t> msa;
-  msa.emplace_back(data_files_dna[state.range(0)].first);
-  rooted_tree_t tree{data_files_dna[state.range(0)].second};
+  msa.emplace_back(data_files_dna[data_keys[state.range(0)]].first);
+  rooted_tree_t tree{data_files_dna[data_keys[state.range(0)]].second};
   uint64_t seed = std::rand();
   model_params_t freqs{.25, .25, .25, .25};
   model_t model{tree, msa, seed};
@@ -59,8 +59,8 @@ BENCHMARK(BM_DLH_computation)
 
 static void BM_LH_root_computation(benchmark::State &state) {
   std::vector<msa_t> msa;
-  msa.emplace_back(data_files_dna[1].first);
-  rooted_tree_t tree{data_files_dna[1].second};
+  msa.emplace_back(data_files_dna["101.phy"].first);
+  rooted_tree_t tree{data_files_dna["101.phy"].second};
   uint64_t seed = std::rand();
   model_t model{tree, msa, seed};
   model.initialize_partitions_uniform_freqs(msa);
