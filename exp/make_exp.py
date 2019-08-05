@@ -264,10 +264,10 @@ class exp:
 
         freqs, subst = self.get_model_params()
         with open('subst.model', 'w') as model_file:
-            model_file.write(subst.rd_repr())
+            model_file.write(subst.indel_repr())
 
         with open('freqs.model', 'w') as model_file:
-            model_file.write(freqs.rd_repr())
+            model_file.write(freqs.indel_repr))
 
         for tree_name in self._tree_names:
             all_trees_rd = []
@@ -473,7 +473,7 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                 outfile.write('iqtree,{},{},{}\n'.format(
                     numpy.mean(rf_topo_iqtree),
                     numpy.mean(rf_topo_iqtree) / tree_size,
-                    numpy.mean(rf_metric_rd)))
+                    numpy.mean(rf_metric_iqtree)))
             with open(
                     "{tree_name}tree_{sites}sites_rf_hist".format(tree_name=tn,
                                                                   sites=sites),
@@ -532,7 +532,7 @@ def compute_distances(tree_names, trees, site_steps, aligns):
                 outfile.write('iqtree,{},{},{}\n'.format(
                     numpy.mean(rf_topo_iqtree),
                     numpy.mean(rf_topo_iqtree) / tree_size,
-                    numpy.mean(rf_metric_rd)))
+                    numpy.mean(rf_metric_iqtree)))
             with open(
                     "{tree_name}tree_{align}align_rf_hist".format(tree_name=tn,
                                                                   align=align),
