@@ -54,6 +54,9 @@ private:
   std::pair<root_location_t, double>
   bisect(const root_location_t &beg, dlh_t d_beg, const root_location_t &end,
          dlh_t d_end, double atol, size_t depth);
+  std::pair<root_location_t, double> brents(root_location_t beg, dlh_t d_beg,
+                                            root_location_t end, dlh_t d_end,
+                                            double atol);
   void set_subst_rates(size_t, const model_params_t &);
   void set_subst_rates_random(size_t, const msa_t &);
   void set_gamma_rates(size_t);
