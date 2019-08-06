@@ -8,15 +8,15 @@ import multiprocessing
 import os
 import random
 import shutil
+import string
 import subprocess
 import sys
-import string
 
+import Bio
 import ete3
 import numpy
 import progressbar
 from Bio import SeqIO
-import Bio
 
 progressbar.streams.flush()
 
@@ -43,7 +43,7 @@ CONTROL_FILE = """
 
 RD = os.path.abspath(
     "../bin/rd"
-) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --force"
+) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --force --slow"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
@@ -420,127 +420,94 @@ def get_root_distance_toplogical(true_tree, inferred_tree):
     return numpy.abs(cn_tt_dist - cn_it_dist)
 
 
-def compute_distances(tree_names, trees, site_steps, aligns):
+def calculate_tree_diameter(t1):
+    td = 0.0
+    for c1 in t1.get_leaves():
+        for c2 in t1.get_leaves():
+            tmp = t1.get_distance(c1, c2)
+            td = max(td, tmp)
+    return td
+
+
+def calculate_distance_statistics(true_tree, tree_name, compare_tree_name,
+                                  format_string):
+    rf_topo = []
+    rf_ntopo = []
+    rf_metric = []
+    rf_nmetric = []
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
-    for tn, true_tree in zip(tree_names, trees):
-        for sites in site_steps:
-            rf_topo_iqtree = []
-            rf_topo_rd = []
-            rf_metric_iqtree = []
-            rf_metric_rd = []
-            for i in range(TOTAL_ITERS):
-                if type(true_tree) != ete3.Tree:
-                    with open(
-                            os.path.join(
-                                RUN_TEMPLATE.format(
-                                    leading_zeroes=leading_zeroes, run_iter=i),
-                                "{}.tree".format(tn))) as infile:
-                        true_tree = ete3.Tree(infile.read())
-                result_tree_file_rd = os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{sites}sites".format(taxa=tn,
-                                                     sites=sites), "rd_output")
-                result_tree_file_iqtree = os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{sites}sites".format(taxa=tn, sites=sites),
-                    "seqs_TRUE.phy.treefile")
-                with open(result_tree_file_rd) as infile:
-                    result_tree_rd = ete3.Tree(infile.readline())
-                with open(result_tree_file_iqtree) as infile:
-                    result_tree_iqtree = ete3.Tree(infile.readline())
-
-                rf_topo_rd.append(
-                    get_root_distance_toplogical(true_tree, result_tree_rd))
-                rf_metric_rd.append(
-                    get_root_distance_metric(true_tree, result_tree_rd))
-                rf_topo_iqtree.append(
-                    get_root_distance_toplogical(true_tree,
-                                                 result_tree_iqtree))
-                rf_metric_iqtree.append(
-                    get_root_distance_metric(true_tree, result_tree_iqtree))
-
-            tree_size = len(true_tree.get_leaves())
-            with open(
-                    "{tree_name}tree_{sites}sites_rf_dists".format(
-                        tree_name=tn, sites=sites), 'w') as outfile:
-                outfile.write('method,topo,ntopo,metric\n')
-                outfile.write('rd,{},{},{}\n'.format(
-                    numpy.mean(rf_topo_rd),
-                    numpy.mean(rf_topo_rd) / tree_size,
-                    numpy.mean(rf_metric_rd)))
-                outfile.write('iqtree,{},{},{}\n'.format(
-                    numpy.mean(rf_topo_iqtree),
-                    numpy.mean(rf_topo_iqtree) / tree_size,
-                    numpy.mean(rf_metric_iqtree)))
-            with open(
-                    "{tree_name}tree_{sites}sites_rf_hist".format(tree_name=tn,
-                                                                  sites=sites),
-                    'w') as outfile:
-                outfile.write('iqtree_n_dist,rd_n_dist\n')
-                for rd, iq in zip(rf_topo_rd, rf_topo_iqtree):
-                    outfile.write("{},{},{},{}\n".format(
-                        iq, iq / tree_size, rd, rd / tree_size))
-
+    for i in range(TOTAL_ITERS):
         if type(true_tree) != ete3.Tree:
             with open(
                     os.path.join(
                         RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
                                             run_iter=i),
-                        "{}.tree".format(tn))) as infile:
+                        "{}.tree".format(tree_name))) as infile:
                 true_tree = ete3.Tree(infile.read())
-        for align in aligns:
-            rf_topo_iqtree = []
-            rf_topo_rd = []
-            rf_metric_iqtree = []
-            rf_metric_rd = []
-            for i in range(TOTAL_ITERS):
-                result_tree_file_rd = os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{align}align".format(taxa=tn,
-                                                     align=align), "rd_output")
-                result_tree_file_iqtree = os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{align}align".format(taxa=tn, align=align),
-                    "{align}.fasta.treefile".format(align=align))
-                with open(result_tree_file_rd) as infile:
-                    result_tree_rd = ete3.Tree(infile.readline())
-                with open(result_tree_file_iqtree) as infile:
-                    result_tree_iqtree = ete3.Tree(infile.readline())
-                rf_topo_rd.append(
-                    get_root_distance_toplogical(true_tree, result_tree_rd))
-                rf_metric_rd.append(
-                    get_root_distance_metric(true_tree, result_tree_rd))
-                rf_topo_iqtree.append(
-                    get_root_distance_toplogical(true_tree,
-                                                 result_tree_iqtree))
-                rf_metric_iqtree.append(
-                    get_root_distance_metric(true_tree, result_tree_iqtree))
 
-            tree_size = len(true_tree.get_leaves())
-            with open(
-                    "{tree_name}tree_{align}align_rf_dists".format(
-                        tree_name=tn, align=align), 'w') as outfile:
-                outfile.write('method,topo,ntopo,metric\n')
-                outfile.write('rd,{},{},{}\n'.format(
-                    numpy.mean(rf_topo_rd),
-                    numpy.mean(rf_topo_rd) / tree_size,
-                    numpy.mean(rf_metric_rd)))
-                outfile.write('iqtree,{},{},{}\n'.format(
-                    numpy.mean(rf_topo_iqtree),
-                    numpy.mean(rf_topo_iqtree) / tree_size,
-                    numpy.mean(rf_metric_iqtree)))
-            with open(
-                    "{tree_name}tree_{align}align_rf_hist".format(tree_name=tn,
-                                                                  align=align),
-                    'w') as outfile:
-                outfile.write('iqtree_dist,iqtree_n_dist,rd_dist,rd_n_dist\n')
-                for rd, iq in zip(rf_topo_rd, rf_topo_iqtree):
-                    outfile.write("{},{},{},{}\n".format(
-                        iq, iq / tree_size, rd, rd / tree_size))
+        compare_tree_file = os.path.join(
+            RUN_TEMPLATE.format(leading_zeroes=leading_zeroes, run_iter=i),
+            format_string, compare_tree_name)
+        with open(compare_tree_file) as infile:
+            compare_tree = ete3.Tree(infile.readline())
+
+        tree_diameter = calculate_tree_diameter(compare_tree)
+        tree_size = len(true_tree.get_leaves())
+        topo_dist = get_root_distance_toplogical(true_tree, compare_tree)
+        metric_dist = get_root_distance_metric(true_tree, compare_tree)
+
+        rf_topo.append(topo_dist)
+        rf_ntopo.append(topo_dist / tree_size)
+        rf_metric.append(metric_dist)
+        rf_nmetric.append(metric_dist / tree_diameter)
+    return {
+        'topo': rf_topo,
+        'ntopo': rf_ntopo,
+        'metric': rf_metric,
+        'nmetric': rf_nmetric,
+    }
+
+
+def write_stats(dist_stats_rd, dist_stats_iqtree, format_string):
+    with open(format_string + "_rf_dists", 'w') as outfile:
+        outfile.write('method,topo,ntopo,metric,nmetric\n')
+        outfile.write('rd,{},{},{},{}\n'.format(
+            numpy.mean(dist_stats_rd['topo']),
+            numpy.mean(dist_stats_rd['ntopo']),
+            numpy.mean(dist_stats_rd['metric']),
+            numpy.mean(dist_stats_rd['nmetric'])))
+        outfile.write('iqtree,{},{},{},{}\n'.format(
+            numpy.mean(dist_stats_iqtree['topo']),
+            numpy.mean(dist_stats_iqtree['ntopo']),
+            numpy.mean(dist_stats_iqtree['metric']),
+            numpy.mean(dist_stats_iqtree['nmetric'])))
+    with open(format_string + "_rf_hists", 'w') as outfile:
+        outfile.write('iqtree_n_dist,rd_n_dist,iqtree_n_metric,rd_n_metric\n')
+        for row in zip(dist_stats_rd['ntopo'], dist_stats_iqtree['ntopo'],
+                       dist_stats_rd['nmetric'], dist_stats_iqtree['nmetric']):
+            outfile.write("{},{},{},{}\n".format(*row))
+
+
+def compute_distances(tree_names, trees, site_steps, aligns):
+    for tn, true_tree in zip(tree_names, trees):
+        for sites in site_steps:
+            format_string = '{taxa}tree_{sites}sites'.format(taxa=tn,
+                                                             sites=sites)
+            dist_stats_rd = calculate_distance_statistics(
+                true_tree, tn, 'rd_output', format_string)
+            dist_stats_iqtree = calculate_distance_statistics(
+                true_tree, tn, 'seqs_TRUE.phy.treefile', format_string)
+            write_stats(dist_stats_rd, dist_stats_iqtree, format_string)
+
+        for align in aligns:
+            format_string = '{taxa}tree_{align}align'.format(taxa=tn,
+                                                             align=align)
+            dist_stats_rd = calculate_distance_statistics(
+                true_tree, tn, 'rd_output', format_string)
+            dist_stats_iqtree = calculate_distance_statistics(
+                true_tree, tn, '{}.fasta.treefile'.format(align),
+                format_string)
+            write_stats(dist_stats_rd, dist_stats_iqtree, format_string)
 
 
 def map_root_onto_main(tree_names, trees, site_steps, aligns):
