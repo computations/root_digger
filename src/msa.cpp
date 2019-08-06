@@ -12,6 +12,7 @@ extern "C" {
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename) {
 
+  debug_print("attempting to open msa: %s", msa_filename.c_str());
   if (pll_phylip_t *fd =
           pll_phylip_open(msa_filename.c_str(), pll_map_generic)) {
     pll_msa_t *pll_msa = nullptr;
