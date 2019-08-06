@@ -1,5 +1,6 @@
 #include "debug.h"
 #include "model.hpp"
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -68,7 +69,7 @@ model_params_t random_params(size_t size, uint64_t seed) {
   return mp;
 }
 
-std::vector<double> sample_diriclet(std::minstd_rand engine, double alpha,
+std::vector<double> sample_dirichlet(std::minstd_rand engine, double alpha,
                                     double beta, size_t size) {
   std::vector<double> rand_sample(size);
   static std::gamma_distribution<double> gd(alpha * (beta / (size * beta)),
@@ -126,7 +127,7 @@ void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
   pll_set_pattern_weights(_partitions[p_index], msa.weights());
 }
 
-void model_t::set_emperical_freqs(size_t p_index) {
+void model_t::set_empirical_freqs(size_t p_index) {
   pll_partition_t *partition = _partitions[p_index];
   double *emp_freqs = pllmod_msa_empirical_frequencies(partition);
   for (size_t i = 0; i < partition->states; ++i) {
@@ -180,6 +181,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   }
 
   attributes |= PLL_ATTRIB_NONREV;
+  attributes |= PLL_ATTRIB_PATTERN_TIP;
 
   for (size_t partition_index = 0; partition_index < msas.size();
        ++partition_index) {
@@ -417,9 +419,9 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
       d_midpoint = d_beg;
     }
 
-    double tol = 2.0 * abs(end.brlen_ratio) *
-                     std::numeric_limits<double>::epsilon() +
-                 0.5 * atol;
+    double tol =
+        2.0 * abs(end.brlen_ratio) * std::numeric_limits<double>::epsilon() +
+        0.5 * atol;
     double e_tol = 0.5 * (midpoint.brlen_ratio - end.brlen_ratio);
     if (abs(e_tol) <= tol || d_end.dlh == 0)
       return {end, d_end.lh};
@@ -580,6 +582,10 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
       "Initial derivatives failed when optimizing alpha, ran out of cases");
 }
 
+/*
+ * TODO: Rewrite this, and other functions to be much more clever so that we can
+ * only update a few CLVs when we iterate through the root locations
+ */
 std::pair<root_location_t, double> model_t::optimize_root_location() {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
@@ -598,18 +604,77 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
   return best;
 }
 
+void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
+                           const std::vector<model_params_t> &initial_rates,
+                           const root_location_t &root_location,
+                           double initial_temp, double final_temp) {
+
+  std::minstd_rand engine(_seed);
+  std::uniform_real_distribution<> roller(0.0, 1.0);
+  std::normal_distribution<> err_subst(0.0, 0.10);
+  std::normal_distribution<> err_freqs(0.0, 0.01);
+
+  auto next_freqs{initial_freqs};
+  auto cur_freqs{initial_freqs};
+  auto next_subst{initial_rates};
+  double current_lh = compute_lh(root_location);
+  /* anneal the model parameters parameters */
+  while (initial_temp > final_temp) {
+    for (size_t i = 0; i < next_subst.size(); ++i) {
+      for (size_t j = 0; j < next_subst[i].size(); ++j) {
+        next_subst[i][j] = _subst_params[i][j] + err_subst(engine);
+        if (next_subst[i][j] <= 1e-7) {
+          next_subst[i][j] = 1e-7;
+        }
+      }
+    }
+
+    for (size_t i = 0; i < next_freqs.size(); ++i) {
+      for (size_t j = 0; j < next_freqs[i].size(); ++j) {
+        next_freqs[i][j] = cur_freqs[i][j] + err_freqs(engine);
+        if (next_freqs[i][j] <= 1e-7) {
+          next_freqs[i][j] = 1e-7;
+        }
+      }
+      double sum = 0.0;
+      for (auto f : next_freqs[i]) {
+        sum += f;
+      }
+      for (auto &f : next_freqs[i]) {
+        sum /= f;
+      }
+    }
+
+    for (size_t i = 0; i < _partitions.size(); ++i) {
+      pll_set_subst_params(_partitions[i], 0, next_subst[i].data());
+    }
+
+    for (size_t i = 0; i < _partitions.size(); ++i) {
+      pll_set_frequencies(_partitions[i], 0, next_freqs[i].data());
+    }
+
+    double next_lh = compute_lh(root_location);
+
+    if (next_lh > current_lh) {
+      next_lh = current_lh;
+      std::swap(_subst_params, next_subst);
+      std::swap(cur_freqs, next_freqs);
+    } else if (exp((next_lh - current_lh) / initial_temp) > roller(engine)) {
+      next_lh = current_lh;
+      std::swap(_subst_params, next_subst);
+      std::swap(cur_freqs, next_freqs);
+    }
+    initial_temp *= _temp_ratio;
+  }
+}
+
 /* Optimize the substitution parameters by simulated annealing */
 root_location_t model_t::optimize_all(double final_temp) {
   assert_string(final_temp < 1.0, "Starting temperature is too high");
 
   auto cur = optimize_root_location();
-  double initial_lh = cur.second;
   auto initial_rl = cur.first;
-
-  std::minstd_rand engine(_seed);
-  std::uniform_real_distribution<> roller(0.0, 1.0);
-  std::normal_distribution<> err_subst(0.0, 0.05);
-  std::normal_distribution<> err_freqs(0.0, 0.01);
+  double cur_temp = 1.0;
 
   std::vector<model_params_t> inital_subst{_subst_params};
   std::vector<model_params_t> initial_freqs;
@@ -620,68 +685,12 @@ root_location_t model_t::optimize_all(double final_temp) {
                                    _partitions[i]->states);
   }
 
-  for (size_t sa_iters = 0; sa_iters < 10; ++sa_iters) {
-    auto next_freqs{initial_freqs};
-    auto cur_freqs{initial_freqs};
-    auto next_subst{_subst_params};
-    double temp = 1.0;
-    while (temp > final_temp) {
-
-      for (size_t i = 0; i < next_subst.size(); ++i) {
-        for (size_t j = 0; j < next_subst[i].size(); ++j) {
-          next_subst[i][j] = _subst_params[i][j] + err_subst(engine);
-          if (next_subst[i][j] <= 1e-7) {
-            next_subst[i][j] = 1e-7;
-          }
-        }
-      }
-
-      for (size_t i = 0; i < next_freqs.size(); ++i) {
-        for (size_t j = 0; j < next_freqs[i].size(); ++j) {
-          next_freqs[i][j] = cur_freqs[i][j] + err_freqs(engine);
-          if (next_freqs[i][j] <= 1e-7) {
-            next_freqs[i][j] = 1e-7;
-          }
-        }
-        double sum = 0.0;
-        for (auto f : next_freqs[i]) {
-          sum += f;
-        }
-        for (auto &f : next_freqs[i]) {
-          sum /= f;
-        }
-      }
-
-      for (size_t i = 0; i < _partitions.size(); ++i) {
-        pll_set_subst_params(_partitions[i], 0, next_subst[i].data());
-      }
-
-      for (size_t i = 0; i < _partitions.size(); ++i) {
-        pll_set_frequencies(_partitions[i], 0, next_freqs[i].data());
-      }
-
-      auto next = optimize_root_location();
-      if (next.second > cur.second) {
-        cur = next;
-        _subst_params = next_subst;
-        cur_freqs = next_freqs;
-        continue;
-      } else if (exp((next.second - cur.second) / temp) > roller(engine)) {
-        cur = next;
-        _subst_params = next_subst;
-        cur_freqs = next_freqs;
-      }
-      temp *= _temp_ratio;
-    }
-
-    if (initial_lh > cur.second) {
-      continue;
-    }
-    return cur.first;
-  }
-  for (size_t i = 0; i < _partitions.size(); ++i) {
-    pll_set_subst_params(_partitions[i], 0, inital_subst[i].data());
-    pll_set_frequencies(_partitions[i], 0, initial_freqs[i].data());
+  // for (size_t sa_iters = 0; sa_iters < 50; ++sa_iters) {
+  while (cur_temp > final_temp) {
+    anneal_rates(initial_freqs, _subst_params, initial_rl, cur_temp,
+                 final_temp);
+    initial_rl = optimize_root_location().first;
+    cur_temp *= _temp_ratio / 3.0;
   }
   return initial_rl;
 }

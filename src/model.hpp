@@ -62,8 +62,11 @@ private:
   void set_gamma_rates(size_t);
   void update_invariant_sites(size_t);
   void set_tip_states(size_t, const msa_t &);
-  void set_emperical_freqs(size_t);
+  void set_empirical_freqs(size_t);
   void set_freqs(size_t, const model_params_t &);
+  void anneal_rates(const std::vector<model_params_t> &,
+                    const std::vector<model_params_t> &, 
+                    const root_location_t&,double, double);
 
   std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;
