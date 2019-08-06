@@ -267,7 +267,7 @@ class exp:
             model_file.write(subst.indel_repr())
 
         with open('freqs.model', 'w') as model_file:
-            model_file.write(freqs.indel_repr))
+            model_file.write(freqs.indel_repr())
 
         for tree_name in self._tree_names:
             all_trees_rd = []
