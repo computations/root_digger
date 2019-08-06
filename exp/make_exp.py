@@ -43,7 +43,7 @@ CONTROL_FILE = """
 
 RD = os.path.abspath(
     "../bin/rd"
-) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --silent --force --slow"
+) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --force --slow"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
@@ -240,11 +240,16 @@ class exp:
                                    stdout=subprocess.PIPE)
         with open('rd_output_all', 'w') as logfile:
             logfile.write(rd_output.stdout.decode('utf-8'))
-        lh, tree, _ = rd_output.stdout.decode('utf-8').split('\n')
+        output_lines = rd_output.stdout.decode('utf-8').split('\n')
+        tree = output_lines[-3]
+        lh = output_lines[-4]
+        time = output_lines[-2]
         with open('rd_output', 'w') as rd_outfile:
             rd_outfile.write(tree)
         with open('rd_output_lh', 'w') as rd_outfile:
             rd_outfile.write(lh)
+        with open('rd_output_time', 'w') as rd_outfile:
+            rd_outfile.write(time)
         self.set_rd_done('.')
 
     def run_iqtree(self, tree_filename, msa):
