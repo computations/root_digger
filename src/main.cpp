@@ -117,7 +117,7 @@ int main(int argv, char **argc) {
     uint64_t seed = std::random_device()();
     unsigned int states = 0;
     bool silent = false;
-    double temp_param = 0.8;
+    double temp_param = 0.9;
     double final_temp = 1e-8;
     bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
@@ -147,10 +147,10 @@ int main(int argv, char **argc) {
         silent = true;
         break;
       case 8: // fast
-        temp_param = 0.7;
+        temp_param = 0.5;
         break;
       case 9: // slow
-        temp_param = 0.9;
+        temp_param = 0.98;
         break;
       case 10: // force
         sanity_checks = false;
