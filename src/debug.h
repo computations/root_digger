@@ -15,6 +15,13 @@ extern bool __VERBOSE__;
 
 #define DEBUG_IF_FLAG 1
 
+
+#ifdef RD_DEBUG
+#define RD_DEBUG_ASSERT_FLAG 1
+#else 
+#define RD_DEBUG_ASSERT_FLAG 0
+#endif
+
 #define EMIT_DEBUG_FLAG __VERBOSE__
 
 #define print_clock                                                            \
@@ -56,7 +63,7 @@ extern bool __VERBOSE__;
 
 #define assert_string(cond, comment)                                           \
   do {                                                                         \
-    if (DEBUG_IF_FLAG && EMIT_DEBUG_FLAG) {                                    \
+    if (DEBUG_IF_FLAG) {                                                       \
       {                                                                        \
         if (!(cond)) {                                                         \
           print_clock;                                                         \

@@ -70,7 +70,7 @@ model_params_t random_params(size_t size, uint64_t seed) {
 }
 
 std::vector<double> sample_dirichlet(std::minstd_rand engine, double alpha,
-                                    double beta, size_t size) {
+                                     double beta, size_t size) {
   std::vector<double> rand_sample(size);
   static std::gamma_distribution<double> gd(alpha * (beta / (size * beta)),
                                             1.0);
@@ -132,7 +132,7 @@ void model_t::set_empirical_freqs(size_t p_index) {
   double *emp_freqs = pllmod_msa_empirical_frequencies(partition);
   for (size_t i = 0; i < partition->states; ++i) {
     if (emp_freqs[i] <= 0) {
-      throw invalid_emperical_frequencies_exception(
+      throw invalid_empirical_frequencies_exception(
           "One of the state frequenices is zero while using emperical "
           "frequencies");
     }
@@ -395,7 +395,7 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
                                                    root_location_t end,
                                                    dlh_t d_end, double atol) {
 
-  assert_string(d_beg.dlh * d_end.dlh > 0,
+  assert_string(d_beg.dlh * d_end.dlh < 0,
                 "Brents called with endpoints which don't bracket");
 
   root_location_t midpoint{end};
@@ -469,7 +469,7 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
 /* Find the optimum for the ratio via the bisection method */
 root_location_t model_t::optimize_alpha(const root_location_t &root) {
   constexpr double ATOL = 1e-7;
-  double lh = compute_lh(root);
+  double lh = compute_lh_root(root);
   if (std::isnan(lh)) {
     throw std::runtime_error("initial likelihood calculation is not finite");
   }
@@ -582,15 +582,14 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
       "Initial derivatives failed when optimizing alpha, ran out of cases");
 }
 
-/*
- * TODO: Rewrite this, and other functions to be much more clever so that we can
- * only update a few CLVs when we iterate through the root locations
- */
 std::pair<root_location_t, double> model_t::optimize_root_location() {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
+  _tree.root_by(_tree.root_location(0));
   for (size_t i = 0; i < _tree.root_count(); ++i) {
     debug_print("working rl: %s", _tree.root_location(i).label().c_str());
+    move_root(_tree.root_location(i));
+    compute_lh_root(_tree.root_location(i));
     root_location_t rl = optimize_alpha(_tree.root_location(i));
     debug_print("alpha: %f", rl.brlen_ratio);
     double rl_lh = compute_lh(rl);
@@ -602,6 +601,37 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
   }
   debug_print("finished with lh: %f", best.second);
   return best;
+}
+
+void model_t::move_root(const root_location_t &new_root) {
+  auto old_root = _tree.current_root();
+  _tree.root_by(new_root);
+
+  std::vector<pll_operation_t> ops;
+  std::vector<unsigned int> pmatrix_indices;
+  std::vector<double> branch_lengths;
+
+  {
+    auto result = _tree.generate_root_update_operations(old_root);
+    ops = std::move(std::get<0>(result));
+    pmatrix_indices = std::move(std::get<1>(result));
+    branch_lengths = std::move(std::get<2>(result));
+  }
+
+  unsigned int params[4] = {0, 0, 0, 0};
+
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    auto &partition = _partitions[i];
+    int result =
+        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
+                                 branch_lengths.data(), pmatrix_indices.size());
+
+    if (result == PLL_FAILURE) {
+      throw std::runtime_error(pll_errmsg);
+    }
+
+    pll_update_partials(partition, ops.data(), ops.size());
+  }
 }
 
 void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
@@ -618,6 +648,7 @@ void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
   auto cur_freqs{initial_freqs};
   auto next_subst{initial_rates};
   double current_lh = compute_lh(root_location);
+
   /* anneal the model parameters parameters */
   while (initial_temp > final_temp) {
     for (size_t i = 0; i < next_subst.size(); ++i) {
@@ -685,12 +716,11 @@ root_location_t model_t::optimize_all(double final_temp) {
                                    _partitions[i]->states);
   }
 
-  // for (size_t sa_iters = 0; sa_iters < 50; ++sa_iters) {
   while (cur_temp > final_temp) {
     anneal_rates(initial_freqs, _subst_params, initial_rl, cur_temp,
-                 final_temp);
+                 final_temp );
     initial_rl = optimize_root_location().first;
-    cur_temp *= _temp_ratio / 3.0;
+    cur_temp *= _temp_ratio / 1.5;
   }
   return initial_rl;
 }
@@ -705,7 +735,7 @@ void model_t::initialize_partitions(const std::vector<msa_t> &msa) {
        ++partition_index) {
     set_tip_states(partition_index, msa[partition_index]);
     update_invariant_sites(partition_index);
-    set_emperical_freqs(partition_index);
+    set_empirical_freqs(partition_index);
     set_subst_rates_random(partition_index, msa[partition_index]);
     set_gamma_rates(partition_index);
   }

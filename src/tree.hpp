@@ -27,7 +27,7 @@ struct root_location_t {
   constexpr inline double brlen_compliment() const {
     return saved_brlen * (1 - brlen_ratio);
   }
-  std::string label() const{
+  std::string label() const {
     return edge->label != nullptr ? edge->label : "(null)";
   }
 };
@@ -67,6 +67,8 @@ public:
   unsigned int root_clv_index() const;
   unsigned int root_scaler_index() const;
 
+  root_location_t current_root() const;
+
   std::unordered_map<std::string, unsigned int> label_map() const;
   std::unordered_set<std::string> label_set() const;
 
@@ -75,7 +77,12 @@ public:
   generate_operations(const root_location_t &);
 
   std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
+
   generate_derivative_operations(const root_location_t &root);
+
+  std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
+             std::vector<double>>
+  generate_root_update_operations(const root_location_t &new_root);
 
   void root_by(const root_location_t &);
   void update_root(root_location_t);
@@ -93,8 +100,12 @@ private:
   void deduplicate_roots();
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;
+  void find_path(pll_unode_t *n1, pll_unode_t *n2);
+  bool find_path_recurse(pll_unode_t *n1, pll_unode_t *n2);
+  void clear_traversal_data();
 
   pll_utree_t *_tree;
+  root_location_t _current_rl;
   std::vector<root_location_t> _roots;
 };
 

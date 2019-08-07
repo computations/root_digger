@@ -17,8 +17,8 @@ struct dlh_t {
   double dlh;
 };
 
-struct invalid_emperical_frequencies_exception : public std::runtime_error {
-  invalid_emperical_frequencies_exception(const char *m)
+struct invalid_empirical_frequencies_exception : public std::runtime_error {
+  invalid_empirical_frequencies_exception(const char *m)
       : std::runtime_error(m){};
 };
 
@@ -64,9 +64,10 @@ private:
   void set_tip_states(size_t, const msa_t &);
   void set_empirical_freqs(size_t);
   void set_freqs(size_t, const model_params_t &);
+  void move_root(const root_location_t &new_root);
   void anneal_rates(const std::vector<model_params_t> &,
-                    const std::vector<model_params_t> &, 
-                    const root_location_t&,double, double);
+                    const std::vector<model_params_t> &,
+                    const root_location_t &, double, double);
 
   std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;

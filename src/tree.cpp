@@ -61,7 +61,7 @@ unsigned int rooted_tree_t::root_scaler_index() const {
 
 std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
   std::unordered_map<std::string, unsigned int> label_map;
-  if(_tree == nullptr){
+  if (_tree == nullptr) {
     return label_map;
   }
   for (unsigned int i = 0; i < tip_count(); ++i) {
@@ -71,9 +71,9 @@ std::unordered_map<std::string, unsigned int> rooted_tree_t::label_map() const {
   return label_map;
 }
 
-std::unordered_set<std::string> rooted_tree_t::label_set() const{
+std::unordered_set<std::string> rooted_tree_t::label_set() const {
   std::unordered_set<std::string> label_set;
-  if(_tree == nullptr){
+  if (_tree == nullptr) {
     return label_set;
   }
   for (unsigned int i = 0; i < tip_count(); ++i) {
@@ -179,6 +179,8 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
   right_child->pmatrix_index = new_root_right->pmatrix_index =
       _tree->edge_count - 1;
   new_root_right->pmatrix_index = _tree->edge_count - 1;
+
+  _current_rl = root_location;
 }
 
 void rooted_tree_t::update_root(root_location_t root) {
@@ -336,4 +338,98 @@ bool rooted_tree_t::branch_length_sanity_check() const {
 
 bool rooted_tree_t::sanity_check() const {
   return branch_length_sanity_check();
+}
+
+inline void tag_nodes(pll_unode_t *n) {
+  pll_unode_t *start = n;
+  do {
+    n->data = (void *)0x1;
+    n = n->next;
+  } while (n != nullptr && n != start);
+}
+
+void rooted_tree_t::find_path(pll_unode_t *n1, pll_unode_t *n2) {
+  pll_unode_t *start = n1;
+  pll_unode_t *current = n1;
+  tag_nodes(n1);
+  do {
+    if (find_path_recurse(current, n2))
+      break;
+    current = current->next;
+  } while (current != nullptr && current != start);
+}
+
+bool rooted_tree_t::find_path_recurse(pll_unode_t *n1, pll_unode_t *n2) {
+  pll_unode_t *start = n1;
+  do {
+    if (n1 == n2) {
+      tag_nodes(n1);
+      return true;
+    }
+    if (n1 != start && find_path_recurse(n1->back, n2)) {
+      tag_nodes(n1);
+      return true;
+    }
+    n1 = n1->next;
+  } while (n1 != nullptr && n1 != start);
+  return false;
+}
+
+std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
+           std::vector<double>>
+rooted_tree_t::generate_root_update_operations(
+    const root_location_t &old_root) {
+  find_path(_tree->vroot, old_root.edge);
+  tag_nodes(_tree->vroot->back);
+  tag_nodes(_tree->vroot->next->back);
+  std::vector<pll_unode_t *> trav_buf(inner_count());
+  unsigned int trav_size = 0;
+
+  auto update_root_callback = [](pll_unode_t *n) -> int {
+    if (n->data) {
+      return PLL_SUCCESS;
+    }
+    return PLL_FAILURE;
+  };
+
+  pll_utree_traverse(_tree->vroot, PLL_TREE_TRAVERSE_POSTORDER,
+                     update_root_callback, trav_buf.data(), &trav_size);
+  trav_buf.resize(trav_size);
+
+  std::vector<pll_operation_t> ops(trav_buf.size());
+  std::vector<unsigned int> pmatrix_indices(trav_buf.size());
+  std::vector<double> branch_lengths(trav_buf.size());
+
+  assert_string(trav_buf.size() != 0,
+                "traversal buffer when updating the root had size zero");
+
+  unsigned int op_count = 0;
+  unsigned int matrix_count = 0;
+
+  pll_utree_create_operations(trav_buf.data(), trav_buf.size() - 1,
+                              branch_lengths.data(), pmatrix_indices.data(),
+                              ops.data(), &matrix_count, &op_count);
+  ops.resize(op_count);
+  pmatrix_indices.resize(matrix_count);
+  branch_lengths.resize(matrix_count);
+
+  clear_traversal_data();
+
+  return std::make_tuple(ops, pmatrix_indices, branch_lengths);
+}
+
+void rooted_tree_t::clear_traversal_data() {
+  auto clear_data_callback = [](pll_unode_t *n, void *) -> int {
+    n->data = 0x0;
+    return PLL_SUCCESS;
+  };
+
+  pllmod_utree_traverse_apply(_tree->vroot, nullptr, nullptr,
+                              clear_data_callback, nullptr);
+}
+
+root_location_t rooted_tree_t::current_root() const {
+  if (!rooted())
+    throw std::runtime_error("Failed to return root, tree is unrooted");
+  return _current_rl;
 }

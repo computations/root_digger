@@ -3,8 +3,8 @@ extern "C" {
 }
 #include "data.hpp"
 #include <catch2/catch.hpp>
-#include <tree.hpp>
 #include <debug.h>
+#include <tree.hpp>
 #include <utility>
 
 root_location_t find_node(const rooted_tree_t &tree, const std::string &label) {
@@ -238,6 +238,43 @@ TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
         "025000):0.0;" == tree.newick());
 }
 
+TEST_CASE("rooted_tree_t check move root operations", "[rooted_tree_t]") {
+  rooted_tree_t tree{data_files_dna["single"].second};
+  std::vector<pll_operation_t> ops;
+  std::vector<unsigned int> pmatrix_indices;
+  std::vector<double> branch_lengths;
+
+  auto old_root = tree.root_location(0);
+  tree.root_by(tree.root_location(1));
+
+  {
+    auto result = tree.generate_root_update_operations(old_root);
+    ops = std::move(std::get<0>(result));
+    pmatrix_indices = std::move(std::get<1>(result));
+    branch_lengths = std::move(std::get<2>(result));
+  }
+
+  CHECK(ops.size() == 1);
+  CHECK(ops[0].parent_clv_index == 5);
+  CHECK(ops[0].parent_scaler_index == 1);
+  CHECK(ops[0].child1_clv_index == 3);
+  CHECK(ops[0].child1_scaler_index == -1);
+  CHECK(ops[0].child1_matrix_index == 3);
+  CHECK(ops[0].child2_clv_index == 4);
+  CHECK(ops[0].child2_scaler_index == 0);
+  CHECK(ops[0].child2_matrix_index == 4);
+
+  CHECK(pmatrix_indices.size() == 3);
+  CHECK(pmatrix_indices[0] == 2);
+  CHECK(pmatrix_indices[1] == 3);
+  CHECK(pmatrix_indices[2] == 5);
+
+  CHECK(branch_lengths.size() == 3);
+  CHECK(branch_lengths[0] == 0.05);
+  CHECK(branch_lengths[1] == 0.1);
+  CHECK(branch_lengths[2] == 0.05);
+}
+
 TEST_CASE("rooted_tree_t check derivative vs regular operations",
           "[rooted_tree_t]") {
   rooted_tree_t tree{data_files_dna["single"].second};
@@ -276,7 +313,7 @@ TEST_CASE("rooted_tree_t check derivative vs regular operations",
   }
 }
 
-TEST_CASE("rooted_tree_t sanity check", "[rooted_tree_t]"){
+TEST_CASE("rooted_tree_t sanity check", "[rooted_tree_t]") {
   rooted_tree_t t1(check_trees["sanity_check1"]);
   CHECK(!t1.sanity_check());
 
