@@ -40,6 +40,24 @@ TEST_CASE("model_t constructor with partitions", "[model_t]") {
 }
 
 TEST_CASE("model_t compute lh", "[model_t]") {
+  auto &ds = data_files_dna["10.fasta"];
+  std::vector<msa_t> msa;
+  msa.emplace_back(ds.first);
+  rooted_tree_t tree{ds.second};
+  uint64_t seed = std::rand();
+  model_t model{tree, msa, seed};
+  model.initialize_partitions_uniform_freqs(msa);
+  for (size_t i = 0; i < tree.root_count(); ++i) {
+    if (tree.root_location(i).edge->back == nullptr) {
+      continue;
+    }
+    double lh = model.compute_lh(tree.root_location(i));
+    CHECK(std::isfinite(lh));
+    CHECK(lh < 0.0);
+  }
+}
+
+TEST_CASE("model_t compute lh, all data", "[!hide][all_data][model_t]") {
   for (auto &kv : data_files_dna) {
     auto &ds = kv.second;
     std::vector<msa_t> msa;
@@ -60,6 +78,26 @@ TEST_CASE("model_t compute lh", "[model_t]") {
 }
 
 TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
+  auto &ds = data_files_dna["10.fasta"];
+  std::vector<msa_t> msa;
+  msa.emplace_back(ds.first);
+  rooted_tree_t tree{ds.second};
+  uint64_t seed = std::rand();
+  model_t model{tree, msa, seed};
+  model.initialize_partitions_uniform_freqs(msa);
+  for (size_t i = 0; i < tree.root_count(); ++i) {
+    if (tree.root_location(i).edge->back == nullptr) {
+      continue;
+    }
+    model.compute_lh(tree.root_location(i));
+    auto dlh = model.compute_dlh(tree.root_location(i));
+    CHECK(std::isfinite(dlh.lh));
+    CHECK(std::isfinite(dlh.dlh));
+  }
+}
+
+TEST_CASE("model_t compute dlh/da, all data",
+          "[!hide][all_data][model_t][opt]") {
   for (auto &kv : data_files_dna) {
     auto &ds = kv.second;
     std::vector<msa_t> msa;
@@ -82,19 +120,19 @@ TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
 
 TEST_CASE("model_t optimize root locations on individual roots",
           "[model_t][opt]") {
-    auto &ds = data_files_dna["10.fasta"];
-    std::vector<msa_t> msa;
-    msa.emplace_back(ds.first);
-    rooted_tree_t tree{ds.second};
-    uint64_t seed = std::rand();
-    model_t model{tree, msa, seed};
-    model.initialize_partitions_uniform_freqs(msa);
-    for (size_t i = 0; i < tree.root_count(); ++i) {
-      if (tree.root_location(i).edge->back == nullptr) {
-        continue;
-      }
-      model.optimize_alpha(tree.root_location(i));
+  auto &ds = data_files_dna["10.fasta"];
+  std::vector<msa_t> msa;
+  msa.emplace_back(ds.first);
+  rooted_tree_t tree{ds.second};
+  uint64_t seed = std::rand();
+  model_t model{tree, msa, seed};
+  model.initialize_partitions_uniform_freqs(msa);
+  for (size_t i = 0; i < tree.root_count(); ++i) {
+    if (tree.root_location(i).edge->back == nullptr) {
+      continue;
     }
+    model.optimize_alpha(tree.root_location(i));
+  }
 }
 
 TEST_CASE("model_t optimize root locations on individual roots, all data",
@@ -273,8 +311,8 @@ TEST_CASE("model_t optimize all", "[model_t]") {
   model_t model{tree, msa, seed};
   model.initialize_partitions_uniform_freqs(msa);
   auto initial_rl = model.optimize_root_location();
-  model.set_temp_ratio(0.4);
-  auto final_rl = model.optimize_all(1e-2);
+  model.set_temp_ratio(0.5);
+  auto final_rl = model.optimize_all(1e-3);
   CHECK(model.compute_lh(final_rl) >= initial_rl.second);
 }
 

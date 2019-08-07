@@ -231,7 +231,7 @@ int main(int argv, char **argc) {
     model_t model{tree, msa, seed};
     try {
       model.initialize_partitions(msa);
-    } catch (const invalid_emperical_frequencies_exception &) {
+    } catch (const invalid_empirical_frequencies_exception &) {
       model.initialize_partitions_uniform_freqs(msa);
     }
     model.set_temp_ratio(temp_param);
