@@ -43,7 +43,7 @@ CONTROL_FILE = """
 
 RD = os.path.abspath(
     "../bin/rd"
-) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --force --slow"
+) + " --msa {msa} - -tree {tree} - -states 4 - -seed {seed} - -force - -slow --root-freq 1.2"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
@@ -488,8 +488,8 @@ def write_stats(dist_stats_rd, dist_stats_iqtree, format_string):
             numpy.mean(dist_stats_iqtree['nmetric'])))
     with open(format_string + "_rf_hists", 'w') as outfile:
         outfile.write('iqtree_n_dist,rd_n_dist,iqtree_n_metric,rd_n_metric\n')
-        for row in zip(dist_stats_rd['ntopo'], dist_stats_iqtree['ntopo'],
-                       dist_stats_rd['nmetric'], dist_stats_iqtree['nmetric']):
+        for row in zip(dist_stats_iqtree['ntopo'], dist_stats_rd['ntopo'],
+                       dist_stats_iqtree['nmetric'], dist_stats_rd['nmetric']):
             outfile.write("{},{},{},{}\n".format(*row))
 
 

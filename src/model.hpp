@@ -48,6 +48,7 @@ public:
   void initialize_partitions(const std::vector<msa_t> &);
   void initialize_partitions_uniform_freqs(const std::vector<msa_t> &);
   void set_temp_ratio(double);
+  void set_root_opt_frequency(double);
   std::string subst_string() const;
 
 private:
@@ -75,6 +76,7 @@ private:
   std::vector<unsigned int> _partition_weights;
   uint64_t _seed;
   double _temp_ratio;
+  double _root_opt_frequency;
 };
 
 #endif
