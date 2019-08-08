@@ -98,6 +98,7 @@ int main(int argv, char **argc) {
       {"force", no_argument, 0, 0},
       {"tfinal", no_argument, 0, 0},
       {"partition", required_argument, 0, 0},
+      {"root-freq", required_argument, 0, 0},
       {"version", no_argument, 0, 0},
       {0, 0, 0, 0},
   };
@@ -118,6 +119,7 @@ int main(int argv, char **argc) {
     unsigned int states = 0;
     bool silent = false;
     double temp_param = 0.9;
+    double root_opt_freq = 2.0;
     double final_temp = 1e-8;
     bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
@@ -158,10 +160,13 @@ int main(int argv, char **argc) {
       case 11: // force
         final_temp = atof(optarg);
         break;
-      case 12: // force
+      case 12: // partition
         partition_filename = optarg;
         break;
-      case 13: // version
+      case 13: // root-freq
+        root_opt_freq = atof(optarg);
+        break;
+      case 14: // version
         print_version();
         return 0;
       default:
@@ -235,6 +240,7 @@ int main(int argv, char **argc) {
       model.initialize_partitions_uniform_freqs(msa);
     }
     model.set_temp_ratio(temp_param);
+    model.set_root_opt_frequency(root_opt_freq);
     auto final_rl = model.optimize_all(final_temp);
     double final_lh = model.compute_lh(final_rl);
     std::cout << final_lh << std::endl;

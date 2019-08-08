@@ -156,6 +156,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   _seed = seed;
   _tree = std::move(tree);
   _temp_ratio = 0.8;
+  _root_opt_frequency = 2.0;
 
   for (auto &msa : msas) {
     if (!msa.constiency_check(_tree.label_set())) {
@@ -718,9 +719,9 @@ root_location_t model_t::optimize_all(double final_temp) {
 
   while (cur_temp > final_temp) {
     anneal_rates(initial_freqs, _subst_params, initial_rl, cur_temp,
-                 final_temp );
+                 final_temp);
     initial_rl = optimize_root_location().first;
-    cur_temp *= _temp_ratio / 1.5;
+    cur_temp *= _temp_ratio / _root_opt_frequency;
   }
   return initial_rl;
 }
@@ -757,6 +758,8 @@ void model_t::initialize_partitions_uniform_freqs(
 }
 
 void model_t::set_temp_ratio(double t) { _temp_ratio = t; }
+
+void model_t::set_root_opt_frequency(double r) { _root_opt_frequency = r; }
 
 std::string model_t::subst_string() const {
   std::ostringstream oss;
