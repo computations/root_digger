@@ -6,6 +6,7 @@ extern "C" {
 }
 #include "msa.hpp"
 #include "tree.hpp"
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,7 +43,7 @@ public:
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root);
   std::pair<root_location_t, double> optimize_root_location();
-  root_location_t optimize_all(double final_temp);
+  root_location_t optimize_all(double final_temp, size_t iters);
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
   void initialize_partitions(const std::vector<msa_t> &);
@@ -66,9 +67,9 @@ private:
   void set_empirical_freqs(size_t);
   void set_freqs(size_t, const model_params_t &);
   void move_root(const root_location_t &new_root);
-  void anneal_rates(const std::vector<model_params_t> &,
-                    const std::vector<model_params_t> &,
-                    const root_location_t &, double, double);
+  void anneal_rates(std::vector<model_params_t> &,
+                    std::vector<model_params_t> &, root_location_t &, double,
+                    double, std::minstd_rand &);
 
   std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;

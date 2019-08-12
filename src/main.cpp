@@ -75,6 +75,12 @@ void print_usage() {
       << "    --tfinal [NUMBER]\n"
       << "           Threshold to end the simulated annealing at.\n"
       << "           Default is 1e-6\n"
+      << "    --root-freq [NUMBER]\n"
+      << "           Optional argument which controls the rate at which the\n"
+      << "           root is replaced.\n"
+      << "    --anneal-iters [NUMBER]\n"
+      << "           Optional argument which controls the number of annealing\n"
+      << "           iterations that are performed. Default is 100\n"
       << "    --force\n"
       << "           Disable Saftey checks.\n"
       << "    --verbose\n"
@@ -99,6 +105,7 @@ int main(int argv, char **argc) {
       {"tfinal", no_argument, 0, 0},
       {"partition", required_argument, 0, 0},
       {"root-freq", required_argument, 0, 0},
+      {"anneal-iters", required_argument, 0, 0},
       {"version", no_argument, 0, 0},
       {0, 0, 0, 0},
   };
@@ -121,6 +128,7 @@ int main(int argv, char **argc) {
     double temp_param = 0.9;
     double root_opt_freq = 2.0;
     double final_temp = 1e-8;
+    size_t anneal_iters = 100;
     bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
@@ -149,7 +157,7 @@ int main(int argv, char **argc) {
         silent = true;
         break;
       case 8: // fast
-        temp_param = 0.5;
+        temp_param = 0.3;
         break;
       case 9: // slow
         temp_param = 0.98;
@@ -164,9 +172,12 @@ int main(int argv, char **argc) {
         partition_filename = optarg;
         break;
       case 13: // root-freq
-        root_opt_freq = atof(optarg);
+        root_opt_freq = 1 / atof(optarg);
         break;
-      case 14: // version
+      case 14: // root-freq
+        anneal_iters = atol(optarg);
+        break;
+      case 15: // version
         print_version();
         return 0;
       default:
@@ -241,7 +252,7 @@ int main(int argv, char **argc) {
     }
     model.set_temp_ratio(temp_param);
     model.set_root_opt_frequency(root_opt_freq);
-    auto final_rl = model.optimize_all(final_temp);
+    auto final_rl = model.optimize_all(final_temp, anneal_iters);
     double final_lh = model.compute_lh(final_rl);
     std::cout << final_lh << std::endl;
     std::cout << model.rooted_tree(final_rl).newick() << std::endl;

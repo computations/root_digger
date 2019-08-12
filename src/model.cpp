@@ -11,6 +11,7 @@
 extern "C" {
 #include <libpll/pll_msa.h>
 }
+#include <iostream>
 
 std::string read_file_contents(std::ifstream &infile) {
   std::string str;
@@ -69,7 +70,7 @@ model_params_t random_params(size_t size, uint64_t seed) {
   return mp;
 }
 
-std::vector<double> sample_dirichlet(std::minstd_rand engine, double alpha,
+std::vector<double> sample_dirichlet(std::minstd_rand &engine, double alpha,
                                      double beta, size_t size) {
   std::vector<double> rand_sample(size);
   static std::gamma_distribution<double> gd(alpha * (beta / (size * beta)),
@@ -259,7 +260,13 @@ double model_t::compute_lh_root(const root_location_t &root) {
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
     }
+  }
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    auto &partition = _partitions[i];
     pll_update_partials(partition, &op, 1);
+  }
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    auto &partition = _partitions[i];
     lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
                                          _tree.root_scaler_index(), params,
                                          nullptr) *
@@ -290,20 +297,12 @@ dlh_t model_t::compute_dlh(const root_location_t &root) {
   double fx = compute_lh_root(root);
   ret.lh = fx;
 
-  if (std::isnan(fx)) {
-    throw std::runtime_error("fx is not finite when computing derivative: " +
-                             std::to_string(root.edge->length));
-  }
-  double fxh = compute_lh_root(root_prime);
-  if (std::isnan(fxh)) {
-    throw std::runtime_error("fxh is not finite when computing derivative: " +
-                             std::to_string(root_prime.edge->length));
-  }
+  assert_string(!std::isnan(fx), "fx is not finite when computing derivative");
 
-  if (std::isnan(fxh)) {
-    throw std::runtime_error("fxh is not finite when computing derivative: " +
-                             std::to_string(root_prime.edge->length));
-  }
+  double fxh = compute_lh_root(root_prime);
+
+  assert_string(!std::isnan(fxh),
+                "fxh is not finite when computing derivative");
   if (std::isinf(fxh) && std::isinf(fx)) {
     debug_string("Both evals are -inf, returning a 0 derivative");
     return {fx, 0};
@@ -484,11 +483,8 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
 
   auto d_end = compute_dlh(end);
 
-  if (std::isnan(d_beg.dlh) || std::isnan(d_end.dlh)) {
-    throw std::runtime_error(
-        "Initial derivatives failed when optimizing alpha: " +
-        std::to_string(root.edge->length));
-  }
+  assert_string(!(std::isnan(d_beg.dlh) || std::isnan(d_end.dlh)),
+                "Initial derivatives failed when optimizing alpha");
 
   root_location_t best_endpoint = d_beg.lh >= d_end.lh ? beg : end;
   auto lh_best_endpoint = d_beg.lh >= d_end.lh ? d_beg : d_end;
@@ -523,7 +519,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   root_location_t best_midpoint;
   bool found_midpoint = false;
 
-  for (size_t midpoints = 2; midpoints <= 32; midpoints *= 2) {
+  for (size_t midpoints = 2; midpoints <= 16; midpoints *= 2) {
     for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
       if (midpoint % 2 == 0)
         continue;
@@ -593,7 +589,7 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
     compute_lh_root(_tree.root_location(i));
     root_location_t rl = optimize_alpha(_tree.root_location(i));
     debug_print("alpha: %f", rl.brlen_ratio);
-    double rl_lh = compute_lh(rl);
+    double rl_lh = compute_lh_root(rl);
     debug_print("rl_lh: %f", rl_lh);
     if (rl_lh > best.second) {
       best.first = rl;
@@ -635,12 +631,11 @@ void model_t::move_root(const root_location_t &new_root) {
   }
 }
 
-void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
-                           const std::vector<model_params_t> &initial_rates,
-                           const root_location_t &root_location,
-                           double initial_temp, double final_temp) {
+void model_t::anneal_rates(std::vector<model_params_t> &initial_freqs,
+                           std::vector<model_params_t> &initial_rates,
+                           root_location_t &root_location, double initial_temp,
+                           double final_temp, std::minstd_rand &engine) {
 
-  std::minstd_rand engine(_seed);
   std::uniform_real_distribution<> roller(0.0, 1.0);
   std::normal_distribution<> err_subst(0.0, 0.10);
   std::normal_distribution<> err_freqs(0.0, 0.01);
@@ -685,7 +680,8 @@ void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
       pll_set_frequencies(_partitions[i], 0, next_freqs[i].data());
     }
 
-    double next_lh = compute_lh(root_location);
+    // root_location = optimize_alpha(root_location);
+    double next_lh = compute_lh_root(root_location);
 
     if (next_lh > current_lh) {
       next_lh = current_lh;
@@ -698,17 +694,25 @@ void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
     }
     initial_temp *= _temp_ratio;
   }
+  initial_freqs = cur_freqs;
+  initial_rates = _subst_params;
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    pll_set_subst_params(_partitions[i], 0, _subst_params[i].data());
+    pll_set_frequencies(_partitions[i], 0, cur_freqs[i].data());
+  }
 }
 
 /* Optimize the substitution parameters by simulated annealing */
-root_location_t model_t::optimize_all(double final_temp) {
+root_location_t model_t::optimize_all(double final_temp, size_t iters) {
   assert_string(final_temp < 1.0, "Starting temperature is too high");
 
-  auto cur = optimize_root_location();
-  auto initial_rl = cur.first;
-  double cur_temp = 1.0;
+  std::minstd_rand engine(_seed);
+  std::uniform_real_distribution<> param_gen(0.0, 1.0);
+  std::uniform_int_distribution<> inital_rl_roller(0, _tree.root_count());
 
-  std::vector<model_params_t> inital_subst{_subst_params};
+  auto initial_rl =
+      _tree.root_location(inital_rl_roller(engine) % _tree.root_count());
+  std::vector<model_params_t> initial_subst{_subst_params};
   std::vector<model_params_t> initial_freqs;
   initial_freqs.reserve(_partitions.size());
   for (size_t i = 0; i < _partitions.size(); ++i) {
@@ -717,13 +721,42 @@ root_location_t model_t::optimize_all(double final_temp) {
                                    _partitions[i]->states);
   }
 
-  while (cur_temp > final_temp) {
-    anneal_rates(initial_freqs, _subst_params, initial_rl, cur_temp,
-                 final_temp);
-    initial_rl = optimize_root_location().first;
-    cur_temp *= _temp_ratio / _root_opt_frequency;
+  double best_lh = -INFINITY;
+  root_location_t best_rl;
+  std::vector<model_params_t> best_freqs;
+  std::vector<model_params_t> best_subst;
+
+  for (size_t iter = 0; iter < iters; iter++) {
+    for (auto &is : initial_freqs) {
+      is = sample_dirichlet(engine, 1.0, 1.0, is.size());
+    }
+    for (auto &is : initial_subst) {
+      for (auto &p : is) {
+        p = param_gen(engine);
+      }
+    }
+
+    double cur_temp = 1.0;
+
+    while (cur_temp > final_temp) {
+      anneal_rates(initial_freqs, initial_subst, initial_rl, cur_temp,
+                   final_temp, engine);
+      auto current = optimize_root_location();
+      initial_rl = current.first;
+      cur_temp *= _temp_ratio / _root_opt_frequency;
+      if (current.second > best_lh) {
+        best_lh = current.second;
+        best_rl = initial_rl;
+        best_freqs = initial_freqs;
+        best_subst = initial_subst;
+      }
+    }
   }
-  return initial_rl;
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    pll_set_subst_params(_partitions[i], 0, best_subst[i].data());
+    pll_set_frequencies(_partitions[i], 0, best_freqs[i].data());
+  }
+  return best_rl;
 }
 
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
