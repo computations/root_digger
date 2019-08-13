@@ -423,8 +423,10 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
         2.0 * abs(end.brlen_ratio) * std::numeric_limits<double>::epsilon() +
         0.5 * atol;
     double e_tol = 0.5 * (midpoint.brlen_ratio - end.brlen_ratio);
-    if (abs(e_tol) <= tol || d_end.dlh == 0)
+    if (abs(e_tol) <= tol || d_end.dlh == 0) {
+      // debug_print("brents method took %lu iters to converge", i);
       return {end, d_end.lh};
+    }
     if (abs(e) >= tol && abs(d_beg.dlh) > abs(d_end.dlh)) {
       double s = d_end.dlh / d_beg.dlh;
       double p, q;
@@ -468,7 +470,7 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
 
 /* Find the optimum for the ratio via the bisection method */
 root_location_t model_t::optimize_alpha(const root_location_t &root) {
-  constexpr double ATOL = 1e-7;
+  constexpr double ATOL = 1e-14;
   double lh = compute_lh_root(root);
   if (std::isnan(lh)) {
     throw std::runtime_error("initial likelihood calculation is not finite");

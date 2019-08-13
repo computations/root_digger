@@ -41,9 +41,10 @@ CONTROL_FILE = """
 [EVOLVE] p1 1 seqs
 """
 
+
 RD = os.path.abspath(
     "../bin/rd"
-) + " --msa {msa} - -tree {tree} - -states 4 - -seed {seed} - -force - -slow --root-freq 1.2"
+) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --force --root-freq .2 --anneal-iters 10"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
@@ -237,7 +238,8 @@ class exp:
                                              tree=os.path.join(
                                                  "../", tree_filename),
                                              seed=self._seed).split(' '),
-                                   stdout=subprocess.PIPE)
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
         with open('rd_output_all', 'w') as logfile:
             logfile.write(rd_output.stdout.decode('utf-8'))
         output_lines = rd_output.stdout.decode('utf-8').split('\n')
@@ -250,6 +252,8 @@ class exp:
             rd_outfile.write(lh)
         with open('rd_output_time', 'w') as rd_outfile:
             rd_outfile.write(time)
+        with open('rd_output_err', 'w') as rd_outfile:
+            rd_outfile.write(rd_output.stderr.decode('utf-8'))
         self.set_rd_done('.')
 
     def run_iqtree(self, tree_filename, msa):
@@ -324,7 +328,7 @@ class exp:
             try:
                 parsed_trees = [ete3.Tree(t) for t in all_trees_rd]
             except:
-                print(all_trees_rd)
+                print("error on: ", PROGRESS_BAR_ITER.value, all_trees_rd)
                 sys.exit(1)
             true_tree = ete3.Tree(true_tree_newick)
             self._result_trees = parsed_trees
