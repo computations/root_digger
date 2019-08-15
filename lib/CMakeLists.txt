@@ -31,6 +31,10 @@ file(COPY
     ${PLLMOD_SRC}/util/pllmod_util.h
     ${LIBPLL_SRC}/pll.h
     DESTINATION ${LOCALDEPS_DIR}/include/libpll)
+file(COPY
+    ${CMAKE_CURRENT_SOURCE_DIR}/lbfgsb/lbfgsb.h
+    DESTINATION ${LOCALDEPS_DIR}/include)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LOCALDEPS_DIR}/lib)
 
 add_subdirectory(pll-modules)
+add_subdirectory(lbfgsb)
