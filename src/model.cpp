@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 extern "C" {
+#include <lbfgsb.h>
 #include <libpll/pll_msa.h>
 }
 
@@ -467,9 +468,9 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
   throw std::runtime_error("Brents method failed to converge");
 }
 
-/* Find the optimum for the ratio via the bisection method */
-root_location_t model_t::optimize_alpha(const root_location_t &root) {
-  constexpr double ATOL = 1e-7;
+/* Find the optimum for the ratio via brents method */
+root_location_t model_t::optimize_alpha(const root_location_t &root,
+                                        double atol) {
   double lh = compute_lh_root(root);
   if (std::isnan(lh)) {
     throw std::runtime_error("initial likelihood calculation is not finite");
@@ -501,14 +502,14 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
   debug_print("lh_endpoint.dlh: %f", lh_best_endpoint.dlh);
   debug_print("d_beg.dlh: %f, d_end.dlh: %f", d_beg.dlh, d_end.dlh);
 
-  if (fabs(d_beg.dlh) < ATOL || fabs(d_end.dlh) < ATOL) {
+  if (fabs(d_beg.dlh) < atol || fabs(d_end.dlh) < atol) {
     debug_string("one of the endpoints is sufficient");
     return best_endpoint;
   }
 
   if ((d_beg.dlh < 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_end.dlh < 0.0)) {
-    auto mid = brents(beg, d_beg, end, d_end, ATOL);
+    auto mid = brents(beg, d_beg, end, d_end, atol);
     debug_print("mid lh: %f, end lh: %f", mid.second, lh_best_endpoint.lh);
     return lh_best_endpoint.lh > mid.second ? best_endpoint : mid.first;
   }
@@ -534,7 +535,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
       midpoint_root.brlen_ratio = alpha;
       auto d_midpoint = compute_dlh(midpoint_root);
       debug_print("d_midpoint.dlh: %f", d_midpoint.dlh);
-      if (fabs(d_midpoint.dlh) < ATOL) {
+      if (fabs(d_midpoint.dlh) < atol) {
         if (best_midpoint_lh.lh < d_midpoint.lh) {
           best_midpoint_lh = d_midpoint;
           best_midpoint = midpoint_root;
@@ -547,8 +548,8 @@ root_location_t model_t::optimize_alpha(const root_location_t &root) {
          * we have a midpoint, so now we need to figure out if it is a min or a
          * maximum.
          */
-        auto r1 = brents(beg, d_beg, midpoint_root, d_midpoint, ATOL);
-        auto r2 = brents(midpoint_root, d_midpoint, end, d_end, ATOL);
+        auto r1 = brents(beg, d_beg, midpoint_root, d_midpoint, atol);
+        auto r2 = brents(midpoint_root, d_midpoint, end, d_end, atol);
         debug_print("r1 lh: %f, r2 lh: %f", r1.second, r2.second);
         if (lh_best_endpoint.lh < best_midpoint_lh.lh) {
           lh_best_endpoint = best_midpoint_lh;
@@ -587,11 +588,30 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
   _tree.root_by(_tree.root_location(0));
-  for (size_t i = 0; i < _tree.root_count(); ++i) {
-    debug_print("working rl: %s", _tree.root_location(i).label().c_str());
-    move_root(_tree.root_location(i));
-    compute_lh_root(_tree.root_location(i));
-    root_location_t rl = optimize_alpha(_tree.root_location(i));
+
+  /* start by making a list of "good" roots, with the current model*/
+
+  std::vector<std::pair<double, root_location_t>> sorted_roots;
+  sorted_roots.reserve(_tree.root_count());
+  for (const auto &rl : _tree.roots()) {
+    move_root(rl);
+    sorted_roots.push_back(std::make_pair(compute_lh_root(rl), rl));
+  }
+
+  std::sort(sorted_roots.begin(), sorted_roots.end(),
+            [](const std::pair<double, root_location_t> &a,
+               const std::pair<double, root_location_t> &b) {
+              return a.first > b.first;
+            });
+
+  size_t reduced_size = sorted_roots.size() / 2;
+  sorted_roots.resize(std::max(reduced_size, 1ul));
+  for (auto &sr : sorted_roots) {
+    auto &rl = sr.second;
+    debug_print("working rl: %s", rl.label().c_str());
+    move_root(rl);
+    compute_lh_root(rl);
+    rl = optimize_alpha(rl, 1e-14);
     debug_print("alpha: %f", rl.brlen_ratio);
     double rl_lh = compute_lh(rl);
     debug_print("rl_lh: %f", rl_lh);
@@ -698,6 +718,13 @@ void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
     }
     initial_temp *= _temp_ratio;
   }
+}
+
+void model_t::bfgs_rates(const std::vector<model_params_t> &initial_freqs,
+                         const std::vector<model_params_t> &initial_rates,
+                         const root_location_t &root_location) {
+  int task;
+  task = START;
 }
 
 /* Optimize the substitution parameters by simulated annealing */

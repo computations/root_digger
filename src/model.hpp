@@ -40,7 +40,7 @@ public:
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
   dlh_t compute_dlh(const root_location_t &root_location);
-  root_location_t optimize_alpha(const root_location_t &root);
+  root_location_t optimize_alpha(const root_location_t &root, double atol);
   std::pair<root_location_t, double> optimize_root_location();
   root_location_t optimize_all(double final_temp);
   const rooted_tree_t &rooted_tree(const root_location_t &root);
@@ -69,6 +69,9 @@ private:
   void anneal_rates(const std::vector<model_params_t> &,
                     const std::vector<model_params_t> &,
                     const root_location_t &, double, double);
+  void bfgs_rates(const std::vector<model_params_t> &initial_freqs,
+                  const std::vector<model_params_t> &initial_rates,
+                  const root_location_t &root_location);
 
   std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;
