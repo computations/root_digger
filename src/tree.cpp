@@ -433,3 +433,7 @@ root_location_t rooted_tree_t::current_root() const {
     throw std::runtime_error("Failed to return root, tree is unrooted");
   return _current_rl;
 }
+
+const std::vector<root_location_t>& rooted_tree_t::roots() const{
+  return _roots;
+}

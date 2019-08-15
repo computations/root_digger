@@ -68,6 +68,7 @@ public:
   unsigned int root_scaler_index() const;
 
   root_location_t current_root() const;
+  const std::vector<root_location_t>& roots() const;
 
   std::unordered_map<std::string, unsigned int> label_map() const;
   std::unordered_set<std::string> label_set() const;
