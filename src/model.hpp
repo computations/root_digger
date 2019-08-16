@@ -69,9 +69,9 @@ private:
   void anneal_rates(const std::vector<model_params_t> &,
                     const std::vector<model_params_t> &,
                     const root_location_t &, double, double);
-  void bfgs_rates(const std::vector<model_params_t> &initial_freqs,
-                  const std::vector<model_params_t> &initial_rates,
-                  const root_location_t &root_location);
+  double bfgs_rates(model_params_t &initial_rates,
+                    const root_location_t &root_location,
+                    size_t partition_index);
 
   std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;
