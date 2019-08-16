@@ -6,6 +6,7 @@ extern "C" {
 }
 #include "msa.hpp"
 #include "tree.hpp"
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,7 +43,7 @@ public:
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root, double atol);
   std::pair<root_location_t, double> optimize_root_location();
-  root_location_t optimize_all(double final_temp);
+  root_location_t optimize_all(double rtol);
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
   void initialize_partitions(const std::vector<msa_t> &);
@@ -69,9 +70,15 @@ private:
   void anneal_rates(const std::vector<model_params_t> &,
                     const std::vector<model_params_t> &,
                     const root_location_t &, double, double);
-  double bfgs_rates(model_params_t &initial_rates,
-                    const root_location_t &root_location,
+  double bfgs_rates(model_params_t &initial_rates, const root_location_t &rl,
                     size_t partition_index);
+  double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,
+                    size_t partition_index);
+  friend double
+  bfgs_params(model_params_t &initial_params, size_t partition_index,
+              double p_min, double p_max, double epsilon,
+              std::function<double()> compute_lh,
+              std::function<void(size_t, model_params_t &)> set_func);
 
   std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;
