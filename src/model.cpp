@@ -720,11 +720,60 @@ void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
   }
 }
 
-void model_t::bfgs_rates(const std::vector<model_params_t> &initial_freqs,
-                         const std::vector<model_params_t> &initial_rates,
-                         const root_location_t &root_location) {
-  int task;
-  task = START;
+double model_t::bfgs_rates(model_params_t &initial_rates,
+                           const root_location_t &root_location,
+                           size_t partition_index) {
+  move_root(root_location);
+  int task = START;
+  size_t n_params = initial_rates.size();
+  double score = 0;
+  double factor = 1;
+  double pgtol = 1e-7;
+  int csave;
+  std::vector<double> gradient(n_params);
+  size_t max_corrections = 5;
+  std::vector<double> wa((2 * max_corrections + 5) * n_params +
+                         12 * max_corrections * (max_corrections + 1));
+  std::vector<int> iwa(3 * n_params);
+
+  std::vector<double> parameters(initial_rates);
+  std::vector<double> param_min(n_params);
+  std::vector<double> param_max(n_params);
+  logical lsave[4];
+  int isave[44];
+  double dsave[29];
+  int bound_type = 2;
+  int neg_one = -1;
+  constexpr double esp = 1e-4;
+
+  while (true) {
+    setulb((int *)&n_params, (int *)&max_corrections, parameters.data(),
+           param_min.data(), param_max.data(), &bound_type, &score,
+           gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
+           &neg_one, &csave, lsave, isave, dsave);
+
+    if (IS_FG(task)) {
+      score = compute_lh(root_location);
+      for (size_t i = 0; i < n_params; ++i) {
+        double h = esp * fabs(parameters[i]);
+        if (h < 1e-12) {
+          h = esp;
+        }
+        double temp = parameters[i];
+        parameters[i] += h;
+        set_subst_rates(partition_index, parameters);
+        double dlh = compute_lh(root_location);
+        gradient[i] = (dlh - score) / h;
+        parameters[i] = temp;
+      }
+    } else if (task != NEW_X) {
+      break;
+    }
+  }
+  set_subst_rates(partition_index, parameters);
+  score = compute_lh(root_location);
+  std::swap(parameters, initial_rates);
+  return score;
 }
 
 /* Optimize the substitution parameters by simulated annealing */
