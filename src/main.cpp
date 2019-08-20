@@ -120,7 +120,7 @@ int main(int argv, char **argc) {
     bool silent = false;
     double temp_param = 0.9;
     double root_opt_freq = 2.0;
-    double final_temp = 1e-8;
+    double final_temp = 1e-7;
     bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
@@ -233,18 +233,27 @@ int main(int argv, char **argc) {
       }
     }
 
-    model_t model{tree, msa, seed};
-    try {
-      model.initialize_partitions(msa);
-    } catch (const invalid_empirical_frequencies_exception &) {
-      model.initialize_partitions_uniform_freqs(msa);
+    std::string final_tree_string;
+    double final_lh = -INFINITY;
+
+    for (size_t i = 0; i < 5; ++i) {
+      model_t model{tree, msa, seed+i};
+      try {
+        model.initialize_partitions(msa);
+      } catch (const invalid_empirical_frequencies_exception &) {
+        model.initialize_partitions_uniform_freqs(msa);
+      }
+      model.set_temp_ratio(temp_param);
+      model.set_root_opt_frequency(root_opt_freq);
+      auto rl = model.optimize_all(final_temp);
+      double lh = model.compute_lh(rl);
+      if (lh > final_lh) {
+        final_tree_string = model.rooted_tree(rl).newick();
+        final_lh = lh;
+      }
     }
-    model.set_temp_ratio(temp_param);
-    model.set_root_opt_frequency(root_opt_freq);
-    auto final_rl = model.optimize_all(final_temp);
-    double final_lh = model.compute_lh(final_rl);
     std::cout << final_lh << std::endl;
-    std::cout << model.rooted_tree(final_rl).newick() << std::endl;
+    std::cout << final_tree_string << std::endl;
     auto end_time = std::chrono::system_clock::now();
     std::chrono::duration<double> duration = end_time - start_time;
     if (!silent)
