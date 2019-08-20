@@ -42,8 +42,7 @@ CONTROL_FILE = """
 """
 
 RD = os.path.abspath(
-    "../bin/rd"
-) + " --msa {msa} - -tree {tree} - -states 4 - -seed {seed} - -force - -slow --root-freq 1.2"
+    "../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --force"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
@@ -237,9 +236,12 @@ class exp:
                                              tree=os.path.join(
                                                  "../", tree_filename),
                                              seed=self._seed).split(' '),
-                                   stdout=subprocess.PIPE)
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
         with open('rd_output_all', 'w') as logfile:
             logfile.write(rd_output.stdout.decode('utf-8'))
+        with open('rd_output_err', 'w') as logfile:
+            logfile.write(rd_output.stderr.decode('utf-8'))
         output_lines = rd_output.stdout.decode('utf-8').split('\n')
         tree = output_lines[-3]
         lh = output_lines[-4]
@@ -324,8 +326,9 @@ class exp:
             try:
                 parsed_trees = [ete3.Tree(t) for t in all_trees_rd]
             except:
-                print(all_trees_rd)
-                sys.exit(1)
+                print("")
+                print("Failure in run:", self._run_iter)
+                #sys.exit(1)
             true_tree = ete3.Tree(true_tree_newick)
             self._result_trees = parsed_trees
 
