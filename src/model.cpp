@@ -98,6 +98,12 @@ void model_t::set_subst_rates_random(size_t p_index, const msa_t &msa) {
       random_params(msa.states() * msa.states() - msa.states(), _seed));
 }
 
+void model_t::set_subst_rates_random(size_t p_index, size_t states,
+                                     int seed_offset) {
+  set_subst_rates(p_index,
+                  random_params(states * states - states, _seed + seed_offset));
+}
+
 void model_t::set_gamma_rates(size_t p_index) {
   constexpr size_t n_rate_cat = 1;
   double rate_cats[n_rate_cat] = {0};
@@ -153,12 +159,15 @@ void model_t::set_freqs(size_t p_index, const model_params_t &freqs) {
 }
 
 void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
-  double last = 1.0;
-  for (size_t i = 0; i < freqs.size(); ++i) {
-    last -= freqs[i];
+  double sum = 1.0;
+  for (auto p : freqs) {
+    sum += p;
   }
-  assert_string(last >= 0, "encountered a mal-formed frequency vector");
-  freqs.push_back(last);
+  double d = 1.0 / sum;
+  for (auto& f : freqs) {
+    f *= d;
+  }
+  freqs.push_back(d);
   set_freqs(p_index, freqs);
 }
 
@@ -605,8 +614,8 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
   std::vector<std::pair<double, root_location_t>> sorted_roots;
   sorted_roots.reserve(_tree.root_count());
   for (const auto &rl : _tree.roots()) {
-    move_root(rl);
-    sorted_roots.push_back(std::make_pair(compute_lh_root(rl), rl));
+    _tree.root_by(rl);
+    sorted_roots.push_back(std::make_pair(compute_lh(rl), rl));
   }
 
   std::sort(sorted_roots.begin(), sorted_roots.end(),
@@ -615,13 +624,13 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
               return a.first > b.first;
             });
 
-  size_t reduced_size = sorted_roots.size() / 2;
+  size_t reduced_size = sorted_roots.size() / 1;
   sorted_roots.resize(std::max(reduced_size, 1ul));
   for (auto &sr : sorted_roots) {
     auto &rl = sr.second;
     debug_print("working rl: %s", rl.label().c_str());
-    move_root(rl);
-    compute_lh_root(rl);
+    _tree.root_by(rl);
+    compute_lh(rl);
     rl = optimize_alpha(rl, 1e-14);
     debug_print("alpha: %f", rl.brlen_ratio);
     double rl_lh = compute_lh(rl);
@@ -733,7 +742,8 @@ void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
 
 /* Optimize the substitution parameters by simulated annealing */
 root_location_t model_t::optimize_all(double rtol) {
-
+  double best_lh = -INFINITY;
+  root_location_t best_rl;
   std::vector<model_params_t> inital_subst{_subst_params};
   std::vector<model_params_t> initial_freqs;
   initial_freqs.reserve(_partitions.size());
@@ -742,30 +752,37 @@ root_location_t model_t::optimize_all(double rtol) {
                                _partitions[i]->frequencies[0] +
                                    _partitions[i]->states);
   }
-
-  double best_lh = -INFINITY;
-  root_location_t best_rl;
-  root_location_t rl = _tree.root_location(0);
+  std::minstd_rand engine(_seed);
+  std::uniform_int_distribution<size_t> dis(0, _tree.root_count() - 1);
+  root_location_t rl = _tree.root_location(dis(engine));
   _tree.root_by(rl);
+  compute_lh(rl);
+  size_t iters = 0;
 
   while (true) {
-    move_root(rl);
+    if (iters > 32) {
+      break;
+    }
+    _tree.root_by(rl);
     for (size_t partition_index = 0; partition_index < _partitions.size();
          ++partition_index) {
-      bfgs_rates(inital_subst[partition_index], rl, partition_index);
       bfgs_freqs(initial_freqs[partition_index], rl, partition_index);
+      bfgs_rates(inital_subst[partition_index], rl, partition_index);
     }
     auto cur = optimize_root_location();
     rl = cur.first;
     if (fabs(cur.second - best_lh) / fabs(cur.second) < rtol) {
-      best_lh = cur.second;
-      best_rl = cur.first;
+      if (cur.second > best_lh) {
+        best_lh = cur.second;
+        best_rl = cur.first;
+      }
       break;
     }
     if (cur.second > best_lh) {
       best_lh = cur.second;
       best_rl = cur.first;
     }
+    iters++;
   }
   return best_rl;
 }
@@ -831,10 +848,10 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
             std::function<void(size_t, const model_params_t &)> set_func) {
   int task = START;
   size_t n_params = initial_params.size();
-  double score = 0;
-  double factor = 1;
-  double pgtol = 1e-7;
-  int csave;
+  double score = compute_lh();
+  double factor = 1e4;
+  double pgtol = 1e-12;
+  int csave[60];
   std::vector<double> gradient(n_params);
   size_t max_corrections = 5;
   std::vector<double> wa((2 * max_corrections + 5) * n_params +
@@ -847,15 +864,17 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   logical lsave[4];
   int isave[44];
   double dsave[29];
-  int bound_type = 2;
-  int neg_one = -1;
+  std::vector<int> bound_type(n_params, 2);
+  int iprint = -1;
   set_func(partition_index, initial_params);
+  size_t iters = 0;
 
   while (true) {
+    debug_string("Running a bfgs iteration");
     setulb((int *)&n_params, (int *)&max_corrections, parameters.data(),
-           param_min.data(), param_max.data(), &bound_type, &score,
+           param_min.data(), param_max.data(), bound_type.data(), &score,
            gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
-           &neg_one, &csave, lsave, isave, dsave);
+           &iprint, csave, lsave, isave, dsave);
 
     if (IS_FG(task)) {
       score = compute_lh();
@@ -874,6 +893,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
     } else if (task != NEW_X) {
       break;
     }
+    iters++;
   }
   set_func(partition_index, parameters);
   score = compute_lh();
@@ -885,11 +905,12 @@ double model_t::bfgs_rates(model_params_t &initial_rates,
                            const root_location_t &rl, size_t partition_index) {
 
   constexpr double p_min = 1e-4;
-  constexpr double p_max = 10.0;
-  constexpr double epsilon = 1e-4;
+  constexpr double p_max = 1e4;
+  constexpr double epsilon = 1e-7;
+  debug_string("doing bfgs params");
   return bfgs_params(
       initial_rates, partition_index, p_min, p_max, epsilon,
-      [&, this]() -> double { return this->compute_lh(rl); },
+      [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_subst_rates(pi, mp);
       });
@@ -898,24 +919,43 @@ double model_t::bfgs_rates(model_params_t &initial_rates,
 double model_t::bfgs_freqs(model_params_t &initial_freqs,
                            const root_location_t &rl, size_t partition_index) {
   constexpr double p_min = 1e-4;
-  constexpr double p_max = 1.0;
-  constexpr double epsilon = 1e-4;
+  constexpr double p_max = 1.0 - 1e-4 * 3;
+  constexpr double epsilon = 1e-7;
   model_params_t constrained_freqs(initial_freqs.begin(),
                                    initial_freqs.end() - 1);
 
+  double d = *(initial_freqs.end()-1);
+  for(auto& f: constrained_freqs){
+    f/=d;
+  }
+  debug_string("doing bfgs freqs");
   double lh = bfgs_params(
       constrained_freqs, partition_index, p_min, p_max, epsilon,
-      [&, this]() -> double { return this->compute_lh(rl); },
+      [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_freqs_all_free(pi, mp);
       });
 
   double sum = 0.0;
   for (size_t i = 0; i < constrained_freqs.size(); ++i) {
-    initial_freqs[i] = constrained_freqs[i];
     sum += constrained_freqs[i];
   }
-  *(initial_freqs.end() - 1) = 1.0 - sum;
-
+  d = 1.0 / sum;
+  for (size_t i = 0; i < constrained_freqs.size(); ++i){
+    initial_freqs[i] = constrained_freqs[i] * d;
+  }
+  *(initial_freqs.end()-1) = d;
+  set_freqs(partition_index, initial_freqs);
   return lh;
+}
+
+std::vector<double> model_t::compute_all_root_lh(){
+  _tree.root_by(_tree.roots()[0]);
+  std::vector<double> root_lh;
+  root_lh.reserve(_tree.roots().size());
+  for(auto rl : _tree.roots()){
+    move_root(rl);
+    root_lh.push_back(compute_lh_root(rl));
+  }
+  return root_lh;
 }

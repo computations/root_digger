@@ -52,6 +52,10 @@ public:
   void set_root_opt_frequency(double);
   std::string subst_string() const;
 
+  std::vector<double> compute_all_root_lh();
+  void set_subst_rates(size_t, const model_params_t &);
+  void set_freqs(size_t, const model_params_t &);
+
 private:
   std::pair<root_location_t, double>
   bisect(const root_location_t &beg, dlh_t d_beg, const root_location_t &end,
@@ -59,13 +63,13 @@ private:
   std::pair<root_location_t, double> brents(root_location_t beg, dlh_t d_beg,
                                             root_location_t end, dlh_t d_end,
                                             double atol);
-  void set_subst_rates(size_t, const model_params_t &);
   void set_subst_rates_random(size_t, const msa_t &);
+  void set_subst_rates_random(size_t, size_t, int);
   void set_gamma_rates(size_t);
   void update_invariant_sites(size_t);
   void set_tip_states(size_t, const msa_t &);
   void set_empirical_freqs(size_t);
-  void set_freqs(size_t, const model_params_t &);
+  void set_freqs_all_free(size_t, model_params_t );
   void move_root(const root_location_t &new_root);
   void anneal_rates(const std::vector<model_params_t> &,
                     const std::vector<model_params_t> &,
@@ -74,11 +78,6 @@ private:
                     size_t partition_index);
   double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,
                     size_t partition_index);
-  friend double
-  bfgs_params(model_params_t &initial_params, size_t partition_index,
-              double p_min, double p_max, double epsilon,
-              std::function<double()> compute_lh,
-              std::function<void(size_t, model_params_t &)> set_func);
 
   std::vector<model_params_t> _subst_params;
   rooted_tree_t _tree;
