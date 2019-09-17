@@ -203,7 +203,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   }
 
   attributes |= PLL_ATTRIB_NONREV;
-  attributes |= PLL_ATTRIB_PATTERN_TIP;
+  //attributes |= PLL_ATTRIB_PATTERN_TIP;
 
   for (size_t partition_index = 0; partition_index < msas.size();
        ++partition_index) {
@@ -629,8 +629,7 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
   for (auto &sr : sorted_roots) {
     auto &rl = sr.second;
     debug_print("working rl: %s", rl.label().c_str());
-    _tree.root_by(rl);
-    compute_lh(rl);
+    move_root(rl);
     rl = optimize_alpha(rl, 1e-14);
     debug_print("alpha: %f", rl.brlen_ratio);
     double rl_lh = compute_lh(rl);
@@ -645,34 +644,7 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
 }
 
 void model_t::move_root(const root_location_t &new_root) {
-  auto old_root = _tree.current_root();
-  _tree.root_by(new_root);
-
-  std::vector<pll_operation_t> ops;
-  std::vector<unsigned int> pmatrix_indices;
-  std::vector<double> branch_lengths;
-
-  {
-    auto result = _tree.generate_root_update_operations(old_root);
-    ops = std::move(std::get<0>(result));
-    pmatrix_indices = std::move(std::get<1>(result));
-    branch_lengths = std::move(std::get<2>(result));
-  }
-
-  unsigned int params[4] = {0, 0, 0, 0};
-
-  for (size_t i = 0; i < _partitions.size(); ++i) {
-    auto &partition = _partitions[i];
-    int result =
-        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
-                                 branch_lengths.data(), pmatrix_indices.size());
-
-    if (result == PLL_FAILURE) {
-      throw std::runtime_error(pll_errmsg);
-    }
-
-    pll_update_partials(partition, ops.data(), ops.size());
-  }
+  compute_lh(new_root);
 }
 
 void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
@@ -755,8 +727,7 @@ root_location_t model_t::optimize_all(double rtol) {
   std::minstd_rand engine(_seed);
   std::uniform_int_distribution<size_t> dis(0, _tree.root_count() - 1);
   root_location_t rl = _tree.root_location(dis(engine));
-  _tree.root_by(rl);
-  compute_lh(rl);
+  move_root(rl);
   size_t iters = 0;
 
   while (true) {
@@ -887,7 +858,9 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
         parameters[i] += h;
         set_func(partition_index, parameters);
         double dlh = compute_lh();
+        assert_string(std::isfinite(dlh), "dlh is not finite");
         gradient[i] = (dlh - score) / h;
+        assert_string(std::isfinite(gradient[i]), "gradient is not finite");
         parameters[i] = temp;
       }
     } else if (task != NEW_X) {
@@ -906,7 +879,7 @@ double model_t::bfgs_rates(model_params_t &initial_rates,
 
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1e4;
-  constexpr double epsilon = 1e-7;
+  constexpr double epsilon = 1e-4;
   debug_string("doing bfgs params");
   return bfgs_params(
       initial_rates, partition_index, p_min, p_max, epsilon,
@@ -920,7 +893,7 @@ double model_t::bfgs_freqs(model_params_t &initial_freqs,
                            const root_location_t &rl, size_t partition_index) {
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1.0 - 1e-4 * 3;
-  constexpr double epsilon = 1e-7;
+  constexpr double epsilon = 1e-4;
   model_params_t constrained_freqs(initial_freqs.begin(),
                                    initial_freqs.end() - 1);
 
