@@ -89,7 +89,6 @@ std::vector<double> sample_dirichlet(std::minstd_rand engine, double alpha,
 
 void model_t::set_subst_rates(size_t p_index, const model_params_t &mp) {
   pll_set_subst_params(_partitions[p_index], 0, mp.data());
-  _subst_params[p_index] = mp;
 }
 
 void model_t::set_subst_rates_random(size_t p_index, const msa_t &msa) {
@@ -164,7 +163,7 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
     sum += p;
   }
   double d = 1.0 / sum;
-  for (auto& f : freqs) {
+  for (auto &f : freqs) {
     f *= d;
   }
   freqs.push_back(d);
@@ -175,6 +174,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
                  uint64_t seed) {
 
   _seed = seed;
+  _random_engine = std::minstd_rand(_seed);
   _tree = std::move(tree);
   _temp_ratio = 0.8;
   _root_opt_frequency = 2.0;
@@ -203,7 +203,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   }
 
   attributes |= PLL_ATTRIB_NONREV;
-  //attributes |= PLL_ATTRIB_PATTERN_TIP;
+  // attributes |= PLL_ATTRIB_PATTERN_TIP;
 
   for (size_t partition_index = 0; partition_index < msas.size();
        ++partition_index) {
@@ -214,8 +214,6 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
         attributes));
     _partition_weights.push_back(msa.total_weight());
   }
-
-  _subst_params.resize(_partitions.size());
 }
 
 model_t::~model_t() {
@@ -647,76 +645,32 @@ void model_t::move_root(const root_location_t &new_root) {
   compute_lh(new_root);
 }
 
-void model_t::anneal_rates(const std::vector<model_params_t> &initial_freqs,
-                           const std::vector<model_params_t> &initial_rates,
-                           const root_location_t &root_location,
-                           double initial_temp, double final_temp) {
-
-  std::minstd_rand engine(_seed);
-  std::uniform_real_distribution<> roller(0.0, 1.0);
-  std::normal_distribution<> err_subst(0.0, 0.10);
-  std::normal_distribution<> err_freqs(0.0, 0.01);
-
-  auto next_freqs{initial_freqs};
-  auto cur_freqs{initial_freqs};
-  auto next_subst{initial_rates};
-  double current_lh = compute_lh(root_location);
-
-  /* anneal the model parameters parameters */
-  while (initial_temp > final_temp) {
-    for (size_t i = 0; i < next_subst.size(); ++i) {
-      for (size_t j = 0; j < next_subst[i].size(); ++j) {
-        next_subst[i][j] = _subst_params[i][j] + err_subst(engine);
-        if (next_subst[i][j] <= 1e-7) {
-          next_subst[i][j] = 1e-7;
-        }
-      }
-    }
-
-    for (size_t i = 0; i < next_freqs.size(); ++i) {
-      for (size_t j = 0; j < next_freqs[i].size(); ++j) {
-        next_freqs[i][j] = cur_freqs[i][j] + err_freqs(engine);
-        if (next_freqs[i][j] <= 1e-7) {
-          next_freqs[i][j] = 1e-7;
-        }
-      }
-      double sum = 0.0;
-      for (auto f : next_freqs[i]) {
-        sum += f;
-      }
-      for (auto &f : next_freqs[i]) {
-        sum /= f;
-      }
-    }
-
-    for (size_t i = 0; i < _partitions.size(); ++i) {
-      pll_set_subst_params(_partitions[i], 0, next_subst[i].data());
-    }
-
-    for (size_t i = 0; i < _partitions.size(); ++i) {
-      pll_set_frequencies(_partitions[i], 0, next_freqs[i].data());
-    }
-
-    double next_lh = compute_lh(root_location);
-
-    if (next_lh > current_lh) {
-      next_lh = current_lh;
-      std::swap(_subst_params, next_subst);
-      std::swap(cur_freqs, next_freqs);
-    } else if (exp((next_lh - current_lh) / initial_temp) > roller(engine)) {
-      next_lh = current_lh;
-      std::swap(_subst_params, next_subst);
-      std::swap(cur_freqs, next_freqs);
-    }
-    initial_temp *= _temp_ratio;
+std::vector<std::pair<root_location_t, double>> model_t::suggest_roots() {
+  set_subst_rates_uniform();
+  set_empirical_freqs();
+  std::vector<std::pair<root_location_t, double>> rl_lhs;
+  rl_lhs.reserve(_tree.root_count());
+  for (auto rl : _tree.roots()) {
+    rl_lhs.push_back(std::make_pair(rl, compute_lh(rl)));
   }
+  std::sort(
+      rl_lhs.begin(), rl_lhs.end(),
+      [](std::pair<root_location_t, double> a,
+         std::pair<root_location_t, double> b) { return a.second < b.second; });
+  rl_lhs.resize(std::min(rl_lhs.size(), 10ul));
+  return rl_lhs;
 }
 
 /* Optimize the substitution parameters by simulated annealing */
-root_location_t model_t::optimize_all(double rtol) {
+root_location_t model_t::optimize_all() {
   double best_lh = -INFINITY;
   root_location_t best_rl;
-  std::vector<model_params_t> inital_subst{_subst_params};
+  std::vector<model_params_t> initial_subst;
+  initial_subst.reserve(_partitions.size());
+  for (auto p : _partitions) {
+    size_t params_size = p->states * p->states - p->states;
+    initial_subst.emplace_back(random_params(params_size, _random_engine()));
+  }
   std::vector<model_params_t> initial_freqs;
   initial_freqs.reserve(_partitions.size());
   for (size_t i = 0; i < _partitions.size(); ++i) {
@@ -724,36 +678,27 @@ root_location_t model_t::optimize_all(double rtol) {
                                _partitions[i]->frequencies[0] +
                                    _partitions[i]->states);
   }
-  std::minstd_rand engine(_seed);
-  std::uniform_int_distribution<size_t> dis(0, _tree.root_count() - 1);
-  root_location_t rl = _tree.root_location(dis(engine));
-  move_root(rl);
   size_t iters = 0;
-
-  while (true) {
-    if (iters > 32) {
-      break;
-    }
+  for (auto rl : _tree.roots()) {
     _tree.root_by(rl);
-    for (size_t partition_index = 0; partition_index < _partitions.size();
-         ++partition_index) {
-      bfgs_freqs(initial_freqs[partition_index], rl, partition_index);
-      bfgs_rates(inital_subst[partition_index], rl, partition_index);
+    for (size_t i = 0; i < _partitions.size(); ++i) {
+      size_t subst_size = _partitions[i]->states;
+      subst_size = subst_size * subst_size - subst_size;
+      auto freqs =
+          model_params_t(_partitions[i]->states, 1.0 / _partitions[i]->states);
+      auto subst_rates = model_params_t(subst_size, 1.0 / subst_size);
+      bfgs_rates(subst_rates, rl, i);
+      bfgs_freqs(freqs, rl, i);
     }
     auto cur = optimize_root_location();
-    rl = cur.first;
-    if (fabs(cur.second - best_lh) / fabs(cur.second) < rtol) {
-      if (cur.second > best_lh) {
-        best_lh = cur.second;
-        best_rl = cur.first;
-      }
+    if (cur.second > best_lh) {
+      best_rl = cur.first;
+      best_lh = cur.second;
+    }
+    if (iters > 10) {
       break;
     }
-    if (cur.second > best_lh) {
-      best_lh = cur.second;
-      best_rl = cur.first;
-    }
-    iters++;
+    ++iters;
   }
   return best_rl;
 }
@@ -796,16 +741,19 @@ void model_t::set_root_opt_frequency(double r) { _root_opt_frequency = r; }
 std::string model_t::subst_string() const {
   std::ostringstream oss;
   oss << "{";
-  for (size_t p_index = 0; p_index < _subst_params.size(); ++p_index) {
+  for (size_t p_index = 0; p_index < _partitions.size(); ++p_index) {
+    auto p = _partitions[p_index];
     oss << "{";
-    auto &params = _subst_params[p_index];
+    size_t params_size = p->states * p->states - p->states;
+    std::vector<double> params{p->subst_params[0],
+                               p->subst_params[0] + params_size};
     for (size_t i = 0; i < params.size(); ++i) {
       oss << std::to_string(params[i]);
       if (i != params.size() - 1)
         oss << ",";
     }
     oss << "}";
-    if (p_index != _subst_params.size() - 1)
+    if (p_index != _partitions.size() - 1)
       oss << ",";
   }
   oss << "}";
@@ -821,7 +769,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   size_t n_params = initial_params.size();
   double score = compute_lh();
   double factor = 1e4;
-  double pgtol = 1e-12;
+  double pgtol = 1e-4;
   int csave[60];
   std::vector<double> gradient(n_params);
   size_t max_corrections = 5;
@@ -840,7 +788,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   set_func(partition_index, initial_params);
   size_t iters = 0;
 
-  while (true) {
+  while (iters < 5) {
     debug_string("Running a bfgs iteration");
     setulb((int *)&n_params, (int *)&max_corrections, parameters.data(),
            param_min.data(), param_max.data(), bound_type.data(), &score,
@@ -879,7 +827,7 @@ double model_t::bfgs_rates(model_params_t &initial_rates,
 
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1e4;
-  constexpr double epsilon = 1e-4;
+  constexpr double epsilon = 1e-7;
   debug_string("doing bfgs params");
   return bfgs_params(
       initial_rates, partition_index, p_min, p_max, epsilon,
@@ -893,13 +841,13 @@ double model_t::bfgs_freqs(model_params_t &initial_freqs,
                            const root_location_t &rl, size_t partition_index) {
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1.0 - 1e-4 * 3;
-  constexpr double epsilon = 1e-4;
+  constexpr double epsilon = 1e-7;
   model_params_t constrained_freqs(initial_freqs.begin(),
                                    initial_freqs.end() - 1);
 
-  double d = *(initial_freqs.end()-1);
-  for(auto& f: constrained_freqs){
-    f/=d;
+  double d = *(initial_freqs.end() - 1);
+  for (auto &f : constrained_freqs) {
+    f /= d;
   }
   debug_string("doing bfgs freqs");
   double lh = bfgs_params(
@@ -914,21 +862,36 @@ double model_t::bfgs_freqs(model_params_t &initial_freqs,
     sum += constrained_freqs[i];
   }
   d = 1.0 / sum;
-  for (size_t i = 0; i < constrained_freqs.size(); ++i){
+  for (size_t i = 0; i < constrained_freqs.size(); ++i) {
     initial_freqs[i] = constrained_freqs[i] * d;
   }
-  *(initial_freqs.end()-1) = d;
+  *(initial_freqs.end() - 1) = d;
   set_freqs(partition_index, initial_freqs);
   return lh;
 }
 
-std::vector<double> model_t::compute_all_root_lh(){
+std::vector<double> model_t::compute_all_root_lh() {
   _tree.root_by(_tree.roots()[0]);
   std::vector<double> root_lh;
   root_lh.reserve(_tree.roots().size());
-  for(auto rl : _tree.roots()){
+  for (auto rl : _tree.roots()) {
     move_root(rl);
     root_lh.push_back(compute_lh_root(rl));
   }
   return root_lh;
+}
+
+void model_t::set_subst_rates_uniform() {
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    unsigned int states = _partitions[i]->states;
+    unsigned int params = states * states - states;
+    model_params_t mp(params, 1.0 / params);
+    set_subst_rates(i, mp);
+  }
+}
+
+void model_t::set_empirical_freqs() {
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    set_empirical_freqs(i);
+  }
 }

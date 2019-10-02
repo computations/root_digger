@@ -120,7 +120,6 @@ int main(int argv, char **argc) {
     bool silent = false;
     double temp_param = 0.9;
     double root_opt_freq = 2.0;
-    double final_temp = 1e-7;
     bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
@@ -157,8 +156,8 @@ int main(int argv, char **argc) {
       case 10: // force
         sanity_checks = false;
         break;
-      case 11: // force
-        final_temp = atof(optarg);
+      case 11: // final_temp
+        //final_temp = atof(optarg);
         break;
       case 12: // partition
         partition_filename = optarg;
@@ -236,7 +235,7 @@ int main(int argv, char **argc) {
     std::string final_tree_string;
     double final_lh = -INFINITY;
 
-    for (size_t i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < 1; ++i) {
       model_t model{tree, msa, seed+i};
       try {
         model.initialize_partitions(msa);
@@ -245,7 +244,7 @@ int main(int argv, char **argc) {
       }
       model.set_temp_ratio(temp_param);
       model.set_root_opt_frequency(root_opt_freq);
-      auto rl = model.optimize_all(final_temp);
+      auto rl = model.optimize_all();
       double lh = model.compute_lh(rl);
       if (lh > final_lh) {
         final_tree_string = model.rooted_tree(rl).newick();
