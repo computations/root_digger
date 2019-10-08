@@ -157,7 +157,7 @@ int main(int argv, char **argc) {
         sanity_checks = false;
         break;
       case 11: // final_temp
-        //final_temp = atof(optarg);
+        // final_temp = atof(optarg);
         break;
       case 12: // partition
         partition_filename = optarg;
@@ -236,7 +236,7 @@ int main(int argv, char **argc) {
     double final_lh = -INFINITY;
 
     for (size_t i = 0; i < 1; ++i) {
-      model_t model{tree, msa, seed+i};
+      model_t model{tree, msa, seed + i};
       try {
         model.initialize_partitions(msa);
       } catch (const invalid_empirical_frequencies_exception &) {
@@ -251,6 +251,7 @@ int main(int argv, char **argc) {
         final_lh = lh;
       }
     }
+    std::cout << std::fixed << std::setprecision(2);
     std::cout << final_lh << std::endl;
     std::cout << final_tree_string << std::endl;
     auto end_time = std::chrono::system_clock::now();
