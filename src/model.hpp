@@ -66,7 +66,7 @@ private:
                                             root_location_t end, dlh_t d_end,
                                             double atol);
   void set_subst_rates_random(size_t, const msa_t &);
-  void set_subst_rates_random(size_t, size_t, int);
+  void set_subst_rates_random(size_t, size_t);
   void set_subst_rates_uniform();
   void set_gamma_rates(size_t);
   void update_invariant_sites(size_t);
