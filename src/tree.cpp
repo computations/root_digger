@@ -378,8 +378,8 @@ bool rooted_tree_t::find_path_recurse(pll_unode_t *n1, pll_unode_t *n2) {
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_root_update_operations(
-    const root_location_t &old_root) {
-  find_path(_tree->vroot, old_root.edge);
+    const root_location_t &new_root) {
+  find_path(new_root.edge, _tree->vroot);
   tag_nodes(_tree->vroot->back);
   tag_nodes(_tree->vroot->next->back);
   std::vector<pll_unode_t *> trav_buf(inner_count());
