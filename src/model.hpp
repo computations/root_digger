@@ -7,10 +7,10 @@ extern "C" {
 #include "msa.hpp"
 #include "tree.hpp"
 #include <functional>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
-#include <random>
 
 typedef std::vector<double> model_params_t;
 
@@ -54,6 +54,8 @@ public:
   std::string subst_string() const;
 
   std::vector<std::pair<root_location_t, double>> suggest_roots();
+  std::vector<std::pair<root_location_t, double>> suggest_roots(size_t min,
+                                                                double ratio);
   std::vector<double> compute_all_root_lh();
   void set_subst_rates(size_t, const model_params_t &);
   void set_freqs(size_t, const model_params_t &);
@@ -73,12 +75,16 @@ private:
   void set_tip_states(size_t, const msa_t &);
   void set_empirical_freqs(size_t);
   void set_empirical_freqs();
-  void set_freqs_all_free(size_t, model_params_t );
+  void set_freqs_all_free(size_t, model_params_t);
   void move_root(const root_location_t &new_root);
   double bfgs_rates(model_params_t &initial_rates, const root_location_t &rl,
                     size_t partition_index);
   double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,
                     size_t partition_index);
+  double gd_rates(model_params_t &initial_rates, const root_location_t &rl,
+                  size_t partition_index);
+  double gd_freqs(model_params_t &initial_rates, const root_location_t &rl,
+                  size_t partition_index);
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;
@@ -87,7 +93,6 @@ private:
   uint64_t _seed;
   double _temp_ratio;
   double _root_opt_frequency;
-
 };
 
 #endif

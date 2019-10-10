@@ -68,7 +68,7 @@ public:
   unsigned int root_scaler_index() const;
 
   root_location_t current_root() const;
-  const std::vector<root_location_t>& roots() const;
+  const std::vector<root_location_t> &roots() const;
 
   std::unordered_map<std::string, unsigned int> label_map() const;
   std::unordered_set<std::string> label_set() const;
@@ -78,7 +78,6 @@ public:
   generate_operations(const root_location_t &);
 
   std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
-
   generate_derivative_operations(const root_location_t &root);
 
   std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
