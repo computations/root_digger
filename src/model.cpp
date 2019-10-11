@@ -202,7 +202,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   }
 
   attributes |= PLL_ATTRIB_NONREV;
-  attributes |= PLL_ATTRIB_PATTERN_TIP;
+  // attributes |= PLL_ATTRIB_PATTERN_TIP;
 
   for (size_t partition_index = 0; partition_index < msas.size();
        ++partition_index) {
@@ -670,11 +670,12 @@ model_t::suggest_roots(size_t min, double ratio) {
     move_root(rl);
     rl_lhs.push_back(std::make_pair(rl, compute_lh_root(rl)));
   }
-  std::sort(
-      rl_lhs.begin(), rl_lhs.end(),
+  size_t final_size = std::max(static_cast<size_t>(rl_lhs.size() * ratio), min);
+  std::partial_sort(
+      rl_lhs.begin(), rl_lhs.begin() + final_size, rl_lhs.end(),
       [](std::pair<root_location_t, double> a,
          std::pair<root_location_t, double> b) { return a.second > b.second; });
-  rl_lhs.resize(std::max(static_cast<size_t>(rl_lhs.size() * ratio), min));
+  rl_lhs.resize(final_size);
   return rl_lhs;
 }
 
