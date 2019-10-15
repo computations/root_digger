@@ -982,10 +982,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   }
   set_func(partition_index, parameters);
   score = compute_lh();
-  // assert_string(initial_score >= score, "Failed to improve the likelihood");
-  if (initial_score >= score) {
-    return initial_score;
-  }
+  assert_string(initial_score >= score, "Failed to improve the likelihood");
   std::swap(parameters, initial_params);
   return score;
 }
