@@ -702,7 +702,7 @@ root_location_t model_t::optimize_all() {
 
   set_subst_rates_uniform();
   set_empirical_freqs();
-  auto roots = suggest_roots(1, .0);
+  auto roots = suggest_roots(1, .05);
   size_t root_count = roots.size();
   size_t root_index = 0;
 
@@ -917,8 +917,8 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   set_func(partition_index, initial_params);
   double score = compute_lh();
   double initial_score = score;
-  double factor = 1e7;
-  double pgtol = 1e-2;
+  double factor = 1e4;
+  double pgtol = 1e-7;
   int csave;
   std::vector<double> gradient(n_params, 0.0);
   size_t max_corrections = 20;
@@ -968,16 +968,6 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
     } else if (task != NEW_X) {
       break;
     }
-    std::cout << "Parameters: ";
-    for (auto p : parameters) {
-      std::cout << p << ",";
-    }
-    std::cout << std::endl;
-    std::cout << "Gradient: ";
-    for (auto p : gradient) {
-      std::cout << p << ",";
-    }
-    std::cout << std::endl;
     iters++;
   }
   set_func(partition_index, parameters);
