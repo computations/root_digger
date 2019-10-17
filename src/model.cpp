@@ -626,35 +626,27 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
   return best;
 }
 
-void model_t::move_root(const root_location_t &new_root) {
-  compute_lh(new_root);
-  return;
+void model_t::move_root(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
   std::vector<unsigned int> pmatrix_indices;
   std::vector<double> branch_lengths;
 
-  {
-    auto results = _tree.generate_root_update_operations(new_root);
-    ops = std::move(std::get<0>(results));
-    pmatrix_indices = std::move(std::get<1>(results));
-    branch_lengths = std::move(std::get<2>(results));
-  }
-
-  _tree.root_by(new_root);
+  GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
+                          branch_lengths);
 
   unsigned int params[4] = {0, 0, 0, 0};
 
-  for (size_t partition_index = 0; partition_index < _partitions.size();
-       ++partition_index) {
-    int result = pll_update_prob_matrices(
-        _partitions[partition_index], params, pmatrix_indices.data(),
-        branch_lengths.data(), pmatrix_indices.size());
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    auto &partition = _partitions[i];
+    int result =
+        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
+                                 branch_lengths.data(), pmatrix_indices.size());
 
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
     }
 
-    pll_update_partials(_partitions[partition_index], ops.data(), ops.size());
+    pll_update_partials(partition, ops.data(), ops.size());
   }
 }
 
@@ -702,7 +694,7 @@ root_location_t model_t::optimize_all() {
 
   set_subst_rates_uniform();
   set_empirical_freqs();
-  auto roots = suggest_roots(1, .05);
+  auto roots = suggest_roots(1, .00);
   size_t root_count = roots.size();
   size_t root_index = 0;
 
