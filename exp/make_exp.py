@@ -5,6 +5,7 @@ import csv
 import datetime
 import math
 import multiprocessing
+from multiprocessing.pool import ThreadPool
 import os
 import random
 import shutil
@@ -42,7 +43,8 @@ CONTROL_FILE = """
 """
 
 RD = os.path.abspath(
-    "../bin/rd") + " --msa {msa} --tree {tree} --states 4 --seed {seed} --force"
+    "../bin/rd"
+) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --force"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
@@ -159,6 +161,7 @@ class exp:
 
         self._site_steps = []
         self._aligns = []
+        self._exp_keys = set()
         align_name_counter = 0
         for align in aligns:
             if type(align) == int:
@@ -238,20 +241,10 @@ class exp:
                                              seed=self._seed).split(' '),
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        with open('rd_output_all', 'w') as logfile:
+        with open('rd_output', 'w') as logfile:
             logfile.write(rd_output.stdout.decode('utf-8'))
         with open('rd_output_err', 'w') as logfile:
             logfile.write(rd_output.stderr.decode('utf-8'))
-        output_lines = rd_output.stdout.decode('utf-8').split('\n')
-        tree = output_lines[-3]
-        lh = output_lines[-4]
-        time = output_lines[-2]
-        with open('rd_output', 'w') as rd_outfile:
-            rd_outfile.write(tree)
-        with open('rd_output_lh', 'w') as rd_outfile:
-            rd_outfile.write(lh)
-        with open('rd_output_time', 'w') as rd_outfile:
-            rd_outfile.write(time)
         self.set_rd_done('.')
 
     def run_iqtree(self, tree_filename, msa):
@@ -268,6 +261,8 @@ class exp:
     def run_all(self):
         old_dir = os.getcwd()
         os.chdir(self._run_path)
+        self._rd_results = {}
+        self._iqtree_results = {}
 
         freqs, subst = self.get_model_params()
         with open('subst.model', 'w') as model_file:
@@ -277,12 +272,10 @@ class exp:
             model_file.write(freqs.indel_repr())
 
         for tree_name in self._tree_names:
-            all_trees_rd = []
-            all_trees_iqtree = []
-            all_lh_rd = [0.0]
             tree_file = os.path.join(self._run_path, str(tree_name) + ".tree")
             with open(tree_file) as tf:
                 true_tree_newick = tf.read()
+                true_tree_ete = ete3.Tree(true_tree_newick)
             for sites in self._site_steps:
                 exp_dir = "{taxa}tree_{sites}sites".format(taxa=tree_name,
                                                            sites=sites)
@@ -291,10 +284,13 @@ class exp:
                 with directory_guard(exp_dir):
                     self.gen_indel_alignment(sites, freqs, subst, tree_file)
                     self.run_exp(tree_file, 'seqs_TRUE.phy')
-                    with open('rd_output') as tf:
-                        all_trees_rd.append(tf.readline())
-                    with open('rd_output_lh') as tf:
-                        all_lh_rd.append(tf.readline())
+                exp_key = (tree_name, sites)
+                self._rd_results[exp_key] = rd_result(exp_dir, true_tree_ete)
+                self._iqtree_results[exp_key] = iqtree_result(
+                    exp_dir, true_tree_ete)
+                if exp_key not in self._exp_keys:
+                    self._exp_keys.add(exp_key)
+
             for align_name, align in self._aligns:
                 exp_dir = "{taxa}tree_{align_name}align".format(
                     taxa=tree_name, align_name=align_name)
@@ -305,36 +301,17 @@ class exp:
                     with open(align_filename, 'w') as align_file:
                         SeqIO.write(align, align_file, 'fasta')
                     self.run_exp(tree_file, msa=align_filename)
-                    with open('rd_output') as tf:
-                        all_trees_rd.append(tf.readline())
-                    with open('rd_output_lh') as tf:
-                        all_lh_rd.append(tf.readline())
-                    with open('{}.treefile'.format(
-                            align_filename)) as iqtree_treefile:
-                        all_trees_iqtree.append(iqtree_treefile.read())
-            result_tree_file_rd = "result_trees_{}_tree_rd".format(tree_name)
-            result_tree_file_iqtree = "result_trees_{}_tree_iqtree".format(
-                tree_name)
-            with open(result_tree_file_rd, 'w') as rt:
-                rt.write(''.join(all_trees_rd))
-            with open(result_tree_file_iqtree, 'w') as rt:
-                rt.write(''.join(all_trees_iqtree))
-            result_tree_lh = "result_trees_{}_lh_rd".format(tree_name)
-            with open(result_tree_lh, 'w') as rt:
-                rt.write('\n'.join([str(f) for f in all_lh_rd]))
-
-            try:
-                parsed_trees = [ete3.Tree(t) for t in all_trees_rd]
-            except:
-                print("")
-                print("Failure in run:", self._run_iter)
-                #sys.exit(1)
-            true_tree = ete3.Tree(true_tree_newick)
-            self._result_trees = parsed_trees
+                exp_key = (tree_name, align_name)
+                self._rd_results[exp_key] = rd_result(exp_dir, true_tree_ete)
+                self._iqtree_results[exp_key] = iqtree_result(
+                    exp_dir, true_tree_ete)
+                if exp_key not in self._exp_keys:
+                    self._exp_keys.add(exp_key)
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         os.chdir(old_dir)
+        return self
 
     def tree_names(self):
         return self._tree_names
@@ -347,6 +324,266 @@ class exp:
 
     def site_steps(self):
         return [str(s) for s in self._site_steps]
+
+    def rd_results(self):
+        return self._rd_results
+
+    def iqtree_results(self):
+        return self._iqtree_results
+
+    def exp_keys(self):
+        return self._exp_keys
+
+
+class result:
+    @property
+    def time(self):
+        return self._time
+
+    @property
+    def tree(self):
+        return self._tree.write(format=5)
+
+    @property
+    def lh(self):
+        return self._final_lh
+
+    @property
+    def root_distance(self):
+        return self._root_distance
+
+    @property
+    def normalized_root_distance(self):
+        return self._normalized_root_distance
+
+    @property
+    def path_distance(self):
+        return self._path_distance
+
+    @property
+    def normalized_path_distance(self):
+        return self._normalized_path_distance
+
+    def _calculate_distances(self, true_tree, inferred_tree):
+        tree_size = len(true_tree.get_leaves())
+        self._root_distance = get_root_distance_toplogical(
+            true_tree, self._tree)
+        self._normalized_root_distance = self._root_distance / tree_size
+        self._path_distance = get_root_distance_metric(true_tree, self._tree)
+        self._normalized_path_distance = self._path_distance / tree_size
+
+    def get(self):
+        return {
+            'time': self.time,
+            'tree': self.tree,
+            'lh': self.lh,
+            'root_distance': self.root_distance,
+            'path_distance': self.path_distance,
+            'normalized_root_distance': self.normalized_root_distance,
+            'normalized_path_distance': self.normalized_path_distance,
+        }
+
+
+class rd_result(result):
+    def __init__(self, directory, true_tree):
+        with directory_guard(directory):
+            with open('rd_output') as results_file:
+                results_string = results_file.read().split('\n')
+        self._time = rd_result._read_time(results_string)
+        self._tree = rd_result._read_tree(results_string)
+        self._final_lh = rd_result._read_lh(results_string)
+        self._calculate_distances(true_tree, self._tree)
+
+    @staticmethod
+    def _read_time(results):
+        time_line = results[-2]
+        start_index = len('Inference took: ')
+        end_index = start_index + time_line[start_index:].find('s')
+        return float(time_line[start_index:end_index])
+
+    @staticmethod
+    def _read_tree(results):
+        tree_string = results[-3]
+        return ete3.Tree(tree_string)
+
+    @staticmethod
+    def _read_lh(results):
+        return results[-4]
+
+
+class iqtree_result(result):
+    def __init__(self, directory, true_tree):
+        with directory_guard(directory):
+            with open('seqs_TRUE.phy.treefile') as tree_file:
+                self._tree = iqtree_result._read_tree(tree_file.read())
+            with open('seqs_TRUE.phy.iqtree') as iqtree_file:
+                for line in iqtree_file:
+                    if 'Log-likelihood of the tree:' in line:
+                        self._final_lh = iqtree_result._read_lh(line)
+                    if 'Total wall-clock time used:' in line:
+                        self._time = iqtree_result._read_time(line)
+        self._calculate_distances(true_tree, self._tree)
+
+    @staticmethod
+    def _read_tree(tree_string):
+        return ete3.Tree(tree_string)
+
+    @staticmethod
+    def _read_lh(lh_string):
+        start_index = len('Log-likelihood of the tree: ')
+        end_index = lh_string.rfind('(') - 1
+        return float(lh_string[start_index:end_index])
+
+    @staticmethod
+    def _read_time(time_string):
+        start_index = len('Total wall-clock time used: ')
+        end_index = start_index + time_string[start_index:].find(' ')
+        return float(time_string[start_index:end_index])
+
+
+class summary_row:
+    def __init__(self, exp, stats):
+        self._values = {}
+        self._values['tree'] = exp[0]
+        self._values['alignment'] = exp[1]
+        for stat_name, stat_value in stats.items():
+            rd_key = 'rd_' + stat_name
+            iq_key = 'iq_' + stat_name
+            self._values[rd_key] = stat_value['rd']
+            self._values[iq_key] = stat_value['iq']
+
+    def make_row(self, header):
+        return ','.join([str(s) for s in self.make_line(header)])
+
+    def make_line(self, header):
+        return [self._values[h] for h in header]
+
+
+class summary:
+    def __init__(self, experiments):
+        self._experiments = summary._extract_exp_keys(experiments)
+        self._rd_results = [e.rd_results() for e in experiments]
+        self._iq_results = [e.iqtree_results() for e in experiments]
+
+    def make_header(self):
+        return [
+            'tree',
+            'alignment',
+            'rd_time_mean',
+            'iq_time_mean',
+            'rd_time_median',
+            'iq_time_median',
+            'rd_time_std',
+            'iq_time_std',
+            'rd_root_distance_mean',
+            'iq_root_distance_mean',
+            'rd_root_distance_median',
+            'iq_root_distance_median',
+            'rd_root_distance_std',
+            'iq_root_distance_std',
+            'rd_path_distance_mean',
+            'iq_path_distance_mean',
+            'rd_path_distance_median',
+            'iq_path_distance_median',
+            'rd_path_distance_std',
+            'iq_path_distance_std',
+        ]
+
+    def write(self, filename):
+        header = self.make_header()
+        with open(filename, 'w') as results_file:
+            results_file.write(','.join(header))
+            results_file.write('\n')
+            for row in self.generate_rows():
+                results_file.write(row.make_row(header))
+                results_file.write('\n')
+
+    def generate_rows(self):
+        for k in self._experiments:
+            stats = {}
+            stats['time_mean'] = self.mean_times(k)
+            stats['time_median'] = self.median_times(k)
+            stats['time_std'] = self.std_times(k)
+            stats['root_distance_mean'] = self.mean_root_distance(k)
+            stats['root_distance_median'] = self.median_root_distance(k)
+            stats['root_distance_std'] = self.std_root_distance(k)
+            stats['path_distance_mean'] = self.mean_root_distance(k)
+            stats['path_distance_median'] = self.median_root_distance(k)
+            stats['path_distance_std'] = self.std_root_distance(k)
+            yield summary_row(k, stats)
+
+    def mean_times(self, k):
+        return {
+            'rd': summary._mean_attr(self._rd_results, k, 'time'),
+            'iq': summary._mean_attr(self._iq_results, k, 'time')
+        }
+
+    def median_times(self, k):
+        return {
+            'rd': summary._median_attr(self._rd_results, k, 'time'),
+            'iq': summary._median_attr(self._iq_results, k, 'time')
+        }
+
+    def std_times(self, k):
+        return {
+            'rd': summary._stddev_attr(self._rd_results, k, 'time'),
+            'iq': summary._stddev_attr(self._iq_results, k, 'time')
+        }
+
+    def mean_root_distance(self, k):
+        return {
+            'rd': summary._mean_attr(self._rd_results, k, 'root_distance'),
+            'iq': summary._mean_attr(self._iq_results, k, 'root_distance')
+        }
+
+    def median_root_distance(self, k):
+        return {
+            'rd': summary._median_attr(self._rd_results, k, 'root_distance'),
+            'iq': summary._median_attr(self._iq_results, k, 'root_distance')
+        }
+
+    def std_root_distance(self, k):
+        return {
+            'rd': summary._stddev_attr(self._rd_results, k, 'root_distance'),
+            'iq': summary._stddev_attr(self._iq_results, k, 'root_distance')
+        }
+
+    def mean_path_distance(self, k):
+        return {
+            'rd': summary._mean_attr(self._rd_results, k, 'path_distance'),
+            'iq': summary._mean_attr(self._iq_results, k, 'path_distance')
+        }
+
+    def median_path_distance(self, k):
+        return {
+            'rd': summary._median_attr(self._rd_results, k, 'path_distance'),
+            'iq': summary._median_attr(self._iq_results, k, 'path_distance')
+        }
+
+    def std_path_distance(self, k):
+        return {
+            'rd': summary._stddev_attr(self._rd_results, k, 'path_distance'),
+            'iq': summary._stddev_attr(self._iq_results, k, 'path_distance')
+        }
+
+    @staticmethod
+    def _mean_attr(results, e, key):
+        return numpy.mean([getattr(r[e], key) for r in results])
+
+    @staticmethod
+    def _median_attr(results, e, key):
+        return numpy.median([getattr(r[e], key) for r in results])
+
+    @staticmethod
+    def _stddev_attr(results, e, key):
+        return numpy.std([getattr(r[e], key) for r in results])
+
+    @staticmethod
+    def _extract_exp_keys(experiments):
+        keys = set()
+        for e in experiments:
+            keys = keys | e.exp_keys()
+        return keys
 
 
 def tree_map(tree_names, trees):
@@ -428,96 +665,6 @@ def get_root_distance_toplogical(true_tree, inferred_tree):
     return numpy.abs(cn_tt_dist - cn_it_dist)
 
 
-def calculate_tree_diameter(t1):
-    td = 0.0
-    for c1 in t1.get_leaves():
-        for c2 in t1.get_leaves():
-            tmp = t1.get_distance(c1, c2)
-            td = max(td, tmp)
-    return td
-
-
-def calculate_distance_statistics(true_tree, tree_name, compare_tree_name,
-                                  format_string):
-    rf_topo = []
-    rf_ntopo = []
-    rf_metric = []
-    rf_nmetric = []
-    leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
-    for i in range(TOTAL_ITERS):
-        if type(true_tree) != ete3.Tree:
-            with open(
-                    os.path.join(
-                        RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                            run_iter=i),
-                        "{}.tree".format(tree_name))) as infile:
-                true_tree = ete3.Tree(infile.read())
-
-        compare_tree_file = os.path.join(
-            RUN_TEMPLATE.format(leading_zeroes=leading_zeroes, run_iter=i),
-            format_string, compare_tree_name)
-        with open(compare_tree_file) as infile:
-            compare_tree = ete3.Tree(infile.readline())
-
-        tree_diameter = calculate_tree_diameter(compare_tree)
-        tree_size = len(true_tree.get_leaves())
-        topo_dist = get_root_distance_toplogical(true_tree, compare_tree)
-        metric_dist = get_root_distance_metric(true_tree, compare_tree)
-
-        rf_topo.append(topo_dist)
-        rf_ntopo.append(topo_dist / tree_size)
-        rf_metric.append(metric_dist)
-        rf_nmetric.append(metric_dist / tree_diameter)
-    return {
-        'topo': rf_topo,
-        'ntopo': rf_ntopo,
-        'metric': rf_metric,
-        'nmetric': rf_nmetric,
-    }
-
-
-def write_stats(dist_stats_rd, dist_stats_iqtree, format_string):
-    with open(format_string + "_rf_dists", 'w') as outfile:
-        outfile.write('method,topo,ntopo,metric,nmetric\n')
-        outfile.write('rd,{},{},{},{}\n'.format(
-            numpy.mean(dist_stats_rd['topo']),
-            numpy.mean(dist_stats_rd['ntopo']),
-            numpy.mean(dist_stats_rd['metric']),
-            numpy.mean(dist_stats_rd['nmetric'])))
-        outfile.write('iqtree,{},{},{},{}\n'.format(
-            numpy.mean(dist_stats_iqtree['topo']),
-            numpy.mean(dist_stats_iqtree['ntopo']),
-            numpy.mean(dist_stats_iqtree['metric']),
-            numpy.mean(dist_stats_iqtree['nmetric'])))
-    with open(format_string + "_rf_hists", 'w') as outfile:
-        outfile.write('iqtree_n_dist,rd_n_dist,iqtree_n_metric,rd_n_metric\n')
-        for row in zip(dist_stats_iqtree['ntopo'], dist_stats_rd['ntopo'],
-                       dist_stats_iqtree['nmetric'], dist_stats_rd['nmetric']):
-            outfile.write("{},{},{},{}\n".format(*row))
-
-
-def compute_distances(tree_names, trees, site_steps, aligns):
-    for tn, true_tree in zip(tree_names, trees):
-        for sites in site_steps:
-            format_string = '{taxa}tree_{sites}sites'.format(taxa=tn,
-                                                             sites=sites)
-            dist_stats_rd = calculate_distance_statistics(
-                true_tree, tn, 'rd_output', format_string)
-            dist_stats_iqtree = calculate_distance_statistics(
-                true_tree, tn, 'seqs_TRUE.phy.treefile', format_string)
-            write_stats(dist_stats_rd, dist_stats_iqtree, format_string)
-
-        for align in aligns:
-            format_string = '{taxa}tree_{align}align'.format(taxa=tn,
-                                                             align=align)
-            dist_stats_rd = calculate_distance_statistics(
-                true_tree, tn, 'rd_output', format_string)
-            dist_stats_iqtree = calculate_distance_statistics(
-                true_tree, tn, '{}.fasta.treefile'.format(align),
-                format_string)
-            write_stats(dist_stats_rd, dist_stats_iqtree, format_string)
-
-
 def map_root_onto_main(tree_names, trees, site_steps, aligns):
     leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
     for tn, true_tree in zip(tree_names, trees):
@@ -592,13 +739,6 @@ def map_root_onto_main(tree_names, trees, site_steps, aligns):
                                     ]))
 
 
-def summarize_results(path, tree_names, trees, site_steps, aligns):
-    with directory_guard(path):
-        tree_map(tree_names, trees)
-        map_root_onto_main(tree_names, trees, site_steps, aligns)
-        compute_distances(tree_names, trees, site_steps, aligns)
-
-
 def base26_encode(index, maximum):
     if index == 0:
         return 'a'
@@ -663,7 +803,6 @@ if __name__ == "__main__":
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         with multiprocessing.Pool(args.procs) as tp:
-            tp.map(exp.run_all, experiments)
-        summarize_results('.', experiments[0].tree_names(), trees,
-                          experiments[0].site_steps(),
-                          experiments[0].align_names())
+            finished_exp = tp.map(exp.run_all, experiments)
+        experiment_summary = summary(finished_exp)
+        experiment_summary.write('test_results')
