@@ -1,8 +1,6 @@
-#include "debug.h"
 #include "msa.hpp"
 #include <cctype>
 #include <fstream>
-#include <iostream>
 #include <stdexcept>
 #include <vector>
 
@@ -12,7 +10,8 @@ extern "C" {
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename) {
 
-  debug_print("attempting to open msa: %s", msa_filename.c_str());
+  debug_print(EMIT_LEVEL_DEBUG, "attempting to open msa: %s",
+              msa_filename.c_str());
   if (pll_phylip_t *fd =
           pll_phylip_open(msa_filename.c_str(), pll_map_generic)) {
     pll_msa_t *pll_msa = nullptr;
@@ -186,7 +185,7 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
      * include the endpoint
      */
     _msa->length += (range.second - range.first) + 1;
-    debug_print("%d",_msa->length);
+    debug_print(EMIT_LEVEL_DEBUG, "%d", _msa->length);
   }
   _msa->sequence = (char **)malloc(sizeof(char *) * other.count());
 
@@ -231,9 +230,9 @@ unsigned int *msa_t::weights() const {
   throw std::runtime_error("msa_t has no weights");
 }
 
-unsigned int msa_t::total_weight() const{
+unsigned int msa_t::total_weight() const {
   unsigned int total = 0;
-  for(int i = 0; i < _msa->length; ++i){
+  for (int i = 0; i < _msa->length; ++i) {
     total += _weights[i];
   }
   return total;
@@ -275,7 +274,8 @@ bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   // labels subset taxa
   for (const std::string &k : labels) {
     if (taxa.find(k) == taxa.end()) {
-      debug_print("Taxa %s in msa is not present on the tree", k.c_str());
+      debug_print(EMIT_LEVEL_DEBUG, "Taxa %s in msa is not present on the tree",
+                  k.c_str());
       ret = false;
     }
   }
@@ -283,7 +283,8 @@ bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   // taxa subset labels
   for (const std::string &k : taxa) {
     if (labels.find(k) == labels.end()) {
-      debug_print("Taxa %s on tree is not present in the msa", k.c_str());
+      debug_print(EMIT_LEVEL_DEBUG, "Taxa %s on tree is not present in the msa",
+                  k.c_str());
       ret = false;
     }
   }

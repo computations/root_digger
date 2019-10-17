@@ -14,11 +14,10 @@ extern "C" {
 #include <vector>
 
 #include "debug.h"
+int __VERBOSE__ = EMIT_LEVEL_WARNING;
 #include "model.hpp"
 #include "msa.hpp"
 #include "tree.hpp"
-
-bool __VERBOSE__ = false;
 
 #define STRING(s) #s
 #define STRINGIFY(s) STRING(s)
@@ -66,19 +65,11 @@ void print_usage() {
       << "           Random seed to use. Optional\n"
       << "    --silent\n"
       << "           Suppress output except for the final tree\n"
-      << "    --fast\n"
-      << "           Use a fast annealing schedule. Gives results quickly,\n"
-      << "           but might be less optimal.\n"
-      << "    --slow\n"
-      << "           Use a slow annealing schedule. Gives results slowly, \n"
-      << "           but results are more likely to be optimial.\n"
-      << "    --tfinal [NUMBER]\n"
-      << "           Threshold to end the simulated annealing at.\n"
-      << "           Default is 1e-6\n"
       << "    --force\n"
       << "           Disable Saftey checks.\n"
       << "    --verbose\n"
-      << "           Enable debug output. Warning, extremely noisy\n"
+      << "           Increase the verbosity level. Can be repeated to\n"
+      << "           level further.\n"
       << std::endl;
 }
 
@@ -93,12 +84,10 @@ int main(int argv, char **argc) {
       {"states", required_argument, 0, 0},
       {"verbose", no_argument, 0, 0},
       {"silent", no_argument, 0, 0},
-      {"fast", no_argument, 0, 0},
-      {"slow", no_argument, 0, 0},
-      {"force", no_argument, 0, 0},
-      {"tfinal", no_argument, 0, 0},
+      {"min-roots", required_argument, 0, 0},
+      {"root-ratio", required_argument, 0, 0},
       {"partition", required_argument, 0, 0},
-      {"root-freq", required_argument, 0, 0},
+      {"force", no_argument, 0, 0},
       {"version", no_argument, 0, 0},
       {0, 0, 0, 0},
   };
@@ -116,10 +105,10 @@ int main(int argv, char **argc) {
     std::string freqs_filename;
     std::string partition_filename;
     uint64_t seed = std::random_device()();
+    size_t min_roots = 1;
+    double root_ratio = 0.0;
     unsigned int states = 0;
     bool silent = false;
-    double temp_param = 0.9;
-    double root_opt_freq = 2.0;
     bool sanity_checks = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       switch (index) {
@@ -142,30 +131,25 @@ int main(int argv, char **argc) {
         states = atol(optarg);
         break;
       case 6: // verbose
-        __VERBOSE__ = true;
+        __VERBOSE__ += 1;
         break;
       case 7: // silent
+        __VERBOSE__ = 0;
         silent = true;
         break;
-      case 8: // fast
-        temp_param = 0.5;
+      case 8: // min-roots
+        min_roots = atol(optarg);
         break;
-      case 9: // slow
-        temp_param = 0.98;
+      case 9: // root-ratio
+        root_ratio = atof(optarg);
         break;
-      case 10: // force
-        sanity_checks = false;
-        break;
-      case 11: // final_temp
-        // final_temp = atof(optarg);
-        break;
-      case 12: // partition
+      case 10: // partition
         partition_filename = optarg;
         break;
-      case 13: // root-freq
-        root_opt_freq = atof(optarg);
+      case 11: // force
+        sanity_checks = false;
         break;
-      case 14: // version
+      case 12: // version
         print_version();
         return 0;
       default:
@@ -235,24 +219,22 @@ int main(int argv, char **argc) {
     std::string final_tree_string;
     double final_lh = -INFINITY;
 
-    for (size_t i = 0; i < 1; ++i) {
-      model_t model{tree, msa, seed + i};
-      try {
-        model.initialize_partitions(msa);
-      } catch (const invalid_empirical_frequencies_exception &) {
-        model.initialize_partitions_uniform_freqs(msa);
-      }
-      model.set_temp_ratio(temp_param);
-      model.set_root_opt_frequency(root_opt_freq);
-      auto rl = model.optimize_all();
-      double lh = model.compute_lh(rl);
-      if (lh > final_lh) {
-        final_tree_string = model.rooted_tree(rl).newick();
-        final_lh = lh;
-      }
+    model_t model{tree, msa, seed};
+    try {
+      model.initialize_partitions(msa);
+    } catch (const invalid_empirical_frequencies_exception &) {
+      model.initialize_partitions_uniform_freqs(msa);
     }
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << final_lh << std::endl;
+    auto rl = model.optimize_all(min_roots, root_ratio);
+    double lh = model.compute_lh(rl);
+    if (lh > final_lh) {
+      final_tree_string = model.rooted_tree(rl).newick();
+      final_lh = lh;
+    }
+    if (!silent) {
+      std::cout << std::fixed << std::setprecision(2);
+      std::cout << final_lh << std::endl;
+    }
     std::cout << final_tree_string << std::endl;
     auto end_time = std::chrono::system_clock::now();
     std::chrono::duration<double> duration = end_time - start_time;

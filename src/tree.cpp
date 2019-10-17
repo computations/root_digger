@@ -1,10 +1,8 @@
-#include "debug.h"
 #include "tree.hpp"
 extern "C" {
 #include <libpll/pll_tree.h>
 }
 #include <algorithm>
-#include <iostream>
 #include <unordered_set>
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename) {
@@ -83,7 +81,7 @@ std::unordered_set<std::string> rooted_tree_t::label_set() const {
 }
 
 void rooted_tree_t::generate_root_locations() {
-  debug_string("generating root locations");
+  debug_string(EMIT_LEVEL_DEBUG, "generating root locations");
   auto edges = full_traverse();
 
   std::unordered_set<pll_unode_t *> node_set;
@@ -130,7 +128,8 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
 }
 
 void rooted_tree_t::root_by(const root_location_t &root_location) {
-  debug_print("rooting by node labeled: %s", root_location.label().c_str());
+  debug_print(EMIT_LEVEL_DEBUG, "rooting by node labeled: %s",
+              root_location.label().c_str());
   if (root_location.edge == _tree->vroot) {
     update_root(root_location);
     return;
@@ -239,9 +238,10 @@ std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
 rooted_tree_t::generate_operations(const root_location_t &new_root) {
   root_by(new_root);
   auto trav_buf = full_traverse();
-  debug_string("traversal after root");
+  debug_string(EMIT_LEVEL_DEBUG, "traversal after root");
   for (auto node : trav_buf) {
-    debug_print("traversal node label: %s, pmatrix index: %d, clv index: %d",
+    debug_print(EMIT_LEVEL_DEBUG,
+                "traversal node label: %s, pmatrix index: %d, clv index: %d",
                 (node->label != nullptr ? node->label : "null"),
                 node->pmatrix_index, node->clv_index);
   }
@@ -434,6 +434,6 @@ root_location_t rooted_tree_t::current_root() const {
   return _current_rl;
 }
 
-const std::vector<root_location_t>& rooted_tree_t::roots() const{
+const std::vector<root_location_t> &rooted_tree_t::roots() const {
   return _roots;
 }

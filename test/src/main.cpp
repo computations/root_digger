@@ -1,3 +1,3 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
-bool __VERBOSE__ =false;
+int __VERBOSE__ = -1;

@@ -11,38 +11,39 @@
 
 const clock_t CLOCK_START = clock();
 extern bool __PROGRESS_BAR_FLAG__;
-extern bool __VERBOSE__;
+extern int __VERBOSE__;
 
 #define DEBUG_IF_FLAG 1
 
-
 #ifdef RD_DEBUG
 #define RD_DEBUG_ASSERT_FLAG 1
-#else 
+#else
 #define RD_DEBUG_ASSERT_FLAG 0
 #endif
 
-#define EMIT_DEBUG_FLAG __VERBOSE__
+#define EMIT_LEVEL_IMPORTANT 0
+#define EMIT_LEVEL_ERROR 1
+#define EMIT_LEVEL_WARNING 2
+#define EMIT_LEVEL_INFO 3
+#define EMIT_LEVEL_DEBUG 4
 
 #define print_clock                                                            \
   do {                                                                         \
-    if (DEBUG_IF_FLAG && EMIT_DEBUG_FLAG) {                                    \
-      fprintf(stderr, "[%f] ",                                                 \
-              ((double)clock() - CLOCK_START) / CLOCKS_PER_SEC);               \
-    }                                                                          \
+    fprintf(stderr, "[%f] ",                                                   \
+            ((double)clock() - CLOCK_START) / CLOCKS_PER_SEC);                 \
   } while (0)
 
-#define debug_print(fmt, ...)                                                  \
+#define debug_print(level, fmt, ...)                                           \
   do {                                                                         \
-    if (DEBUG_IF_FLAG && EMIT_DEBUG_FLAG) {                                    \
+    if (DEBUG_IF_FLAG && __VERBOSE__ >= level) {                               \
       print_clock;                                                             \
       fprintf(stderr, "[%s:%d]: " fmt "\n", __func__, __LINE__, __VA_ARGS__);  \
     }                                                                          \
   } while (0)
 
-#define debug_string(x)                                                        \
+#define debug_string(level, x)                                                 \
   do {                                                                         \
-    debug_print("%s", x);                                                      \
+    debug_print(level, "%s", x);                                               \
   } while (0)
 
 #define print_trace()                                                          \

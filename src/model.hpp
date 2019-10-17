@@ -4,6 +4,7 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#include "debug.h"
 #include "msa.hpp"
 #include "tree.hpp"
 #include <functional>
@@ -44,13 +45,11 @@ public:
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root, double atol);
   std::pair<root_location_t, double> optimize_root_location();
-  root_location_t optimize_all();
+  root_location_t optimize_all(size_t min_roots, double root_ratio);
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
   void initialize_partitions(const std::vector<msa_t> &);
   void initialize_partitions_uniform_freqs(const std::vector<msa_t> &);
-  void set_temp_ratio(double);
-  void set_root_opt_frequency(double);
   std::string subst_string() const;
 
   std::vector<std::pair<root_location_t, double>> suggest_roots();
