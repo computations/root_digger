@@ -4,6 +4,7 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#include "debug.h"
 #include <stdexcept>
 #include <string>
 #include <unordered_map>

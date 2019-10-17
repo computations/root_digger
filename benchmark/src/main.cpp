@@ -1,5 +1,5 @@
 #include <benchmark/benchmark.h>
 #include <debug.h>
-bool __VERBOSE__=false;
+int __VERBOSE__ = -1;
 
 BENCHMARK_MAIN();

@@ -5,6 +5,7 @@ extern "C" {
 #include <libpll/pll.h>
 }
 
+#include "debug.h"
 #include <string>
 #include <unordered_set>
 #include <vector>

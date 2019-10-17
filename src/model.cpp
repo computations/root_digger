@@ -1,11 +1,8 @@
-#include "debug.h"
 #include "model.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <functional>
-#include <iomanip>
-#include <iostream>
 #include <limits>
 #include <random>
 #include <sstream>
@@ -323,11 +320,13 @@ dlh_t model_t::compute_dlh(const root_location_t &root) {
                              std::to_string(root_prime.edge->length));
   }
   if (std::isinf(fxh) && std::isinf(fx)) {
-    debug_string("Both evals are -inf, returning a 0 derivative");
+    debug_string(EMIT_LEVEL_DEBUG,
+                 "Both evals are -inf, returning a 0 derivative");
     return {fx, 0};
   }
   double dlh = (fxh - fx) / EPSILON;
-  debug_print("dlh: %f, fx: %f, fxh: %f", dlh * sign, fx, fxh);
+  debug_print(EMIT_LEVEL_DEBUG, "dlh: %f, fx: %f, fxh: %f", dlh * sign, fx,
+              fxh);
   ret.dlh = dlh * sign;
   return ret;
 }
@@ -354,6 +353,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
 
   if (depth > 32) {
     debug_print(
+        EMIT_LEVEL_DEBUG,
         "depth exceeded limit, returning midpoint with ratio: %f, lh: %f",
         midpoint.brlen_ratio, d_midpoint.lh);
     return {midpoint, d_midpoint.lh};
@@ -364,7 +364,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
 
   if (fabs(d_midpoint.dlh) < atol) {
-    debug_string("case 1");
+    debug_string(EMIT_LEVEL_DEBUG, "case 1");
     return {midpoint, d_midpoint.lh};
   }
 
@@ -374,7 +374,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg.dlh > 0.0 && d_end.dlh > 0.0 && d_midpoint.dlh < 0.0) ||
       (d_beg.dlh < 0.0 && d_end.dlh < 0.0 && d_midpoint.dlh > 0.0)) {
-    debug_string("case 2");
+    debug_string(EMIT_LEVEL_DEBUG, "case 2");
     auto r1 = bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
     auto r2 = bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
     if (r1.second < r2.second) {
@@ -388,6 +388,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
   if ((d_beg.dlh < 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh < 0.0)) {
     debug_print(
+        EMIT_LEVEL_DEBUG,
         "case 3, d_beg.dlh: %f, d_midpoint.dlh: %f, d_end:%f, alpha: %f",
         d_beg.lh, d_midpoint.dlh, d_end.dlh, midpoint.brlen_ratio);
     return bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
@@ -398,7 +399,7 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    */
   if ((d_beg.dlh < 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh < 0.0)) {
-    debug_string("case 4");
+    debug_string(EMIT_LEVEL_DEBUG, "case 4");
     return bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
   }
 
@@ -511,23 +512,25 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
   root_location_t best_endpoint = d_beg.lh >= d_end.lh ? beg : end;
   auto lh_best_endpoint = d_beg.lh >= d_end.lh ? d_beg : d_end;
   if (d_beg.lh >= d_end.lh) {
-    debug_string("beg endpoint is best");
+    debug_string(EMIT_LEVEL_DEBUG, "beg endpoint is best");
   } else {
-    debug_string("end endpoint is best");
+    debug_string(EMIT_LEVEL_DEBUG, "end endpoint is best");
   }
 
-  debug_print("lh_endpoint.dlh: %f", lh_best_endpoint.dlh);
-  debug_print("d_beg.dlh: %f, d_end.dlh: %f", d_beg.dlh, d_end.dlh);
+  debug_print(EMIT_LEVEL_DEBUG, "lh_endpoint.dlh: %f", lh_best_endpoint.dlh);
+  debug_print(EMIT_LEVEL_DEBUG, "d_beg.dlh: %f, d_end.dlh: %f", d_beg.dlh,
+              d_end.dlh);
 
   if (fabs(d_beg.dlh) < atol || fabs(d_end.dlh) < atol) {
-    debug_string("one of the endpoints is sufficient");
+    debug_string(EMIT_LEVEL_DEBUG, "one of the endpoints is sufficient");
     return best_endpoint;
   }
 
   if ((d_beg.dlh < 0.0 && d_end.dlh > 0.0) ||
       (d_beg.dlh > 0.0 && d_end.dlh < 0.0)) {
     auto mid = brents(beg, d_beg, end, d_end, atol);
-    debug_print("mid lh: %f, end lh: %f", mid.second, lh_best_endpoint.lh);
+    debug_print(EMIT_LEVEL_DEBUG, "mid lh: %f, end lh: %f", mid.second,
+                lh_best_endpoint.lh);
     return lh_best_endpoint.lh > mid.second ? best_endpoint : mid.first;
   }
 
@@ -547,11 +550,11 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
         continue;
 
       double alpha = 1.0 / (double)midpoints * midpoint;
-      debug_print("alpha: %f", alpha);
+      debug_print(EMIT_LEVEL_DEBUG, "alpha: %f", alpha);
       root_location_t midpoint_root{beg};
       midpoint_root.brlen_ratio = alpha;
       auto d_midpoint = compute_dlh(midpoint_root);
-      debug_print("d_midpoint.dlh: %f", d_midpoint.dlh);
+      debug_print(EMIT_LEVEL_DEBUG, "d_midpoint.dlh: %f", d_midpoint.dlh);
       if (fabs(d_midpoint.dlh) < atol) {
         if (best_midpoint_lh.lh < d_midpoint.lh) {
           best_midpoint_lh = d_midpoint;
@@ -567,7 +570,8 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
          */
         auto r1 = brents(beg, d_beg, midpoint_root, d_midpoint, atol);
         auto r2 = brents(midpoint_root, d_midpoint, end, d_end, atol);
-        debug_print("r1 lh: %f, r2 lh: %f", r1.second, r2.second);
+        debug_print(EMIT_LEVEL_DEBUG, "r1 lh: %f, r2 lh: %f", r1.second,
+                    r2.second);
         if (lh_best_endpoint.lh < best_midpoint_lh.lh) {
           lh_best_endpoint = best_midpoint_lh;
           best_endpoint = best_midpoint;
@@ -611,18 +615,18 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
   auto sorted_roots = suggest_roots(1, .05);
   for (auto &sr : sorted_roots) {
     auto &rl = sr.first;
-    debug_print("working rl: %s", rl.label().c_str());
+    debug_print(EMIT_LEVEL_DEBUG, "working rl: %s", rl.label().c_str());
     move_root(rl);
     rl = optimize_alpha(rl, 1e-14);
-    debug_print("alpha: %f", rl.brlen_ratio);
+    debug_print(EMIT_LEVEL_DEBUG, "alpha: %f", rl.brlen_ratio);
     double rl_lh = compute_lh_root(rl);
-    debug_print("rl_lh: %f", rl_lh);
+    debug_print(EMIT_LEVEL_DEBUG, "rl_lh: %f", rl_lh);
     if (rl_lh > best.second) {
       best.first = rl;
       best.second = rl_lh;
     }
   }
-  debug_print("finished with lh: %f", best.second);
+  debug_print(EMIT_LEVEL_DEBUG, "finished with lh: %f", best.second);
   return best;
 }
 
@@ -672,7 +676,7 @@ model_t::suggest_roots(size_t min, double ratio) {
 }
 
 /* Optimize the substitution parameters by simulated annealing */
-root_location_t model_t::optimize_all() {
+root_location_t model_t::optimize_all(size_t min_roots, double root_ratio) {
   double best_lh = -INFINITY;
   root_location_t best_rl;
   std::vector<model_params_t> initial_subst;
@@ -694,7 +698,7 @@ root_location_t model_t::optimize_all() {
 
   set_subst_rates_uniform();
   set_empirical_freqs();
-  auto roots = suggest_roots(1, .00);
+  auto roots = suggest_roots(min_roots, root_ratio);
   size_t root_count = roots.size();
   size_t root_index = 0;
 
@@ -703,7 +707,8 @@ root_location_t model_t::optimize_all() {
   for (auto rl_pair : roots) {
     auto rl = rl_pair.first;
     ++root_index;
-    std::cout << "Root " << root_index << "/" << root_count << std::endl;
+    debug_print(EMIT_LEVEL_INFO, "Root %lu/%lu", root_index, root_count);
+    // std::cout << "Root " << root_index << "/" << root_count << std::endl;
 
     move_root(rl);
     std::vector<model_params_t> subst_rates;
@@ -724,9 +729,11 @@ root_location_t model_t::optimize_all() {
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
-        std::cout << "Optimizing Rates" << std::endl;
+        debug_string(EMIT_LEVEL_INFO, "Optmizing Rates");
+        // std::cout << "Optimizing Rates" << std::endl;
         bfgs_rates(subst_rates[i], rl, i);
-        std::cout << "Optimizing Freqs" << std::endl;
+        debug_string(EMIT_LEVEL_INFO, "Optimizing Freqs");
+        // std::cout << "Optimizing Freqs" << std::endl;
         bfgs_freqs(freqs[i], rl, i);
       }
 
@@ -734,10 +741,13 @@ root_location_t model_t::optimize_all() {
         break;
       }
 
-      std::cout << "Optimizing Root Location" << std::endl;
+      debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
+      // std::cout << "Optimizing Root Location" << std::endl;
       auto cur = optimize_root_location();
 
-      std::cout << "Iteration " << iter << " LH: " << cur.second << std::endl;
+      debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur.second);
+      // std::cout << "Iteration " << iter << " LH: " << cur.second <<
+      // std::endl;
 
       if (fabs(cur.second - cur_best_lh) < atol) {
         cur_best_rl = cur.first;
@@ -792,10 +802,6 @@ void model_t::initialize_partitions_uniform_freqs(
   }
 }
 
-void model_t::set_temp_ratio(double t) { _temp_ratio = t; }
-
-void model_t::set_root_opt_frequency(double r) { _root_opt_frequency = r; }
-
 std::string model_t::subst_string() const {
   std::ostringstream oss;
   oss << "{";
@@ -834,8 +840,9 @@ double gd_params(model_params_t &initial_params, size_t partition_index,
   while (true) {
     set_func(partition_index, parameters);
     double score = compute_lh();
-    std::cout << std::fixed << std::setprecision(2) << "GD Iter: " << iters
-              << " Score: " << -score << std::endl;
+    // std::cout << std::fixed << std::setprecision(2) << "GD Iter: " << iters
+    //<< " Score: " << -score << std::endl;
+    debug_print(EMIT_LEVEL_INFO, "GD Iter: %lu Score: %.5f", iters, -score);
     if (fabs(last_score - score) < atol) {
       break;
     }
@@ -930,15 +937,16 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   size_t iters = 0;
 
   while (iters < 500) {
-    debug_string("Running a bfgs iteration");
+    debug_string(EMIT_LEVEL_DEBUG, "Running a bfgs iteration");
 
     setulb(&n_params, (int *)&max_corrections, parameters.data(),
            param_min.data(), param_max.data(), bound_type.data(), &score,
            gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
            &iprint, &csave, lsave, isave, dsave);
 
-    std::cout << "BFGS Iter: " << iters << std::fixed << std::setprecision(2)
-              << " Score: " << score << std::endl;
+    // std::cout << "BFGS Iter: " << iters << std::fixed << std::setprecision(2)
+    //<< " Score: " << score << std::endl;
+    debug_print(EMIT_LEVEL_INFO, "BFGS Iter: %lu Score: %.5f", iters, -score);
 
     set_func(partition_index, parameters);
     score = compute_lh();
@@ -975,7 +983,7 @@ double model_t::bfgs_rates(model_params_t &initial_rates,
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1e4;
   constexpr double epsilon = 1e-4;
-  debug_string("doing bfgs params");
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs params");
   return bfgs_params(
       initial_rates, partition_index, p_min, p_max, epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
@@ -990,7 +998,7 @@ double model_t::gd_rates(model_params_t &initial_rates,
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1e4;
   constexpr double epsilon = 1e-4;
-  debug_string("doing bfgs params");
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs params");
   return gd_params(
       initial_rates, partition_index, p_min, p_max, epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
@@ -1007,7 +1015,7 @@ double model_t::bfgs_freqs(model_params_t &initial_freqs,
   model_params_t constrained_freqs(initial_freqs.begin(),
                                    initial_freqs.end() - 1);
 
-  debug_string("doing bfgs freqs");
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs freqs");
   double lh = bfgs_params(
       initial_freqs, partition_index, p_min, p_max, epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
@@ -1026,7 +1034,7 @@ double model_t::gd_freqs(model_params_t &initial_freqs,
   model_params_t constrained_freqs(initial_freqs.begin(),
                                    initial_freqs.end() - 1);
 
-  debug_string("doing bfgs freqs");
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs freqs");
   double lh = gd_params(
       initial_freqs, partition_index, p_min, p_max, epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
