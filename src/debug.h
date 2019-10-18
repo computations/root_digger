@@ -29,7 +29,7 @@ extern int __VERBOSE__;
 
 #define print_clock                                                            \
   do {                                                                         \
-    fprintf(stderr, "[%f] ",                                                   \
+    fprintf(stdout, "[%f] ",                                                   \
             ((double)clock() - CLOCK_START) / CLOCKS_PER_SEC);                 \
   } while (0)
 
@@ -37,7 +37,10 @@ extern int __VERBOSE__;
   do {                                                                         \
     if (DEBUG_IF_FLAG && __VERBOSE__ >= level) {                               \
       print_clock;                                                             \
-      fprintf(stderr, "[%s:%d]: " fmt "\n", __func__, __LINE__, __VA_ARGS__);  \
+      if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                   \
+        fprintf(stdout, "[%s:%d]: ", __func__, __LINE__);                      \
+      }                                                                        \
+      fprintf(stdout, fmt "\n", __VA_ARGS__);                                  \
     }                                                                          \
   } while (0)
 
