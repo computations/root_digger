@@ -676,7 +676,9 @@ model_t::suggest_roots(size_t min, double ratio) {
 }
 
 /* Optimize the substitution parameters by simulated annealing */
-root_location_t model_t::optimize_all(size_t min_roots, double root_ratio) {
+root_location_t model_t::optimize_all(size_t min_roots, double root_ratio,
+                                      double atol, double pgtol,
+                                      double factor) {
   double best_lh = -INFINITY;
   root_location_t best_rl;
   std::vector<model_params_t> initial_subst;
@@ -702,13 +704,10 @@ root_location_t model_t::optimize_all(size_t min_roots, double root_ratio) {
   size_t root_count = roots.size();
   size_t root_index = 0;
 
-  constexpr double atol = 1e-4;
-
   for (auto rl_pair : roots) {
     auto rl = rl_pair.first;
     ++root_index;
     debug_print(EMIT_LEVEL_INFO, "Root %lu/%lu", root_index, root_count);
-    // std::cout << "Root " << root_index << "/" << root_count << std::endl;
 
     move_root(rl);
     std::vector<model_params_t> subst_rates;
@@ -730,11 +729,9 @@ root_location_t model_t::optimize_all(size_t min_roots, double root_ratio) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
         debug_string(EMIT_LEVEL_INFO, "Optmizing Rates");
-        // std::cout << "Optimizing Rates" << std::endl;
-        bfgs_rates(subst_rates[i], rl, i);
+        bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_INFO, "Optimizing Freqs");
-        // std::cout << "Optimizing Freqs" << std::endl;
-        bfgs_freqs(freqs[i], rl, i);
+        bfgs_freqs(freqs[i], rl, i, pgtol, factor);
       }
 
       if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
@@ -908,16 +905,14 @@ double gd_params(model_params_t &initial_params, size_t partition_index,
 
 double
 bfgs_params(model_params_t &initial_params, size_t partition_index,
-            double p_min, double p_max, double epsilon,
-            std::function<double()> compute_lh,
+            double p_min, double p_max, double epsilon, double pgtol,
+            double factor, std::function<double()> compute_lh,
             std::function<void(size_t, const model_params_t &)> set_func) {
   int task = START;
   int n_params = static_cast<int>(initial_params.size());
   set_func(partition_index, initial_params);
   double score = compute_lh();
   double initial_score = score;
-  double factor = 1e4;
-  double pgtol = 1e-7;
   int csave;
   std::vector<double> gradient(n_params, 0.0);
   size_t max_corrections = 20;
@@ -944,8 +939,6 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
            gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
            &iprint, &csave, lsave, isave, dsave);
 
-    // std::cout << "BFGS Iter: " << iters << std::fixed << std::setprecision(2)
-    //<< " Score: " << score << std::endl;
     debug_print(EMIT_LEVEL_INFO, "BFGS Iter: %lu Score: %.5f", iters, -score);
 
     set_func(partition_index, parameters);
@@ -978,14 +971,15 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
 }
 
 double model_t::bfgs_rates(model_params_t &initial_rates,
-                           const root_location_t &rl, size_t partition_index) {
+                           const root_location_t &rl, size_t partition_index,
+                           double pgtol, double factor) {
 
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1e4;
   constexpr double epsilon = 1e-4;
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs params");
   return bfgs_params(
-      initial_rates, partition_index, p_min, p_max, epsilon,
+      initial_rates, partition_index, p_min, p_max, epsilon, pgtol, factor,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_subst_rates(pi, mp);
@@ -1008,7 +1002,8 @@ double model_t::gd_rates(model_params_t &initial_rates,
 }
 
 double model_t::bfgs_freqs(model_params_t &initial_freqs,
-                           const root_location_t &rl, size_t partition_index) {
+                           const root_location_t &rl, size_t partition_index,
+                           double pgtol, double factor) {
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
@@ -1017,7 +1012,7 @@ double model_t::bfgs_freqs(model_params_t &initial_freqs,
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs freqs");
   double lh = bfgs_params(
-      initial_freqs, partition_index, p_min, p_max, epsilon,
+      initial_freqs, partition_index, p_min, p_max, epsilon, pgtol, factor,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_freqs_all_free(pi, mp);

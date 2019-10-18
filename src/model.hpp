@@ -45,7 +45,10 @@ public:
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root, double atol);
   std::pair<root_location_t, double> optimize_root_location();
-  root_location_t optimize_all(size_t min_roots, double root_ratio);
+
+  root_location_t optimize_all(size_t min_roots, double root_ratio, double atol,
+                               double pgtol, double factor);
+
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
   void initialize_partitions(const std::vector<msa_t> &);
@@ -77,9 +80,9 @@ private:
   void set_freqs_all_free(size_t, model_params_t);
   void move_root(const root_location_t &new_root);
   double bfgs_rates(model_params_t &initial_rates, const root_location_t &rl,
-                    size_t partition_index);
+                    size_t partition_index, double pgtol, double factor);
   double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,
-                    size_t partition_index);
+                    size_t partition_index, double pgtol, double factor);
   double gd_rates(model_params_t &initial_rates, const root_location_t &rl,
                   size_t partition_index);
   double gd_freqs(model_params_t &initial_rates, const root_location_t &rl,
