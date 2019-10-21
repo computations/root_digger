@@ -112,7 +112,16 @@ class freq_params:
 
 
 class exp:
-    def __init__(self, root_path, run_iter, trees, aligns, seed=None):
+    def __init__(self,
+                 root_path,
+                 run_iter,
+                 trees,
+                 aligns,
+                 run_rd=True,
+                 run_iq=True,
+                 seed=None):
+        self._run_rd = run_rd
+        self._run_iq = run_iq
         self._run_iter = run_iter
         leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
         self._run_path = os.path.abspath(
@@ -253,9 +262,9 @@ class exp:
         self.set_iqtree_done('.')
 
     def run_exp(self, tree_filename, msa):
-        if not self.check_done_rd('.'):
+        if not self.check_done_rd('.') and self._run_rd:
             self.run_rd(tree_filename, msa)
-        if not self.check_done_iqtree('.'):
+        if not self.check_done_iqtree('.') and self._run_iq:
             self.run_iqtree(tree_filename, msa)
 
     def run_all(self):
@@ -285,9 +294,12 @@ class exp:
                     self.gen_indel_alignment(sites, freqs, subst, tree_file)
                     self.run_exp(tree_file, 'seqs_TRUE.phy')
                 exp_key = (tree_name, sites)
-                self._rd_results[exp_key] = rd_result(exp_dir, true_tree_ete)
-                self._iqtree_results[exp_key] = iqtree_result(
-                    exp_dir, true_tree_ete)
+                if self._run_rd:
+                    self._rd_results[exp_key] = rd_result(
+                        exp_dir, true_tree_ete)
+                if self._run_iq:
+                    self._iqtree_results[exp_key] = iqtree_result(
+                        exp_dir, true_tree_ete)
                 if exp_key not in self._exp_keys:
                     self._exp_keys.add(exp_key)
 
@@ -302,9 +314,12 @@ class exp:
                         SeqIO.write(align, align_file, 'fasta')
                     self.run_exp(tree_file, msa=align_filename)
                 exp_key = (tree_name, align_name)
-                self._rd_results[exp_key] = rd_result(exp_dir, true_tree_ete)
-                self._iqtree_results[exp_key] = iqtree_result(
-                    exp_dir, true_tree_ete)
+                if self._run_rd:
+                    self._rd_results[exp_key] = rd_result(
+                        exp_dir, true_tree_ete)
+                if self._run_iq:
+                    self._iqtree_results[exp_key] = iqtree_result(
+                        exp_dir, true_tree_ete)
                 if exp_key not in self._exp_keys:
                     self._exp_keys.add(exp_key)
 
@@ -326,10 +341,14 @@ class exp:
         return [str(s) for s in self._site_steps]
 
     def rd_results(self):
-        return self._rd_results
+        if self._run_rd:
+            return self._rd_results
+        return None
 
     def iqtree_results(self):
-        return self._iqtree_results
+        if self._run_iq:
+            return self._iqtree_results
+        return None
 
     def exp_keys(self):
         return self._exp_keys
@@ -408,7 +427,9 @@ class rd_result(result):
 
     @staticmethod
     def _read_lh(results):
-        return results[-4]
+        lh_string = results[-4]
+        start_index = lh_string.find(':') + 1
+        return float(lh_string[start_index:])
 
 
 class iqtree_result(result):
@@ -568,15 +589,21 @@ class summary:
 
     @staticmethod
     def _mean_attr(results, e, key):
-        return numpy.mean([getattr(r[e], key) for r in results])
+        if not None in results:
+            return numpy.mean([getattr(r[e], key) for r in results])
+        return None
 
     @staticmethod
     def _median_attr(results, e, key):
-        return numpy.median([getattr(r[e], key) for r in results])
+        if not None in results:
+            return numpy.median([getattr(r[e], key) for r in results])
+        return None
 
     @staticmethod
     def _stddev_attr(results, e, key):
-        return numpy.std([getattr(r[e], key) for r in results])
+        if not None in results:
+            return numpy.std([getattr(r[e], key) for r in results])
+        return None
 
     @staticmethod
     def _extract_exp_keys(experiments):
@@ -761,9 +788,21 @@ if __name__ == "__main__":
     parser.add_argument('--trees', nargs='+', type=str, required=True)
     parser.add_argument('--iters', type=int, required=True)
     parser.add_argument('--procs', type=int, default=None)
+    parser.add_argument('--atol', type=float, default=1e-4)
+    parser.add_argument('--factor', type=float, default=1e7)
+    parser.add_argument('--bfgstol', type=float, default=1e-4)
+    parser.add_argument('--run-rd', dest='runrd', action='store_true')
+    parser.add_argument('--run-iq-tree', dest='runiq', action='store_true')
+    parser.add_argument('--no-run-rd', dest='runrd', action='store_false')
+    parser.add_argument('--no-run-iq-tree', dest='runiq', action='store_false')
+    parser.set_defaults(runrd=True)
+    parser.set_defaults(runiq=True)
     args = parser.parse_args()
 
-    if not shutil.which("iqtree"):
+    RD += " --atol {atol} --factor {factor} --bfgstol {bfgstol}".format(
+        atol=args.atol, factor=args.factor, bfgstol=args.bfgstol)
+
+    if args.runiq and not shutil.which("iqtree"):
         print("Please add iqtree to your path")
         sys.exit()
 
@@ -798,7 +837,8 @@ if __name__ == "__main__":
     with directory_guard(exp_path):
         experiments = []
         for i in range(TOTAL_ITERS):
-            experiments.append(exp('.', i, trees, aligns))
+            experiments.append(
+                exp('.', i, trees, aligns, args.runrd, args.runiq))
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
