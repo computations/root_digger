@@ -102,9 +102,8 @@ void model_t::set_subst_rates_random(size_t p_index, size_t states) {
 }
 
 void model_t::set_gamma_rates(size_t p_index) {
-  constexpr size_t n_rate_cat = 1;
-  double rate_cats[n_rate_cat] = {0};
-  pll_compute_gamma_cats(1.0, n_rate_cat, rate_cats, PLL_GAMMA_RATES_MEAN);
+  double rate_cats[_n_rate_cats] = {0};
+  pll_compute_gamma_cats(1.0, _n_rate_cats, rate_cats, PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partitions[p_index], rate_cats);
 }
 
@@ -182,12 +181,6 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
     }
   }
 
-  /*
-   * Only one submodel will be used for the time being. If there is desire for
-   * more, we can add support for more models..
-   */
-  constexpr unsigned int submodels = 1;
-  constexpr unsigned int n_rate_cat = 1;
 
   unsigned int attributes = 0;
   if (PLL_STAT(avx2_present)) {
@@ -206,7 +199,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
     auto &msa = msas[partition_index];
     _partitions.push_back(pll_partition_create(
         _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
-        submodels, _tree.branch_count(), n_rate_cat, _tree.branch_count(),
+        _submodels, _tree.branch_count(), _n_rate_cats, _tree.branch_count(),
         attributes));
     _partition_weights.push_back(msa.total_weight());
   }
@@ -965,8 +958,10 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   }
   set_func(partition_index, parameters);
   score = compute_lh();
-  assert_string(initial_score >= score, "Failed to improve the likelihood");
-  std::swap(parameters, initial_params);
+  // assert_string(initial_score >= score, "Failed to improve the likelihood");
+  if (initial_score >= score) {
+    std::swap(parameters, initial_params);
+  }
   return score;
 }
 
