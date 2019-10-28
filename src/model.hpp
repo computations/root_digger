@@ -95,6 +95,12 @@ private:
   uint64_t _seed;
   double _temp_ratio;
   double _root_opt_frequency;
+  /*
+   * Only one submodel will be used for the time being. If there is desire for
+   * more, we can add support for more models..
+   */
+  static constexpr unsigned int _submodels = 1;
+  static constexpr unsigned int _n_rate_cats = 1;
 };
 
 #endif
