@@ -42,8 +42,7 @@ void print_run_header(
     uint64_t seed) {
   time_t st = std::chrono::system_clock::to_time_t(start_time);
   char time_string[256];
-  std::strftime(time_string, sizeof(time_string), "%F %T",
-                 std::localtime(&st));
+  std::strftime(time_string, sizeof(time_string), "%F %T", std::localtime(&st));
   // std::cout << "Runing Root Digger \n";
   debug_string(EMIT_LEVEL_IMPORTANT, "Running Root Digger");
   print_version();
@@ -134,7 +133,7 @@ int main(int argv, char **argc) {
     uint64_t seed = std::random_device()();
     size_t min_roots = 1;
     double root_ratio = 0.01;
-    double abs_tolerance = 1e-4;
+    double abs_tolerance = 1e-7;
     double factor = 1e4;
     double bfgs_tol = 1e-7;
     unsigned int states = 0;
