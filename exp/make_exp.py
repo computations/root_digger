@@ -291,7 +291,7 @@ class exp:
         for tree_name in self._tree_names:
             tree_file = os.path.join(self._run_path, str(tree_name) + ".tree")
             rtree_file = os.path.join(self._run_path, str(tree_name) + ".rtree")
-            with open(tree_file) as tf:
+            with open(rtree_file) as tf:
                 true_tree_newick = tf.read()
                 true_tree_ete = ete3.Tree(true_tree_newick)
             for sites in self._site_steps:
