@@ -13,6 +13,7 @@ import string
 import subprocess
 import sys
 import json
+import itertools
 
 import Bio
 import ete3
@@ -154,7 +155,8 @@ class exp:
                 for n in t.traverse():
                     n.dist = numpy.random.exponential(0.1) + 0.005
                 with open(os.path.join(self._run_path,
-                                       str(tree) + ".rtree"), 'w') as tree_file:
+                                       str(tree) + ".rtree"),
+                          'w') as tree_file:
                     tree_file.write(t.write(format=5))
                 t.unroot()
                 with open(os.path.join(self._run_path,
@@ -167,7 +169,7 @@ class exp:
                 tree_filename = os.path.join(self._run_path,
                                              str(tree_name) + ".tree")
                 rtree_filename = os.path.join(self._run_path,
-                                             str(tree_name) + ".rtree")
+                                              str(tree_name) + ".rtree")
                 unrooted_tree = tree.copy()
                 with open(rtree_filename, 'w') as tree_file:
                     tree_file.write(unrooted_tree.write(format=5))
@@ -290,7 +292,8 @@ class exp:
 
         for tree_name in self._tree_names:
             tree_file = os.path.join(self._run_path, str(tree_name) + ".tree")
-            rtree_file = os.path.join(self._run_path, str(tree_name) + ".rtree")
+            rtree_file = os.path.join(self._run_path,
+                                      str(tree_name) + ".rtree")
             with open(rtree_file) as tf:
                 true_tree_newick = tf.read()
                 true_tree_ete = ete3.Tree(true_tree_newick)
@@ -393,6 +396,14 @@ class result:
         return self._normalized_path_distance
 
     @property
+    def right_clade_list(self):
+        return self.get_right_clade_list(self._tree)
+
+    @property
+    def left_clade_list(self):
+        return self.get_left_clade_list(self._tree)
+
+    @property
     def right_clade(self):
         return self._right_clade
 
@@ -424,6 +435,20 @@ class result:
             'right_clade': self.right_clade,
             'left_clade': self.left_clade,
         }
+
+    @staticmethod
+    def get_left_clade_list(tree):
+        return sorted([
+            n.name for n in tree.get_tree_root().children[0].traverse()
+            if n.name != ''
+        ])
+
+    @staticmethod
+    def get_right_clade_list(tree):
+        return sorted([
+            n.name for n in tree.get_tree_root().children[1].traverse()
+            if n.name != ''
+        ])
 
     @staticmethod
     def get_left_clade(tree):
@@ -525,8 +550,11 @@ class summary_row:
         return ','.join([str(s) for s in self.make_line(header)])
 
     def make_line(self, header):
-        return [self._values[h] if type(self._values[h]) != dict else
-                json.dumps(self._values[h]) for h in header]
+        return [
+            self._values[h] if type(self._values[h]) != dict
+            and type(self._values[h]) != list else json.dumps(self._values[h])
+            for h in header
+        ]
 
     def dict(self):
         return self._values
@@ -534,9 +562,9 @@ class summary_row:
 
 class summary:
     def __init__(self, experiments):
-        self._experiments=summary._extract_exp_keys(experiments)
-        self._rd_results=[e.rd_results() for e in experiments]
-        self._iq_results=[e.iqtree_results() for e in experiments]
+        self._experiments = summary._extract_exp_keys(experiments)
+        self._rd_results = [e.rd_results() for e in experiments]
+        self._iq_results = [e.iqtree_results() for e in experiments]
 
     def make_header(self):
         return [
@@ -567,34 +595,38 @@ class summary:
         ]
 
     def write(self, prefix):
-        csv_filename=prefix + '.csv'
-        header=self.make_header()
+        csv_filename = prefix + '.csv'
+        header = self.make_header()
         with open(csv_filename, 'w') as results_file:
             results_file.write(','.join(header))
             results_file.write('\n')
             for row in self.generate_rows():
                 results_file.write(row.make_row(header))
                 results_file.write('\n')
-        json_filename=prefix + '.json'
+        json_filename = prefix + '.json'
         with open(json_filename, 'w') as results_file:
-            json.dump([r.dict() for r in self.generate_rows(true_tree=True)], results_file)
+            json.dump([r.dict() for r in self.generate_rows(json=True)],
+                      results_file)
 
-    def generate_rows(self, true_tree=False):
+    def generate_rows(self, json=False):
         for k in self._experiments:
-            stats={}
-            stats['time_mean']=self.mean_times(k)
-            stats['time_median']=self.median_times(k)
-            stats['time_std']=self.std_times(k)
-            stats['root_distance_mean']=self.mean_root_distance(k)
-            stats['root_distance_median']=self.median_root_distance(k)
-            stats['root_distance_std']=self.std_root_distance(k)
-            stats['path_distance_mean']=self.mean_root_distance(k)
-            stats['path_distance_median']=self.median_root_distance(k)
-            stats['path_distance_std']=self.std_root_distance(k)
-            stats['left_clade']=self.left_clades(k)
-            stats['right_clade']=self.right_clades(k)
-            if true_tree:
-                stats['true_tree']=self.true_tree(k)
+            stats = {}
+            stats['time_mean'] = self.mean_times(k)
+            stats['time_median'] = self.median_times(k)
+            stats['time_std'] = self.std_times(k)
+            stats['root_distance_mean'] = self.mean_root_distance(k)
+            stats['root_distance_median'] = self.median_root_distance(k)
+            stats['root_distance_std'] = self.std_root_distance(k)
+            stats['path_distance_mean'] = self.mean_root_distance(k)
+            stats['path_distance_median'] = self.median_root_distance(k)
+            stats['path_distance_std'] = self.std_root_distance(k)
+            if json:
+                stats['true_tree'] = self.true_tree(k)
+                stats['left_clade'] = self.left_clades_list(k)
+                stats['right_clade'] = self.right_clades_list(k)
+            else:
+                stats['left_clade'] = self.left_clades(k)
+                stats['right_clade'] = self.right_clades(k)
             yield summary_row(k, stats)
 
     def true_tree(self, k):
@@ -668,16 +700,40 @@ class summary:
             'iq': summary._count_values(self._iq_results, k, 'right_clade'),
         }
 
+    def left_clades_list(self, k):
+        return {
+            'rd': summary._create_list(self._rd_results, k, 'left_clade_list'),
+            'iq': summary._create_list(self._iq_results, k, 'left_clade_list'),
+        }
+
+    def right_clades_list(self, k):
+        return {
+            'rd': summary._create_list(self._rd_results, k,
+                                       'right_clade_list'),
+            'iq': summary._create_list(self._iq_results, k,
+                                       'right_clade_list'),
+        }
+
+    @staticmethod
+    def _create_list(results, e, key):
+        if not None in results:
+            items = []
+            for r in results:
+                k = getattr(r[e], key)
+                items.append(k)
+            return items
+        return None
+
     @staticmethod
     def _count_values(results, e, key):
         if not None in results:
-            counts={}
+            counts = {}
             for r in results:
-                k=getattr(r[e], key)
+                k = getattr(r[e], key)
                 if k in counts:
                     counts[k] += 1
                 else:
-                    counts[k]=1
+                    counts[k] = 1
             return counts
         return None
 
@@ -701,9 +757,9 @@ class summary:
 
     @staticmethod
     def _extract_exp_keys(experiments):
-        keys=set()
+        keys = set()
         for e in experiments:
-            keys=keys | e.exp_keys()
+            keys = keys | e.exp_keys()
         return keys
 
 
@@ -716,8 +772,8 @@ def tree_map(tree_names, trees):
 
 
 def get_root_clades(tree):
-    left_clade=get_left_clade(tree)
-    right_clade=get_right_clade(tree)
+    left_clade = get_left_clade(tree)
+    right_clade = get_right_clade(tree)
     return (left_clade, right_clade)
 
 
@@ -728,10 +784,10 @@ def extract_node_with_clade(tree, clade):
 
 
 def get_mapped_node(true_tree, inferred_tree):
-    left_clade, right_clade=get_root_clades(inferred_tree)
+    left_clade, right_clade = get_root_clades(inferred_tree)
 
-    left_node=extract_node_with_clade(true_tree, left_clade)
-    right_node=extract_node_with_clade(true_tree, right_clade)
+    left_node = extract_node_with_clade(true_tree, left_clade)
+    right_node = extract_node_with_clade(true_tree, right_clade)
 
     if left_node == right_node:
         return left_node
@@ -751,106 +807,81 @@ def get_mapped_node(true_tree, inferred_tree):
 
 
 def get_root_distance_metric(true_tree, inferred_tree):
-    common_node_tt, _=true_tree.get_closest_leaf()
-    common_node_it=inferred_tree & common_node_tt.name
-    cn_tt_dist=true_tree.get_distance(common_node_tt,
+    common_node_tt, _ = true_tree.get_closest_leaf()
+    common_node_it = inferred_tree & common_node_tt.name
+    cn_tt_dist = true_tree.get_distance(common_node_tt,
                                         true_tree.get_tree_root())
-    cn_it_dist=inferred_tree.get_distance(common_node_it,
+    cn_it_dist = inferred_tree.get_distance(common_node_it,
                                             inferred_tree.get_tree_root())
     return numpy.abs(cn_tt_dist - cn_it_dist)
 
 
 def get_root_distance_toplogical(true_tree, inferred_tree):
-    common_node_tt, _=true_tree.get_closest_leaf()
-    common_node_it=inferred_tree & common_node_tt.name
-    cn_tt_dist=true_tree.get_distance(common_node_tt,
+    common_node_tt, _ = true_tree.get_closest_leaf()
+    common_node_it = inferred_tree & common_node_tt.name
+    cn_tt_dist = true_tree.get_distance(common_node_tt,
                                         true_tree.get_tree_root(),
                                         topology_only=True)
-    cn_it_dist=inferred_tree.get_distance(common_node_it,
+    cn_it_dist = inferred_tree.get_distance(common_node_it,
                                             inferred_tree.get_tree_root(),
                                             topology_only=True)
     return numpy.abs(cn_tt_dist - cn_it_dist)
 
 
-def map_root_onto_main(tree_names, trees, site_steps, aligns):
-    leading_zeroes=math.ceil(math.log10(TOTAL_ITERS))
-    for tn, true_tree in zip(tree_names, trees):
-        if type(true_tree) != ete3.Tree:
-            continue
-        for sites in site_steps:
-            for n in true_tree.traverse():
-                n.add_features(root_placement_rd=0)
-                n.add_features(root_placement_iqtree=0)
-            for i in range(TOTAL_ITERS):
-                result_tree_file_rd=os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{sites}sites".format(taxa=tn,
-                                                     sites=sites), "rd_output")
-                result_tree_file_iqtree=os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{sites}sites".format(taxa=tn, sites=sites),
-                    "seqs_TRUE.phy.treefile")
-                with open(result_tree_file_rd) as infile:
-                    result_tree_rd=ete3.Tree(infile.readline())
-                with open(result_tree_file_iqtree) as infile:
-                    result_tree_iqtree=ete3.Tree(infile.readline())
-                clade_rd=get_mapped_node(true_tree, result_tree_rd)
-                clade_iqtree=get_mapped_node(true_tree, result_tree_iqtree)
+def extract_node_with_clade(tree, clade):
+    if len(clade) == 1:
+        return (tree & clade[0])
+    return tree.get_common_ancestor(clade)
 
-                clade_rd.root_placement_rd += 1
-                clade_iqtree.root_placement_iqtree += 1
-            with open(
-                    "{tree_name}tree_{sites}sites_mapped_tree".format(
-                        tree_name=tn, sites=sites), 'w') as outfile:
-                outfile.write(
-                    true_tree.write(format=9,
-                                    features=[
-                                        'root_placement_rd',
-                                        'root_placement_iqtree'
-                                    ]))
 
-        for align in aligns:
-            for n in true_tree.traverse():
-                n.add_features(root_placement_rd=0)
-                n.add_features(root_placement_iqtree=0)
-            for i in range(TOTAL_ITERS):
-                result_tree_file_rd=os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{align}align".format(taxa=tn,
-                                                     align=align), "rd_output")
-                result_tree_file_iqtree=os.path.join(
-                    RUN_TEMPLATE.format(leading_zeroes=leading_zeroes,
-                                        run_iter=i),
-                    "{taxa}tree_{align}align".format(taxa=tn, align=align),
-                    "{align}.fasta.treefile".format(align=align))
-                with open(result_tree_file_rd) as infile:
-                    result_tree_rd=ete3.Tree(infile.readline())
-                with open(result_tree_file_iqtree) as infile:
-                    result_tree_iqtree=ete3.Tree(infile.readline())
-                clade_rd=get_mapped_node(true_tree, result_tree_rd)
-                clade_iqtree=get_mapped_node(true_tree, result_tree_iqtree)
+def map_root_rd(true_tree, left_clades, right_clades):
+    for clade in itertools.chain(left_clades, right_clades):
+        node = extract_node_with_clade(true_tree, clade)
+        if not hasattr(node, 'rd_map'):
+            node.add_features(rd_map=1)
+        else:
+            node.rd_map += 1
 
-                clade_rd.root_placement_rd += 1
-                clade_iqtree.root_placement_iqtree += 1
-            with open(
-                    "{tree_name}tree_{align}align_mapped_tree".format(
-                        tree_name=tn, align=align), 'w') as outfile:
-                outfile.write(
-                    true_tree.write(format=9,
-                                    features=[
-                                        'root_placement_rd',
-                                        'root_placement_iqtree'
-                                    ]))
+def map_root_iq(true_tree, left_clades, right_clades):
+    for clade in itertools.chain(left_clades, right_clades):
+        node = extract_node_with_clade(true_tree, clade)
+        if not hasattr(node, 'iq_map'):
+            node.add_features(iq_map=1)
+        else:
+            node.iq_map += 1
+
+
+def produce_mapped_root_images(json_results_filename):
+    with open(json_results_filename) as json_file:
+        results = json.load(json_file)
+    for result in results:
+        mapped_tree = ete3.Tree(result['true_tree'])
+        map_root_rd(mapped_tree, result['rd_left_clade'],
+                    result['rd_right_clade'])
+        map_root_iq(mapped_tree, result['iq_left_clade'],
+                    result['iq_right_clade'])
+
+        def layout(node):
+            rd_label = ete3.faces.TextFace(str(node.rd_map) if hasattr(node,
+                'rd_map') else (0), fgcolor='Green')
+            iq_label = ete3.faces.TextFace(str(node.iq_map) if hasattr(node,
+                'iq_map') else (0), fgcolor='Red')
+            node.add_face(rd_label, column=0)
+            node.add_face(iq_label, column=0)
+
+        ts = ete3.TreeStyle()
+        ts.layout_fn = layout
+        ts.show_leaf_name = False
+        tree_image_name = "{taxa}_{align}.png".format(
+            taxa=result['tree'], align=result['alignment'])
+        mapped_tree.render(tree_image_name, tree_style=ts)
 
 
 def base26_encode(index, maximum):
     if index == 0:
         return 'a'
-    iters=math.ceil(math.log(maximum, 26))
-    bases=[
+    iters = math.ceil(math.log(maximum, 26))
+    bases = [
         string.ascii_lowercase[(index % (26**(e + 1))) // (26**e)]
         for e in range(iters)
     ]
@@ -859,7 +890,7 @@ def base26_encode(index, maximum):
 
 
 if __name__ == "__main__":
-    parser=argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument('--path',
                         type=str,
                         help='Path to store the exp',
@@ -877,7 +908,7 @@ if __name__ == "__main__":
     parser.add_argument('--no-run-iq-tree', dest='runiq', action='store_false')
     parser.set_defaults(runrd=True)
     parser.set_defaults(runiq=True)
-    args=parser.parse_args()
+    args = parser.parse_args()
 
     RD += " --atol {atol} --factor {factor} --bfgstol {bfgstol}".format(
         atol=args.atol, factor=args.factor, bfgstol=args.bfgstol)
@@ -886,7 +917,7 @@ if __name__ == "__main__":
         print("Please add iqtree to your path")
         sys.exit()
 
-    trees=[]
+    trees = []
     for tree in args.trees:
         try:
             trees.append(int(tree))
@@ -894,7 +925,7 @@ if __name__ == "__main__":
             with open(tree) as tree_file:
                 trees.extend([ete3.Tree(s) for s in tree_file])
 
-    aligns=[]
+    aligns = []
     for align in args.msa:
         try:
             if not shutil.which("indelible"):
@@ -906,16 +937,16 @@ if __name__ == "__main__":
                 list(SeqIO.parse(align,
                                  os.path.splitext(align)[1].strip('.'))))
 
-    exp_path=os.path.abspath(args.path)
-    TOTAL_ITERS=args.iters
+    exp_path = os.path.abspath(args.path)
+    TOTAL_ITERS = args.iters
 
-    PROGRESS_BAR=progressbar.ProgressBar(max_value=TOTAL_ITERS)
+    PROGRESS_BAR = progressbar.ProgressBar(max_value=TOTAL_ITERS)
 
     if not os.path.exists(exp_path):
         os.mkdir(exp_path)
 
     with directory_guard(exp_path):
-        experiments=[]
+        experiments = []
         for i in range(TOTAL_ITERS):
             experiments.append(
                 exp('.', i, trees, aligns, args.runrd, args.runiq))
@@ -923,6 +954,7 @@ if __name__ == "__main__":
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
         with multiprocessing.Pool(args.procs) as tp:
-            finished_exp=tp.map(exp.run_all, experiments)
-        experiment_summary=summary(finished_exp)
+            finished_exp = tp.map(exp.run_all, experiments)
+        experiment_summary = summary(finished_exp)
         experiment_summary.write('test_results')
+        produce_mapped_root_images('test_results.json')
