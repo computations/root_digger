@@ -544,7 +544,7 @@ class summary_row:
                 self._values[rd_key] = stat_value['rd']
                 self._values[iq_key] = stat_value['iq']
             else:
-                self._values['true_tree'] = stat_value.write()
+                self._values['true_tree'] = stat_value.write(format=5)
 
     def make_row(self, header):
         return ','.join([str(s) for s in self.make_line(header)])
@@ -828,23 +828,36 @@ def get_root_distance_toplogical(true_tree, inferred_tree):
     return numpy.abs(cn_tt_dist - cn_it_dist)
 
 
-def extract_node_with_clade(tree, clade):
-    if len(clade) == 1:
-        return (tree & clade[0])
+def extract_node_with_clade_pair(tree, clade_pair):
+    if len(clade_pair[0]) == 1:
+        return (tree & clade_pair[0][0])
+    if len(clade_pair[1]) == 1:
+        return (tree & clade_pair[1][0])
+    clade = clade_pair[0] if len(clade_pair[0]) <= len(clade_pair[1]) else\
+        clade_pair[1]
+    ca0 = tree.get_common_ancestor(clade_pair[0])
+    ca1 = tree.get_common_ancestor(clade_pair[1])
+    if ca0 in tree.children and ca1 in tree.children:
+        return tree
     return tree.get_common_ancestor(clade)
 
 
 def map_root_rd(true_tree, left_clades, right_clades):
-    for clade in itertools.chain(left_clades, right_clades):
-        node = extract_node_with_clade(true_tree, clade)
+    for clade_pair in zip(left_clades, right_clades):
+        node = extract_node_with_clade_pair(true_tree, clade_pair)
+        if node is None:
+            continue
         if not hasattr(node, 'rd_map'):
             node.add_features(rd_map=1)
         else:
             node.rd_map += 1
 
+
 def map_root_iq(true_tree, left_clades, right_clades):
-    for clade in itertools.chain(left_clades, right_clades):
-        node = extract_node_with_clade(true_tree, clade)
+    for clade_pair in zip(left_clades, right_clades):
+        node = extract_node_with_clade_pair(true_tree, clade_pair)
+        if node is None:
+            continue
         if not hasattr(node, 'iq_map'):
             node.add_features(iq_map=1)
         else:
@@ -855,17 +868,19 @@ def produce_mapped_root_images(json_results_filename):
     with open(json_results_filename) as json_file:
         results = json.load(json_file)
     for result in results:
-        mapped_tree = ete3.Tree(result['true_tree'])
+        mapped_tree = ete3.Tree(result['true_tree'], format=5)
         map_root_rd(mapped_tree, result['rd_left_clade'],
                     result['rd_right_clade'])
         map_root_iq(mapped_tree, result['iq_left_clade'],
                     result['iq_right_clade'])
 
         def layout(node):
-            rd_label = ete3.faces.TextFace(str(node.rd_map) if hasattr(node,
-                'rd_map') else (0), fgcolor='Green')
-            iq_label = ete3.faces.TextFace(str(node.iq_map) if hasattr(node,
-                'iq_map') else (0), fgcolor='Red')
+            rd_label = ete3.faces.TextFace(
+                str(node.rd_map) if hasattr(node, 'rd_map') else (0),
+                fgcolor='Green')
+            iq_label = ete3.faces.TextFace(
+                str(node.iq_map) if hasattr(node, 'iq_map') else (0),
+                fgcolor='Red')
             node.add_face(rd_label, column=0)
             node.add_face(iq_label, column=0)
 
