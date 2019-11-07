@@ -311,7 +311,7 @@ class exp:
                         exp_dir, true_tree_ete)
                 if self._run_iq:
                     self._iqtree_results[exp_key] = iqtree_result(
-                        exp_dir, true_tree_ete)
+                        exp_dir, true_tree_ete, 'seqs_TRUE.phy')
                 if exp_key not in self._exp_keys:
                     self._exp_keys.add(exp_key)
 
@@ -331,7 +331,7 @@ class exp:
                         exp_dir, true_tree_ete)
                 if self._run_iq:
                     self._iqtree_results[exp_key] = iqtree_result(
-                        exp_dir, true_tree_ete)
+                        exp_dir, true_tree_ete, align_filename)
                 if exp_key not in self._exp_keys:
                     self._exp_keys.add(exp_key)
 
@@ -500,11 +500,11 @@ class rd_result(result):
 
 
 class iqtree_result(result):
-    def __init__(self, directory, true_tree):
+    def __init__(self, directory, true_tree, prefix):
         with directory_guard(directory):
-            with open('seqs_TRUE.phy.treefile') as tree_file:
+            with open('{}.treefile'.format(prefix)) as tree_file:
                 self._tree = iqtree_result._read_tree(tree_file.read())
-            with open('seqs_TRUE.phy.iqtree') as iqtree_file:
+            with open('{}.iqtree'.format(prefix)) as iqtree_file:
                 for line in iqtree_file:
                     if 'Log-likelihood of the tree:' in line:
                         self._final_lh = iqtree_result._read_lh(line)
