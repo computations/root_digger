@@ -181,7 +181,6 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
     }
   }
 
-
   unsigned int attributes = 0;
   if (PLL_STAT(avx2_present)) {
     attributes |= PLL_ATTRIB_ARCH_AVX2;
@@ -668,6 +667,20 @@ model_t::suggest_roots(size_t min, double ratio) {
   return rl_lhs;
 }
 
+std::vector<root_location_t> model_t::suggest_roots_random(size_t min,
+                                                           double ratio) {
+  std::vector<root_location_t> random_roots;
+  size_t root_count =
+      std::max(static_cast<size_t>(_tree.root_count() * ratio), min);
+  random_roots.reserve(root_count);
+  std::uniform_int_distribution<size_t> dis(0, _tree.root_count() - 1);
+  for (size_t i = 0; i < root_count; ++i) {
+    size_t root_choice_index = dis(_random_engine);
+    random_roots.emplace_back(_tree.root_location(root_choice_index));
+  }
+  return random_roots;
+}
+
 /* Optimize the substitution parameters by simulated annealing */
 root_location_t model_t::optimize_all(size_t min_roots, double root_ratio,
                                       double atol, double pgtol,
@@ -693,12 +706,13 @@ root_location_t model_t::optimize_all(size_t min_roots, double root_ratio,
 
   set_subst_rates_uniform();
   set_empirical_freqs();
-  auto roots = suggest_roots(min_roots, root_ratio);
+  auto roots = suggest_roots_random(min_roots, root_ratio);
   size_t root_count = roots.size();
   size_t root_index = 0;
 
-  for (auto rl_pair : roots) {
-    auto rl = rl_pair.first;
+  for (auto rl : roots) {
+    set_subst_rates_uniform();
+    set_empirical_freqs();
     ++root_index;
     debug_print(EMIT_LEVEL_INFO, "Root %lu/%lu", root_index, root_count);
 
@@ -717,7 +731,7 @@ root_location_t model_t::optimize_all(size_t min_roots, double root_ratio,
     auto cur_best_rl = rl;
     double cur_best_lh = -INFINITY;
 
-    for (size_t iter = 0; iter < 10; ++iter) {
+    for (size_t iter = 0; iter < 1e3; ++iter) {
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
@@ -732,13 +746,16 @@ root_location_t model_t::optimize_all(size_t min_roots, double root_ratio,
       }
 
       debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
-      // std::cout << "Optimizing Root Location" << std::endl;
       auto cur = optimize_root_location();
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur.second);
-      // std::cout << "Iteration " << iter << " LH: " << cur.second <<
-      // std::endl;
 
+      if (rl.edge == cur.first.edge &&
+          fabs(rl.brlen_ratio - cur.first.brlen_ratio) < atol) {
+        cur_best_rl = cur.first;
+        cur_best_lh = cur.second;
+        break;
+      }
       if (fabs(cur.second - cur_best_lh) < atol) {
         cur_best_rl = cur.first;
         cur_best_lh = cur.second;
