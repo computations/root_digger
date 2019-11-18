@@ -132,7 +132,7 @@ int main(int argv, char **argc) {
     std::string partition_filename;
     uint64_t seed = std::random_device()();
     size_t min_roots = 1;
-    double root_ratio = 0.01;
+    double root_ratio = 0.05;
     double abs_tolerance = 1e-7;
     double factor = 1e4;
     double bfgs_tol = 1e-7;

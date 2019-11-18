@@ -29,7 +29,7 @@ extern int __VERBOSE__;
 
 #define print_clock                                                            \
   do {                                                                         \
-    fprintf(stdout, "[%f] ",                                                   \
+    fprintf(stdout, "[%.2f] ",                                                   \
             ((double)clock() - CLOCK_START) / CLOCKS_PER_SEC);                 \
   } while (0)
 
