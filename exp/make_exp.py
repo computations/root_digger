@@ -864,25 +864,30 @@ def map_root_iq(true_tree, left_clades, right_clades):
             node.iq_map += 1
 
 
-def produce_mapped_root_images(json_results_filename):
+def produce_mapped_root_images(json_results_filename, map_iqtree=True,
+        map_rd=True):
     with open(json_results_filename) as json_file:
         results = json.load(json_file)
     for result in results:
         mapped_tree = ete3.Tree(result['true_tree'], format=5)
-        map_root_rd(mapped_tree, result['rd_left_clade'],
-                    result['rd_right_clade'])
-        map_root_iq(mapped_tree, result['iq_left_clade'],
-                    result['iq_right_clade'])
+        if map_rd:
+            map_root_rd(mapped_tree, result['rd_left_clade'],
+                        result['rd_right_clade'])
+        if map_iqtree:
+            map_root_iq(mapped_tree, result['iq_left_clade'],
+                        result['iq_right_clade'])
 
         def layout(node):
-            rd_label = ete3.faces.TextFace(
-                str(node.rd_map) if hasattr(node, 'rd_map') else (0),
-                fgcolor='Green')
-            iq_label = ete3.faces.TextFace(
-                str(node.iq_map) if hasattr(node, 'iq_map') else (0),
-                fgcolor='Red')
-            node.add_face(rd_label, column=0)
-            node.add_face(iq_label, column=0)
+            if map_rd:
+                rd_label = ete3.faces.TextFace(
+                    str(node.rd_map) if hasattr(node, 'rd_map') else (0),
+                    fgcolor='Green')
+                node.add_face(rd_label, column=0)
+            if map_iqtree:
+                iq_label = ete3.faces.TextFace(
+                    str(node.iq_map) if hasattr(node, 'iq_map') else (0),
+                    fgcolor='Red')
+                node.add_face(iq_label, column=0)
 
         ts = ete3.TreeStyle()
         ts.layout_fn = layout
@@ -972,4 +977,4 @@ if __name__ == "__main__":
             finished_exp = tp.map(exp.run_all, experiments)
         experiment_summary = summary(finished_exp)
         experiment_summary.write('test_results')
-        produce_mapped_root_images('test_results.json')
+        produce_mapped_root_images('test_results.json', args.runiq, args.runrd)
