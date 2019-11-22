@@ -46,8 +46,13 @@ public:
   root_location_t optimize_alpha(const root_location_t &root, double atol);
   std::pair<root_location_t, double> optimize_root_location();
 
-  root_location_t optimize_all(size_t min_roots, double root_ratio, double atol,
-                               double pgtol, double factor);
+  std::pair<root_location_t, double> optimize_all(size_t min_roots,
+                                                  double root_ratio,
+                                                  double atol, double pgtol,
+                                                  double factor);
+
+  std::pair<root_location_t, double>
+  exhaustive_search(double atol, double pgtol, double factor);
 
   const rooted_tree_t &rooted_tree(const root_location_t &root);
 
@@ -58,8 +63,7 @@ public:
   std::vector<std::pair<root_location_t, double>> suggest_roots();
   std::vector<std::pair<root_location_t, double>> suggest_roots(size_t min,
                                                                 double ratio);
-  std::vector<root_location_t> suggest_roots_random(size_t min,
-                                                             double ratio);
+  std::vector<root_location_t> suggest_roots_random(size_t min, double ratio);
   std::vector<double> compute_all_root_lh();
   void set_subst_rates(size_t, const model_params_t &);
   void set_freqs(size_t, const model_params_t &);

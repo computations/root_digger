@@ -95,6 +95,10 @@ public:
   std::string newick() const;
 
   void show_tree() const;
+  void annotate_node(const root_location_t &rl, const std::string &key,
+                     const std::string &value);
+  void annotate_node(size_t node_id, const std::string &key,
+                     const std::string &value);
 
 private:
   void generate_root_locations();
@@ -108,6 +112,9 @@ private:
   pll_utree_t *_tree;
   root_location_t _current_rl;
   std::vector<root_location_t> _roots;
+  std::unordered_map<pll_unode_t *,
+                     std::vector<std::pair<std::string, std::string>>>
+      _root_annotations;
 };
 
 #endif
