@@ -112,9 +112,10 @@ int main(int argv, char **argc) {
       {"bfgstol", required_argument, 0, 0},    /* 11 */
       {"factor", required_argument, 0, 0},     /* 12 */
       {"partition", required_argument, 0, 0},  /* 13 */
-      {"force", no_argument, 0, 0},            /* 14 */
-      {"version", no_argument, 0, 0},          /* 15 */
-      {"debug", no_argument, 0, 0},            /* 15 */
+      {"exhaustive", no_argument, 0, 0},       /* 14 */
+      {"force", no_argument, 0, 0},            /* 15 */
+      {"version", no_argument, 0, 0},          /* 16 */
+      {"debug", no_argument, 0, 0},            /* 17 */
       {0, 0, 0, 0},
   };
 
@@ -139,6 +140,7 @@ int main(int argv, char **argc) {
     unsigned int states = 0;
     bool silent = false;
     bool sanity_checks = true;
+    bool exhaustive = false;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       debug_print(EMIT_LEVEL_DEBUG, "parsing option index: %d", index);
       switch (index) {
@@ -186,12 +188,15 @@ int main(int argv, char **argc) {
         partition_filename = optarg;
         break;
       case 14: // force
+        exhaustive = true;
+        break;
+      case 15: // force
         sanity_checks = false;
         break;
-      case 15: // version
+      case 16: // version
         print_version();
         return 0;
-      case 16: // debug
+      case 17: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
       default:
@@ -259,22 +264,25 @@ int main(int argv, char **argc) {
       }
     }
 
-    std::string final_tree_string;
-    double final_lh = -INFINITY;
-
     model_t model{tree, msa, seed};
     try {
       model.initialize_partitions(msa);
     } catch (const invalid_empirical_frequencies_exception &) {
       model.initialize_partitions_uniform_freqs(msa);
     }
-    auto rl = model.optimize_all(min_roots, root_ratio, abs_tolerance, bfgs_tol,
-                                 factor);
-    double lh = model.compute_lh(rl);
-    if (lh > final_lh) {
-      final_tree_string = model.rooted_tree(rl).newick();
-      final_lh = lh;
+    root_location_t final_rl;
+    double final_lh;
+    if (!exhaustive) {
+      auto tmp = model.optimize_all(min_roots, root_ratio, abs_tolerance,
+                                    bfgs_tol, factor);
+      final_rl = tmp.first;
+      final_lh = tmp.second;
+    } else {
+      auto tmp = model.exhaustive_search(abs_tolerance, bfgs_tol, factor);
+      final_rl = tmp.first;
+      final_lh = tmp.second;
     }
+    std::string final_tree_string{model.rooted_tree(final_rl).newick()};
     if (!silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }

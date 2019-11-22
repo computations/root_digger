@@ -682,9 +682,9 @@ std::vector<root_location_t> model_t::suggest_roots_random(size_t min,
 }
 
 /* Optimize the substitution parameters by simulated annealing */
-root_location_t model_t::optimize_all(size_t min_roots, double root_ratio,
-                                      double atol, double pgtol,
-                                      double factor) {
+std::pair<root_location_t, double>
+model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
+                      double pgtol, double factor) {
   double best_lh = -INFINITY;
   root_location_t best_rl;
   std::vector<model_params_t> initial_subst;
@@ -775,7 +775,7 @@ root_location_t model_t::optimize_all(size_t min_roots, double root_ratio,
       best_lh = cur_best_lh;
     }
   }
-  return best_rl;
+  return {best_rl, best_lh};
 }
 
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
@@ -949,7 +949,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
            gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
            &iprint, &csave, lsave, isave, dsave);
 
-    debug_print(EMIT_LEVEL_INFO, "BFGS Iter: %lu Score: %.5f", iters, -score);
+    debug_print(EMIT_LEVEL_DEBUG, "BFGS Iter: %lu Score: %.5f", iters, -score);
 
     set_func(partition_index, parameters);
     score = compute_lh();
@@ -1076,4 +1076,83 @@ void model_t::set_empirical_freqs() {
   for (size_t i = 0; i < _partitions.size(); ++i) {
     set_empirical_freqs(i);
   }
+}
+
+std::pair<root_location_t, double>
+model_t::exhaustive_search(double atol, double pgtol, double factor) {
+  size_t root_index = 0;
+  root_location_t best_rl;
+  double best_lh = -INFINITY;
+  size_t root_count = _tree.root_count();
+  for (auto rl : _tree.roots()) {
+    set_subst_rates_uniform();
+    set_empirical_freqs();
+    ++root_index;
+
+    move_root(rl);
+    std::vector<model_params_t> subst_rates;
+    std::vector<model_params_t> freqs;
+
+    for (size_t p = 0; p < _partitions.size(); ++p) {
+      size_t subst_size = _partitions[p]->states;
+      subst_size = subst_size * subst_size - subst_size;
+      freqs.push_back(
+          model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
+      subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
+    }
+
+    debug_print(EMIT_LEVEL_INFO,
+                "Finding best root location for root %lu / %lu", root_index,
+                root_count);
+
+    root_location_t cur_best_rl;
+    double cur_best_lh = -INFINITY;
+
+    for (size_t iter = 0; iter < 1e3; ++iter) {
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        set_subst_rates(i, subst_rates[i]);
+        set_freqs_all_free(i, freqs[i]);
+        debug_string(EMIT_LEVEL_DEBUG, "Optmizing Rates");
+        bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
+        debug_string(EMIT_LEVEL_DEBUG, "Optimizing Freqs");
+        bfgs_freqs(freqs[i], rl, i, pgtol, factor);
+      }
+
+      if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
+        break;
+      }
+
+      debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
+      auto cur_rl = optimize_alpha(rl, 1e-4);
+      double cur_lh = compute_lh_root(cur_rl);
+
+      debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur_lh);
+
+      if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < atol) {
+        cur_best_rl = cur_rl;
+        cur_best_lh = cur_lh;
+        break;
+      }
+      if (fabs(cur_lh - cur_best_lh) < atol) {
+        cur_best_rl = cur_rl;
+        cur_best_lh = cur_lh;
+        break;
+      }
+
+      if (cur_lh > cur_best_lh) {
+        cur_best_rl = cur_rl;
+        cur_best_lh = cur_lh;
+      }
+
+      rl = cur_best_rl;
+    }
+    _tree.annotate_node(cur_best_rl, "LLH", std::to_string(cur_best_lh));
+    _tree.annotate_node(cur_best_rl, "alpha",
+                       std::to_string(cur_best_rl.brlen_ratio));
+    if (cur_best_lh > best_lh) {
+      best_rl = cur_best_rl;
+      best_lh = cur_best_lh;
+    }
+  }
+  return {best_rl, best_lh};
 }

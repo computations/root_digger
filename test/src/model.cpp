@@ -311,8 +311,11 @@ TEST_CASE("model_t optimize all", "[model_t]") {
   model_t model{tree, msa, seed};
   model.initialize_partitions_uniform_freqs(msa);
   auto initial_rl = model.optimize_root_location();
-  auto final_rl = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e7);
-  CHECK(model.compute_lh(final_rl) >= initial_rl.second);
+  auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e7);
+  auto final_rl = tmp.first;
+  auto final_lh = tmp.second;
+  CHECK(final_lh >= initial_rl.second);
+  CHECK(model.compute_lh(final_rl) == Approx(final_lh));
 }
 
 TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
@@ -324,8 +327,11 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   model_t model{tree, msa, seed};
   model.initialize_partitions_uniform_freqs(msa);
   auto initial_rl = model.optimize_root_location();
-  auto final_rl = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e7);
-  CHECK(model.compute_lh(final_rl) >= initial_rl.second);
+  auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e7);
+  auto final_rl = tmp.first;
+  auto final_lh = tmp.second;
+  CHECK(final_lh >= initial_rl.second);
+  CHECK(model.compute_lh(final_rl) == Approx(final_lh));
 }
 
 TEST_CASE("model_t move root", "[model_t]") {

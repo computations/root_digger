@@ -3,6 +3,7 @@ extern "C" {
 #include <libpll/pll_tree.h>
 }
 #include <algorithm>
+#include <numeric>
 #include <unordered_set>
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename) {
@@ -15,8 +16,12 @@ rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
 }
 
 rooted_tree_t::~rooted_tree_t() {
+  auto deallocate_data = [](void *n) {
+    if (n)
+      free(n);
+  };
   if (_tree != nullptr) {
-    pll_utree_destroy(_tree, nullptr);
+    pll_utree_destroy(_tree, deallocate_data);
   }
 }
 
@@ -306,7 +311,48 @@ rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
 }
 
 std::string rooted_tree_t::newick() const {
-  char *newick_string = pll_utree_export_newick(_tree->vroot, nullptr);
+  if (!_root_annotations.empty()) {
+
+    auto fold_operation = [](std::string a,
+                             std::pair<std::string, std::string> b) {
+      return std::move(a) + ':' + std::move(b.first) + '=' +
+             std::move(b.second);
+    };
+
+    for (auto kv : _root_annotations) {
+      if (kv.second.size() == 0) {
+        continue;
+      }
+      debug_print(EMIT_LEVEL_DEBUG, "number of annotation: %lu",
+                  kv.second.size());
+      auto root_location = kv.first;
+      std::string start = "[&&NHX";
+      std::string annotation = std::accumulate(
+          kv.second.begin(), kv.second.end(), start, fold_operation);
+      annotation += ']';
+
+      if (root_location->data) {
+        throw std::runtime_error("The node data was not empty when we tried to "
+                                 "put node annotations in");
+      }
+
+      debug_print(EMIT_LEVEL_DEBUG, "calculated annotation: %s",
+                  annotation.c_str());
+      char *new_label = (char *)calloc(sizeof(char), (annotation.size() + 1));
+      memcpy(new_label, annotation.data(), sizeof(char) * annotation.size());
+      debug_print(EMIT_LEVEL_DEBUG, "new label: %s", new_label);
+      root_location->data = new_label;
+    }
+  }
+  auto serialize_node = [](const pll_unode_t *n) {
+    auto tmp = (n->label ? std::string(n->label) + ':' : std::string()) +
+               std::to_string(n->length) +
+               (n->data ? std::string((char *)n->data) : std::string());
+    char *node_string = (char *)calloc(sizeof(char), tmp.size() + 1);
+    memcpy(node_string, tmp.data(), tmp.size());
+    return node_string;
+  };
+  char *newick_string = pll_utree_export_newick(_tree->vroot, serialize_node);
   std::string ret{newick_string};
   free(newick_string);
   return ret;
@@ -436,4 +482,15 @@ root_location_t rooted_tree_t::current_root() const {
 
 const std::vector<root_location_t> &rooted_tree_t::roots() const {
   return _roots;
+}
+
+void rooted_tree_t::annotate_node(size_t node_id, const std::string &key,
+                                  const std::string &value) {
+  annotate_node(_roots[node_id], key, value);
+}
+
+void rooted_tree_t::annotate_node(const root_location_t &node_index,
+                                  const std::string &key,
+                                  const std::string &value) {
+  _root_annotations[node_index.edge].push_back(std::make_pair(key, value));
 }
