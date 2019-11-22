@@ -879,17 +879,34 @@ def produce_mapped_root_images(json_results_filename, map_iqtree=True,
 
         def layout(node):
             if map_rd:
-                rd_label = ete3.faces.TextFace(
-                    str(node.rd_map) if hasattr(node, 'rd_map') else (0),
-                    fgcolor='Green')
-                node.add_face(rd_label, column=0)
+                if hasattr(node, 'rd_map'):
+                    rd_label = ete3.faces.TextFace(
+                        str(node.rd_map) if hasattr(node, 'rd_map') else (0),
+                        fgcolor='Green')
+                    if node.rd_map == 100:
+                        rd_label.inner_border.type=0
+                        rd_label.inner_border.width=1
+                    node.add_face(rd_label, column=0)
             if map_iqtree:
-                iq_label = ete3.faces.TextFace(
-                    str(node.iq_map) if hasattr(node, 'iq_map') else (0),
-                    fgcolor='Red')
-                node.add_face(iq_label, column=0)
+                if hasattr(node, 'iq_map'):
+                    iq_label = ete3.faces.TextFace(
+                        str(node.iq_map) if hasattr(node, 'iq_map') else (0),
+                        fgcolor='Red')
+                    if node.iq_map == 100:
+                        iq_label.inner_border.type=0
+                        iq_label.inner_border.width=1
+                    node.add_face(iq_label, column=0)
+            if node.name:
+                node.add_face(ete3.faces.TextFace(node.name), column = 1)
 
         ts = ete3.TreeStyle()
+        cur_col = 0
+        if map_rd:
+            rd_leg = ete3.faces.TextFace("RootDigger", fgcolor="Green")
+            ts.legend.add_face(rd_leg, column=cur_col)
+        if map_iqtree:
+            iq_leg = ete3.faces.TextFace("IQ-TREE", fgcolor="Red")
+            ts.legend.add_face(iq_leg, column=cur_col)
         ts.layout_fn = layout
         ts.show_leaf_name = False
         tree_image_name = "{taxa}_{align}.png".format(
