@@ -291,12 +291,33 @@ TEST_CASE("rooted_tree_t sanity check", "[rooted_tree_t]") {
   CHECK(t3.sanity_check());
 }
 
-TEST_CASE("rooted_tree_t annotations", "[rooted_tree_t]") {
+TEST_CASE("rooted_tree_t annotations, basic", "[rooted_tree_t]") {
   rooted_tree_t t1(data_files_dna["10.fasta"].second);
   for (auto rl : t1.roots()) {
     t1.annotate_node(rl, "foo", "bar");
     t1.annotate_node(rl, "fizz", "buzz");
   }
+  CHECK(t1.newick() ==
+        "(((j:0.854700[&&NHX:foo=bar:fizz=buzz],((h:0.983500[&&NHX:foo=bar:"
+        "fizz=buzz],a:0.224900[&&NHX:foo=bar:fizz=buzz])0.416200[&&NHX:foo=bar:"
+        "fizz=buzz],(c:0.540900[&&NHX:foo=bar:fizz=buzz],f:0.422200[&&NHX:foo="
+        "bar:fizz=buzz])0.785300[&&NHX:foo=bar:fizz=buzz])0.614100[&&NHX:foo="
+        "bar:fizz=buzz])0.446100[&&NHX:foo=bar:fizz=buzz],g:0.487400[&&NHX:foo="
+        "bar:fizz=buzz])0.825200[&&NHX:foo=bar:fizz=buzz],((i:0.569700[&&NHX:"
+        "foo=bar:fizz=buzz],e:0.366600[&&NHX:foo=bar:fizz=buzz])0.602800[&&NHX:"
+        "foo=bar:fizz=buzz],b:0.445900[&&NHX:foo=bar:fizz=buzz])0.099300[&&NHX:"
+        "foo=bar:fizz=buzz],d:0.639600[&&NHX:foo=bar:fizz=buzz]):0.0;");
+}
+
+TEST_CASE("rooted_tree_t annotations, moving root", "[rooted_tree_t]") {
+  rooted_tree_t t1(data_files_dna["10.fasta"].second);
+  t1.root_by(t1.roots()[0]);
+  for (auto rl : t1.roots()) {
+    t1.annotate_node(rl, "foo", "bar");
+    t1.annotate_node(rl, "fizz", "buzz");
+  }
+  t1.root_by(t1.roots()[1]);
+  t1.unroot();
   CHECK(t1.newick() ==
         "(((j:0.854700[&&NHX:foo=bar:fizz=buzz],((h:0.983500[&&NHX:foo=bar:"
         "fizz=buzz],a:0.224900[&&NHX:foo=bar:fizz=buzz])0.416200[&&NHX:foo=bar:"

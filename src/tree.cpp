@@ -345,7 +345,7 @@ std::string rooted_tree_t::newick() const {
     }
   }
   auto serialize_node = [](const pll_unode_t *n) {
-    auto tmp = (n->label ? std::string(n->label) + ':' : std::string()) +
+    auto tmp = (n->label ? std::string(n->label) : std::string()) + ':' + 
                std::to_string(n->length) +
                (n->data ? std::string((char *)n->data) : std::string());
     char *node_string = (char *)calloc(sizeof(char), tmp.size() + 1);
