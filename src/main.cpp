@@ -87,8 +87,6 @@ void print_usage() {
       << "           improve results.Default is 1e-4\n"
       << "    --silent\n"
       << "           Suppress output except for the final tree\n"
-      << "    --force\n"
-      << "           Disable Saftey checks.\n"
       << "    --verbose\n"
       << "           Increase the verbosity level. Can be repeated to\n"
       << "           level further.\n"
@@ -109,11 +107,11 @@ int main(int argv, char **argc) {
       {"min-roots", required_argument, 0, 0},  /* 8 */
       {"root-ratio", required_argument, 0, 0}, /* 9 */
       {"atol", required_argument, 0, 0},       /* 10 */
-      {"bfgstol", required_argument, 0, 0},    /* 11 */
-      {"factor", required_argument, 0, 0},     /* 12 */
-      {"partition", required_argument, 0, 0},  /* 13 */
-      {"exhaustive", no_argument, 0, 0},       /* 14 */
-      {"force", no_argument, 0, 0},            /* 15 */
+      {"brtol", required_argument, 0, 0},      /* 11 */
+      {"bfgstol", required_argument, 0, 0},    /* 12 */
+      {"factor", required_argument, 0, 0},     /* 13 */
+      {"partition", required_argument, 0, 0},  /* 14 */
+      {"exhaustive", no_argument, 0, 0},       /* 15 */
       {"version", no_argument, 0, 0},          /* 16 */
       {"debug", no_argument, 0, 0},            /* 17 */
       {0, 0, 0, 0},
@@ -136,10 +134,10 @@ int main(int argv, char **argc) {
     double root_ratio = 0.05;
     double abs_tolerance = 1e-7;
     double factor = 1e4;
+    double br_tolerance = 1e-7;
     double bfgs_tol = 1e-7;
     unsigned int states = 0;
     bool silent = false;
-    bool sanity_checks = true;
     bool exhaustive = false;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       debug_print(EMIT_LEVEL_DEBUG, "parsing option index: %d", index);
@@ -178,20 +176,20 @@ int main(int argv, char **argc) {
       case 10: // atol
         abs_tolerance = atof(optarg);
         break;
-      case 11: // bfgs_tol
+      case 11: // brtol
+        br_tolerance = atof(optarg);
+        break;
+      case 12: // bfgs_tol
         bfgs_tol = atof(optarg);
         break;
-      case 12: // factor
+      case 13: // factor
         factor = atof(optarg);
         break;
-      case 13: // partition
+      case 14: // partition
         partition_filename = optarg;
         break;
-      case 14: // force
+      case 15: // exhaustive
         exhaustive = true;
-        break;
-      case 15: // force
-        sanity_checks = false;
         break;
       case 16: // version
         print_version();
@@ -253,17 +251,6 @@ int main(int argv, char **argc) {
 
     rooted_tree_t tree{tree_filename};
 
-    if (sanity_checks) {
-      if (!tree.sanity_check()) {
-        std::cout << "WARNING: Refusing to run. An extremely long branch is "
-                     "present in the provided tree. Roots are extremely likely "
-                     "to be erronously placed on this branch. Use '--force' to "
-                     "override this warning"
-                  << std::endl;
-        return 1;
-      }
-    }
-
     model_t model{tree, msa, seed};
     try {
       model.initialize_partitions(msa);
@@ -274,15 +261,17 @@ int main(int argv, char **argc) {
     double final_lh;
     if (!exhaustive) {
       auto tmp = model.optimize_all(min_roots, root_ratio, abs_tolerance,
-                                    bfgs_tol, factor);
+                                    bfgs_tol, br_tolerance, factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
     } else {
-      auto tmp = model.exhaustive_search(abs_tolerance, bfgs_tol, factor);
+      auto tmp = model.exhaustive_search(abs_tolerance, bfgs_tol, br_tolerance,
+                                         factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
     }
-    std::string final_tree_string{model.rooted_tree(final_rl).newick()};
+    //std::string final_tree_string{model.rooted_tree(final_rl).newick()};
+    std::string final_tree_string{model.unrooted_tree().newick()};
     if (!silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }

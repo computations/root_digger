@@ -684,7 +684,7 @@ std::vector<root_location_t> model_t::suggest_roots_random(size_t min,
 /* Optimize the substitution parameters by simulated annealing */
 std::pair<root_location_t, double>
 model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
-                      double pgtol, double factor) {
+                      double pgtol, double brtol, double factor) {
   double best_lh = -INFINITY;
   root_location_t best_rl;
   std::vector<model_params_t> initial_subst;
@@ -756,7 +756,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
         cur_best_lh = cur.second;
         break;
       }
-      if (fabs(cur.second - cur_best_lh) < atol) {
+      if (fabs(cur.second - cur_best_lh) < brtol) {
         cur_best_rl = cur.first;
         cur_best_lh = cur.second;
         break;
@@ -780,6 +780,11 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
 
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
   _tree.root_by(root);
+  return _tree;
+}
+
+const rooted_tree_t &model_t::unrooted_tree() {
+  _tree.unroot();
   return _tree;
 }
 
@@ -1078,8 +1083,10 @@ void model_t::set_empirical_freqs() {
   }
 }
 
-std::pair<root_location_t, double>
-model_t::exhaustive_search(double atol, double pgtol, double factor) {
+std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
+                                                              double pgtol,
+                                                              double brtol,
+                                                              double factor) {
   size_t root_index = 0;
   root_location_t best_rl;
   double best_lh = -INFINITY;
@@ -1123,19 +1130,26 @@ model_t::exhaustive_search(double atol, double pgtol, double factor) {
       }
 
       debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
-      auto cur_rl = optimize_alpha(rl, 1e-4);
+      auto cur_rl = optimize_alpha(rl, 1e-7);
       double cur_lh = compute_lh_root(cur_rl);
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur_lh);
 
-      if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < atol) {
+      if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
+        debug_print(EMIT_LEVEL_DEBUG,
+                    "Current BRlen ratio tolerances: %.7f, brtol: %.7f",
+                    fabs(rl.brlen_ratio - cur_rl.brlen_ratio), brtol);
         cur_best_rl = cur_rl;
         cur_best_lh = cur_lh;
         break;
       }
-      if (fabs(cur_lh - cur_best_lh) < atol) {
-        cur_best_rl = cur_rl;
-        cur_best_lh = cur_lh;
+      debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
+                   (cur_lh - cur_best_lh));
+      if ((cur_lh - cur_best_lh) < atol) {
+        if (cur_lh > cur_best_lh) {
+          cur_best_rl = cur_rl;
+          cur_best_lh = cur_lh;
+        }
         break;
       }
 
@@ -1144,11 +1158,11 @@ model_t::exhaustive_search(double atol, double pgtol, double factor) {
         cur_best_lh = cur_lh;
       }
 
-      rl = cur_best_rl;
+      rl = cur_rl;
     }
     _tree.annotate_node(cur_best_rl, "LLH", std::to_string(cur_best_lh));
     _tree.annotate_node(cur_best_rl, "alpha",
-                       std::to_string(cur_best_rl.brlen_ratio));
+                        std::to_string(cur_best_rl.brlen_ratio));
     if (cur_best_lh > best_lh) {
       best_rl = cur_best_rl;
       best_lh = cur_best_lh;

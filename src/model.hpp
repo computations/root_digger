@@ -49,12 +49,13 @@ public:
   std::pair<root_location_t, double> optimize_all(size_t min_roots,
                                                   double root_ratio,
                                                   double atol, double pgtol,
-                                                  double factor);
+                                                  double brtol, double factor);
 
   std::pair<root_location_t, double>
-  exhaustive_search(double atol, double pgtol, double factor);
+  exhaustive_search(double atol, double pgtol, double brtol, double factor);
 
   const rooted_tree_t &rooted_tree(const root_location_t &root);
+  const rooted_tree_t &unrooted_tree();
 
   void initialize_partitions(const std::vector<msa_t> &);
   void initialize_partitions_uniform_freqs(const std::vector<msa_t> &);
