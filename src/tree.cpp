@@ -217,6 +217,9 @@ void rooted_tree_t::unroot() {
   root_left->next = nullptr;
   root_right->next = nullptr;
 
+  assert(!root_left->data);
+  assert(!root_right->data);
+
   free(root_left);
   free(root_right);
 
@@ -332,6 +335,9 @@ std::string rooted_tree_t::newick() const {
       annotation += ']';
 
       if (root_location->data) {
+        debug_print(-1, "root_location->data: %p, int: %ld",
+                    root_location->data, (int64_t)root_location->data);
+
         throw std::runtime_error("The node data was not empty when we tried to "
                                  "put node annotations in");
       }
@@ -341,11 +347,12 @@ std::string rooted_tree_t::newick() const {
       char *new_label = (char *)calloc(sizeof(char), (annotation.size() + 1));
       memcpy(new_label, annotation.data(), sizeof(char) * annotation.size());
       debug_print(EMIT_LEVEL_DEBUG, "new label: %s", new_label);
+
       root_location->data = new_label;
     }
   }
   auto serialize_node = [](const pll_unode_t *n) {
-    auto tmp = (n->label ? std::string(n->label) : std::string()) + ':' + 
+    auto tmp = (n->label ? std::string(n->label) : std::string()) + ':' +
                std::to_string(n->length) +
                (n->data ? std::string((char *)n->data) : std::string());
     char *node_string = (char *)calloc(sizeof(char), tmp.size() + 1);
@@ -389,7 +396,7 @@ bool rooted_tree_t::sanity_check() const {
 inline void tag_nodes(pll_unode_t *n) {
   pll_unode_t *start = n;
   do {
-    n->data = (void *)0x1;
+    n->data = (void *)0xdeadbeef;
     n = n->next;
   } while (n != nullptr && n != start);
 }
@@ -421,6 +428,7 @@ bool rooted_tree_t::find_path_recurse(pll_unode_t *n1, pll_unode_t *n2) {
   return false;
 }
 
+/*
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_root_update_operations(
@@ -463,6 +471,7 @@ rooted_tree_t::generate_root_update_operations(
 
   return std::make_tuple(ops, pmatrix_indices, branch_lengths);
 }
+*/
 
 void rooted_tree_t::clear_traversal_data() {
   auto clear_data_callback = [](pll_unode_t *n, void *) -> int {
@@ -492,5 +501,64 @@ void rooted_tree_t::annotate_node(size_t node_id, const std::string &key,
 void rooted_tree_t::annotate_node(const root_location_t &node_index,
                                   const std::string &key,
                                   const std::string &value) {
-  _root_annotations[node_index.edge].push_back(std::make_pair(key, value));
+  annotate_node(node_index.edge, key, value);
+}
+
+void rooted_tree_t::annotate_node(pll_unode_t *node_id, const std::string &key,
+                                  const std::string &value) {
+  _root_annotations[node_id].emplace_back(key, value);
+}
+
+void rooted_tree_t::annotate_ratio(size_t node_id, double ratio) {
+  annotate_ratio(_roots[node_id], ratio);
+}
+
+void rooted_tree_t::annotate_ratio(const root_location_t &node_index,
+                                   double ratio) {
+  annotate_branch(node_index, "alpha", std::to_string(ratio),
+                  std::to_string(1 - ratio));
+}
+
+void rooted_tree_t::annotate_lh(size_t node_index, double lh) {
+  annotate_ratio(_roots[node_index], lh);
+}
+
+void rooted_tree_t::annotate_lh(const root_location_t &node_index, double lh) {
+  annotate_branch(node_index, "LLH", std::to_string(lh));
+}
+
+void rooted_tree_t::annotate_branch(size_t node_id, const std::string &key,
+                                    const std::string &value) {
+  annotate_branch(_roots[node_id], key, value);
+}
+
+void rooted_tree_t::annotate_branch(const root_location_t &rl,
+                                    const std::string &key,
+                                    const std::string &value) {
+  annotate_branch(rl, key, value, value);
+}
+
+void rooted_tree_t::annotate_branch(const root_location_t &rl,
+                                    const std::string &key,
+                                    const std::string &left_value,
+                                    const std::string &right_value) {
+  annotate_node(rl.edge, key, left_value);
+  size_t node_count = 0;
+  pll_unode_t *start = rl.edge->back;
+  pll_unode_t *cur = start;
+
+  if (cur->next) {
+    do {
+      node_count++;
+      cur = cur->next;
+    } while (start != cur);
+  } else {
+    node_count = 1;
+  }
+
+  if (node_count > 2) {
+    annotate_node(rl.edge->back, key, right_value);
+  } else {
+    annotate_node(rl.edge->back->next->back, key, right_value);
+  }
 }

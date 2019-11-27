@@ -259,19 +259,20 @@ int main(int argv, char **argc) {
     }
     root_location_t final_rl;
     double final_lh;
+    std::string final_tree_string;
     if (!exhaustive) {
       auto tmp = model.optimize_all(min_roots, root_ratio, abs_tolerance,
                                     bfgs_tol, br_tolerance, factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
+      final_tree_string = std::move(model.rooted_tree(final_rl).newick());
     } else {
       auto tmp = model.exhaustive_search(abs_tolerance, bfgs_tol, br_tolerance,
                                          factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
+      final_tree_string = std::move(model.unrooted_tree().newick());
     }
-    //std::string final_tree_string{model.rooted_tree(final_rl).newick()};
-    std::string final_tree_string{model.unrooted_tree().newick()};
     if (!silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }
