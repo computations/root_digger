@@ -81,9 +81,11 @@ public:
   std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
   generate_derivative_operations(const root_location_t &root);
 
+  /*
   std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
              std::vector<double>>
   generate_root_update_operations(const root_location_t &new_root);
+  */
 
   void root_by(const root_location_t &);
   void update_root(root_location_t);
@@ -99,6 +101,17 @@ public:
                      const std::string &value);
   void annotate_node(size_t node_id, const std::string &key,
                      const std::string &value);
+  void annotate_branch(size_t node_id, const std::string &key,
+                       const std::string &value);
+  void annotate_branch(const root_location_t &rl, const std::string &key,
+                       const std::string &value);
+  void annotate_branch(const root_location_t &rl, const std::string &key,
+                       const std::string &left_value,
+                       const std::string &right_value);
+  void annotate_lh(size_t node_index, double lh);
+  void annotate_lh(const root_location_t &node_index, double lh);
+  void annotate_ratio(size_t node_id, double ratio);
+  void annotate_ratio(const root_location_t &node_index, double ratio);
 
 private:
   void generate_root_locations();
@@ -108,6 +121,8 @@ private:
   void find_path(pll_unode_t *n1, pll_unode_t *n2);
   bool find_path_recurse(pll_unode_t *n1, pll_unode_t *n2);
   void clear_traversal_data();
+  void annotate_node(pll_unode_t *node_id, const std::string &key,
+                     const std::string &value);
 
   pll_utree_t *_tree;
   root_location_t _current_rl;

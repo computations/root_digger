@@ -1130,7 +1130,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       }
 
       debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
-      auto cur_rl = optimize_alpha(rl, 1e-7);
+      auto cur_rl = optimize_alpha(rl, brtol);
       double cur_lh = compute_lh_root(cur_rl);
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur_lh);
@@ -1144,7 +1144,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
         break;
       }
       debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
-                   (cur_lh - cur_best_lh));
+                  (cur_lh - cur_best_lh));
       if ((cur_lh - cur_best_lh) < atol) {
         if (cur_lh > cur_best_lh) {
           cur_best_rl = cur_rl;
@@ -1160,9 +1160,8 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
 
       rl = cur_rl;
     }
-    _tree.annotate_node(cur_best_rl, "LLH", std::to_string(cur_best_lh));
-    _tree.annotate_node(cur_best_rl, "alpha",
-                        std::to_string(cur_best_rl.brlen_ratio));
+    _tree.annotate_lh(cur_best_rl, cur_best_lh);
+    _tree.annotate_ratio(cur_best_rl, cur_best_rl.brlen_ratio);
     if (cur_best_lh > best_lh) {
       best_rl = cur_best_rl;
       best_lh = cur_best_lh;
