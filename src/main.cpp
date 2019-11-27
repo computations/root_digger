@@ -111,9 +111,10 @@ int main(int argv, char **argc) {
       {"bfgstol", required_argument, 0, 0},    /* 12 */
       {"factor", required_argument, 0, 0},     /* 13 */
       {"partition", required_argument, 0, 0},  /* 14 */
-      {"exhaustive", no_argument, 0, 0},       /* 15 */
-      {"version", no_argument, 0, 0},          /* 16 */
-      {"debug", no_argument, 0, 0},            /* 17 */
+      {"treefile", required_argument, 0, 0},   /* 15 */
+      {"exhaustive", no_argument, 0, 0},       /* 16 */
+      {"version", no_argument, 0, 0},          /* 17 */
+      {"debug", no_argument, 0, 0},            /* 18 */
       {0, 0, 0, 0},
   };
 
@@ -126,6 +127,7 @@ int main(int argv, char **argc) {
     int index = 0;
     std::string msa_filename;
     std::string tree_filename;
+    std::string output_tree_filename;
     std::string model_filename;
     std::string freqs_filename;
     std::string partition_filename;
@@ -188,13 +190,16 @@ int main(int argv, char **argc) {
       case 14: // partition
         partition_filename = optarg;
         break;
-      case 15: // exhaustive
+      case 15: // treefile
+        output_tree_filename = optarg;
+        break;
+      case 16: // exhaustive
         exhaustive = true;
         break;
-      case 16: // version
+      case 17: // version
         print_version();
         return 0;
-      case 17: // debug
+      case 18: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
       default:
@@ -281,6 +286,10 @@ int main(int argv, char **argc) {
     std::chrono::duration<double> duration = end_time - start_time;
     if (!silent)
       std::cout << "Inference took: " << duration.count() << "s" << std::endl;
+    if(!output_tree_filename.empty()){
+      std::ofstream outfile{output_tree_filename};
+      outfile << final_tree_string;
+    }
 
   } catch (const std::exception &e) {
     std::cout << "There was an error during processing:\n"
