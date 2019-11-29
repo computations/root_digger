@@ -703,16 +703,17 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
 
   std::vector<model_params_t> initial_freqs;
   initial_freqs.reserve(_partitions.size());
+  std::vector<double> gamma_alpha;
 
   for (size_t i = 0; i < _partitions.size(); ++i) {
     initial_freqs.emplace_back(_partitions[i]->frequencies[0],
                                _partitions[i]->frequencies[0] +
                                    _partitions[i]->states);
+    gamma_alpha.push_back(1.0);
   }
 
   set_subst_rates_uniform();
   set_empirical_freqs();
-  double alpha = 1.0;
   auto roots = suggest_roots_random(min_roots, root_ratio);
   size_t root_count = roots.size();
   size_t root_index = 0;
@@ -742,13 +743,13 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
-        set_gamma_rates(i);
+        set_gamma_rates(i, gamma_alpha[i]);
+        debug_string(EMIT_LEVEL_INFO, "Optimizing Gamma");
+        bfgs_gamma(gamma_alpha[i], rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_INFO, "Optmizing Rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_INFO, "Optimizing Freqs");
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_INFO, "Optimizing Gamma");
-        bfgs_gamma(alpha, rl, i, pgtol, factor);
       }
 
       if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
@@ -1122,6 +1123,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
   root_location_t best_rl;
   double best_lh = -INFINITY;
   size_t root_count = _tree.root_count();
+  std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
   for (auto rl : _tree.roots()) {
     set_subst_rates_uniform();
     set_empirical_freqs();
@@ -1130,7 +1132,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
     move_root(rl);
     std::vector<model_params_t> subst_rates;
     std::vector<model_params_t> freqs;
-    double alpha = 1.0;
+    std::vector<double> gamma_alphas;
 
     for (size_t p = 0; p < _partitions.size(); ++p) {
       size_t subst_size = _partitions[p]->states;
@@ -1138,6 +1140,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       freqs.push_back(
           model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
       subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
+      gamma_alphas.push_back(1.0);
     }
 
     debug_print(EMIT_LEVEL_INFO,
@@ -1151,9 +1154,9 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
-        set_gamma_rates(i, alpha);
+        set_gamma_rates(i, gamma_alphas[i]);
         debug_string(EMIT_LEVEL_DEBUG, "Optimizing Freqs");
-        bfgs_gamma(alpha, rl, i, pgtol, factor);
+        bfgs_gamma(gamma_alphas[i], rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_DEBUG, "Optmizing Rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_DEBUG, "Optimizing Freqs");
@@ -1195,12 +1198,31 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
 
       rl = cur_rl;
     }
-    _tree.annotate_lh(cur_best_rl, cur_best_lh);
-    _tree.annotate_ratio(cur_best_rl, cur_best_rl.brlen_ratio);
+
+    mapped_likelihoods.emplace_back(cur_best_rl, cur_best_lh);
     if (cur_best_lh > best_lh) {
       best_rl = cur_best_rl;
       best_lh = cur_best_lh;
     }
   }
+
+  double max_lh = -INFINITY;
+
+  for (auto kv : mapped_likelihoods) {
+    max_lh = std::max(kv.second, max_lh);
+  }
+
+  double total_lh = 0;
+  for (auto kv : mapped_likelihoods) {
+    total_lh += exp(kv.second - max_lh);
+  }
+
+  for (auto kv : mapped_likelihoods) {
+    double lwr = exp(kv.second - max_lh) / total_lh;
+    _tree.annotate_branch(kv.first, "LWR", std::to_string(lwr));
+    _tree.annotate_lh(kv.first, kv.second);
+    _tree.annotate_ratio(kv.first, kv.first.brlen_ratio);
+  }
+
   return {best_rl, best_lh};
 }
