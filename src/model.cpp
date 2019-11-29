@@ -172,13 +172,11 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
 }
 
 model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
-                 uint64_t seed) {
+                 uint64_t seed, bool early_stop)
+    : _seed{seed}, _early_stop{early_stop} {
 
-  _seed = seed;
   _random_engine = std::minstd_rand(_seed);
   _tree = std::move(tree);
-  _temp_ratio = 0.8;
-  _root_opt_frequency = 2.0;
 
   for (auto &msa : msas) {
     if (!msa.constiency_check(_tree.label_set())) {
@@ -761,11 +759,13 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur.second);
 
-      if (rl.edge == cur.first.edge &&
-          fabs(rl.brlen_ratio - cur.first.brlen_ratio) < atol) {
-        cur_best_rl = cur.first;
-        cur_best_lh = cur.second;
-        break;
+      if (_early_stop) {
+        if (rl.edge == cur.first.edge &&
+            fabs(rl.brlen_ratio - cur.first.brlen_ratio) < atol) {
+          cur_best_rl = cur.first;
+          cur_best_lh = cur.second;
+          break;
+        }
       }
       if (fabs(cur.second - cur_best_lh) < brtol) {
         cur_best_rl = cur.first;
@@ -1175,14 +1175,17 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
                   (cur_lh - cur_best_lh));
 
-      if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
-        debug_print(EMIT_LEVEL_DEBUG,
-                    "Current BRlen ratio tolerances: %.7f, brtol: %.7f",
-                    fabs(rl.brlen_ratio - cur_rl.brlen_ratio), brtol);
-        cur_best_rl = cur_rl;
-        cur_best_lh = cur_lh;
-        break;
+      if (_early_stop) {
+        if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
+          debug_print(EMIT_LEVEL_DEBUG,
+                      "Current BRlen ratio tolerances: %.7f, brtol: %.7f",
+                      fabs(rl.brlen_ratio - cur_rl.brlen_ratio), brtol);
+          cur_best_rl = cur_rl;
+          cur_best_lh = cur_lh;
+          break;
+        }
       }
+
       if ((cur_lh - cur_best_lh) < atol) {
         if (cur_lh > cur_best_lh) {
           cur_best_rl = cur_rl;
@@ -1216,6 +1219,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
   for (auto kv : mapped_likelihoods) {
     total_lh += exp(kv.second - max_lh);
   }
+  debug_print(EMIT_LEVEL_DEBUG, "LWR denom: %f, %e", total_lh, total_lh - 1);
 
   for (auto kv : mapped_likelihoods) {
     double lwr = exp(kv.second - max_lh) / total_lh;

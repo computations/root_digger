@@ -99,7 +99,7 @@ size_t data_type_to_states(std::string data_type) {
   if (data_type == "dna" || data_type == "nt") {
     return 4;
   }
-  if (data_type == "aa") {
+  if (data_type == "protein" || data_type == "aa") {
     return 20;
   }
   if (data_type == "codon") {
@@ -129,9 +129,10 @@ int main(int argv, char **argc) {
       {"partition", required_argument, 0, 0},  /* 14 */
       {"treefile", required_argument, 0, 0},   /* 15 */
       {"exhaustive", no_argument, 0, 0},       /* 16 */
-      {"data-type", required_argument, 0, 0},  /* 17 */
-      {"version", no_argument, 0, 0},          /* 18 */
-      {"debug", no_argument, 0, 0},            /* 19 */
+      {"no-early-stop", no_argument, 0, 0},    /* 17 */
+      {"data-type", required_argument, 0, 0},  /* 18 */
+      {"version", no_argument, 0, 0},          /* 19 */
+      {"debug", no_argument, 0, 0},            /* 20 */
       {0, 0, 0, 0},
   };
 
@@ -159,6 +160,7 @@ int main(int argv, char **argc) {
     unsigned int states = 0;
     bool silent = false;
     bool exhaustive = false;
+    bool early_stop = true;
     while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
       debug_print(EMIT_LEVEL_DEBUG, "parsing option index: %d", index);
       switch (index) {
@@ -214,14 +216,17 @@ int main(int argv, char **argc) {
       case 16: // exhaustive
         exhaustive = true;
         break;
-      case 17: // data-type
+      case 17: // exhaustive
+        early_stop = false;
+        break;
+      case 18: // data-type
         data_type = optarg;
         states = data_type_to_states(data_type);
         break;
-      case 18: // version
+      case 19: // version
         print_version();
         return 0;
-      case 19: // debug
+      case 20: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
       default:
@@ -278,7 +283,7 @@ int main(int argv, char **argc) {
 
     rooted_tree_t tree{tree_filename};
 
-    model_t model{tree, msa, seed};
+    model_t model{tree, msa, seed, early_stop};
     try {
       model.initialize_partitions(msa);
     } catch (const invalid_empirical_frequencies_exception &) {
