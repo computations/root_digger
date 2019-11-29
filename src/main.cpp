@@ -136,7 +136,7 @@ int main(int argv, char **argc) {
     double root_ratio = 0.05;
     double abs_tolerance = 1e-7;
     double factor = 1e4;
-    double br_tolerance = 1e-7;
+    double br_tolerance = 1e-12;
     double bfgs_tol = 1e-7;
     unsigned int states = 0;
     bool silent = false;

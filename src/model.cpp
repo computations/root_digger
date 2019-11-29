@@ -107,6 +107,12 @@ void model_t::set_gamma_rates(size_t p_index) {
   pll_set_category_rates(_partitions[p_index], rate_cats);
 }
 
+void model_t::set_gamma_rates(size_t p_index, double alpha) {
+  double rate_cats[_n_rate_cats] = {0};
+  pll_compute_gamma_cats(alpha, _n_rate_cats, rate_cats, PLL_GAMMA_RATES_MEAN);
+  pll_set_category_rates(_partitions[p_index], rate_cats);
+}
+
 void model_t::update_invariant_sites(size_t p_index) {
   pll_update_invariant_sites(_partitions[p_index]);
 }
@@ -706,6 +712,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
 
   set_subst_rates_uniform();
   set_empirical_freqs();
+  double alpha = 1.0;
   auto roots = suggest_roots_random(min_roots, root_ratio);
   size_t root_count = roots.size();
   size_t root_index = 0;
@@ -735,10 +742,13 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
+        set_gamma_rates(i);
         debug_string(EMIT_LEVEL_INFO, "Optmizing Rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_INFO, "Optimizing Freqs");
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
+        debug_string(EMIT_LEVEL_INFO, "Optimizing Gamma");
+        bfgs_gamma(alpha, rl, i, pgtol, factor);
       }
 
       if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
@@ -1057,6 +1067,27 @@ double model_t::gd_freqs(model_params_t &initial_freqs,
   return lh;
 }
 
+double model_t::bfgs_gamma(double &initial_alpha, const root_location_t &rl,
+                           size_t partition_index, double pgtol,
+                           double factor) {
+  constexpr double p_min = 1e-4;
+  constexpr double p_max = 1.0 - 1e-4 * 3;
+  constexpr double epsilon = 1e-4;
+  model_params_t alpha(1);
+  alpha[0] = initial_alpha;
+
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
+  double lh = bfgs_params(
+      alpha, partition_index, p_min, p_max, epsilon, pgtol, factor,
+      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this](size_t pi, const model_params_t &mp) -> void {
+        this->set_gamma_rates(pi, mp[0]);
+      });
+  initial_alpha = alpha[0];
+
+  return lh;
+}
+
 std::vector<double> model_t::compute_all_root_lh() {
   _tree.root_by(_tree.roots()[0]);
   std::vector<double> root_lh;
@@ -1099,6 +1130,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
     move_root(rl);
     std::vector<model_params_t> subst_rates;
     std::vector<model_params_t> freqs;
+    double alpha = 1.0;
 
     for (size_t p = 0; p < _partitions.size(); ++p) {
       size_t subst_size = _partitions[p]->states;
@@ -1119,6 +1151,9 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
+        set_gamma_rates(i, alpha);
+        debug_string(EMIT_LEVEL_DEBUG, "Optimizing Freqs");
+        bfgs_gamma(alpha, rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_DEBUG, "Optmizing Rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
         debug_string(EMIT_LEVEL_DEBUG, "Optimizing Freqs");
@@ -1134,6 +1169,8 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       double cur_lh = compute_lh_root(cur_rl);
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur_lh);
+      debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
+                  (cur_lh - cur_best_lh));
 
       if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
         debug_print(EMIT_LEVEL_DEBUG,
@@ -1143,8 +1180,6 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
         cur_best_lh = cur_lh;
         break;
       }
-      debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
-                  (cur_lh - cur_best_lh));
       if ((cur_lh - cur_best_lh) < atol) {
         if (cur_lh > cur_best_lh) {
           cur_best_rl = cur_rl;
