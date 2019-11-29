@@ -80,6 +80,7 @@ private:
   void set_subst_rates_random(size_t, size_t);
   void set_subst_rates_uniform();
   void set_gamma_rates(size_t);
+  void set_gamma_rates(size_t, double);
   void update_invariant_sites(size_t);
   void set_tip_states(size_t, const msa_t &);
   void set_empirical_freqs(size_t);
@@ -94,6 +95,8 @@ private:
                   size_t partition_index);
   double gd_freqs(model_params_t &initial_rates, const root_location_t &rl,
                   size_t partition_index);
+  double bfgs_gamma(double &intial_alpha, const root_location_t &rl,
+                    size_t partition_index, double pgtol, double factor);
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;
