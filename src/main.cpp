@@ -1,6 +1,7 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -93,6 +94,21 @@ void print_usage() {
       << std::endl;
 }
 
+size_t data_type_to_states(std::string data_type) {
+  std::for_each(data_type.begin(), data_type.end(), tolower);
+  if (data_type == "dna" || data_type == "nt") {
+    return 4;
+  }
+  if (data_type == "aa") {
+    return 20;
+  }
+  if (data_type == "codon") {
+    return 64;
+  }
+  throw std::runtime_error(
+      "Unrecognized data type, unable to determine correct number of states");
+}
+
 int main(int argv, char **argc) {
   auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
@@ -113,8 +129,9 @@ int main(int argv, char **argc) {
       {"partition", required_argument, 0, 0},  /* 14 */
       {"treefile", required_argument, 0, 0},   /* 15 */
       {"exhaustive", no_argument, 0, 0},       /* 16 */
-      {"version", no_argument, 0, 0},          /* 17 */
-      {"debug", no_argument, 0, 0},            /* 18 */
+      {"data-type", required_argument, 0, 0},  /* 17 */
+      {"version", no_argument, 0, 0},          /* 18 */
+      {"debug", no_argument, 0, 0},            /* 19 */
       {0, 0, 0, 0},
   };
 
@@ -131,6 +148,7 @@ int main(int argv, char **argc) {
     std::string model_filename;
     std::string freqs_filename;
     std::string partition_filename;
+    std::string data_type;
     uint64_t seed = std::random_device()();
     size_t min_roots = 1;
     double root_ratio = 0.05;
@@ -196,10 +214,14 @@ int main(int argv, char **argc) {
       case 16: // exhaustive
         exhaustive = true;
         break;
-      case 17: // version
+      case 17: // data-type
+        data_type = optarg;
+        states = data_type_to_states(data_type);
+        break;
+      case 18: // version
         print_version();
         return 0;
-      case 18: // debug
+      case 19: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
       default:
@@ -286,7 +308,7 @@ int main(int argv, char **argc) {
     std::chrono::duration<double> duration = end_time - start_time;
     if (!silent)
       std::cout << "Inference took: " << duration.count() << "s" << std::endl;
-    if(!output_tree_filename.empty()){
+    if (!output_tree_filename.empty()) {
       std::ofstream outfile{output_tree_filename};
       outfile << final_tree_string;
     }
