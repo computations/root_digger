@@ -38,7 +38,7 @@ model_params_t random_params(size_t size, uint64_t seed);
 
 class model_t {
 public:
-  model_t(rooted_tree_t t, const std::vector<msa_t> &msa, uint64_t seed);
+  model_t(rooted_tree_t t, const std::vector<msa_t> &msa, uint64_t seed, bool early_stop);
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
@@ -103,8 +103,7 @@ private:
   std::vector<unsigned int> _partition_weights;
   std::minstd_rand _random_engine;
   uint64_t _seed;
-  double _temp_ratio;
-  double _root_opt_frequency;
+  bool _early_stop;
   /*
    * Only one submodel will be used for the time being. If there is desire for
    * more, we can add support for more models..
