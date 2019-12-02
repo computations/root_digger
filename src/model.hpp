@@ -97,6 +97,8 @@ private:
                   size_t partition_index);
   double bfgs_gamma(double &intial_alpha, const root_location_t &rl,
                     size_t partition_index, double pgtol, double factor);
+  double gd_gamma(double &intial_alpha, const root_location_t &rl,
+                    size_t partition_index);
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;

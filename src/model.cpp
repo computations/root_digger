@@ -1090,6 +1090,26 @@ double model_t::bfgs_gamma(double &initial_alpha, const root_location_t &rl,
   return lh;
 }
 
+double model_t::gd_gamma(double &initial_alpha, const root_location_t &rl,
+                         size_t partition_index) {
+  constexpr double p_min = 1e-4;
+  constexpr double p_max = 1.0 - 1e-4 * 3;
+  constexpr double epsilon = 1e-4;
+  model_params_t alpha(1);
+  alpha[0] = initial_alpha;
+
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
+  double lh = gd_params(
+      alpha, partition_index, p_min, p_max, epsilon,
+      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this](size_t pi, const model_params_t &mp) -> void {
+        this->set_gamma_rates(pi, mp[0]);
+      });
+  initial_alpha = alpha[0];
+
+  return lh;
+}
+
 std::vector<double> model_t::compute_all_root_lh() {
   _tree.root_by(_tree.roots()[0]);
   std::vector<double> root_lh;
