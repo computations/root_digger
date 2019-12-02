@@ -334,6 +334,9 @@ dlh_t model_t::compute_dlh(const root_location_t &root) {
  *
  * Some tunables:
  *  - depth
+ *
+ * Generally the prefered function for this is brents. This is left here for
+ * legacy reasons.
  */
 std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
                                                    dlh_t d_beg,
@@ -685,7 +688,7 @@ std::vector<root_location_t> model_t::suggest_roots_random(size_t min,
   return random_roots;
 }
 
-/* Optimize the substitution parameters by simulated annealing */
+/* Optimize the substitution parameters and root location.*/
 std::pair<root_location_t, double>
 model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
                       double pgtol, double brtol, double factor) {
@@ -863,8 +866,6 @@ double gd_params(model_params_t &initial_params, size_t partition_index,
   while (true) {
     set_func(partition_index, parameters);
     double score = compute_lh();
-    // std::cout << std::fixed << std::setprecision(2) << "GD Iter: " << iters
-    //<< " Score: " << -score << std::endl;
     debug_print(EMIT_LEVEL_INFO, "GD Iter: %lu Score: %.5f", iters, -score);
     if (fabs(last_score - score) < atol) {
       break;
@@ -991,7 +992,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   }
   set_func(partition_index, parameters);
   score = compute_lh();
-  // assert_string(initial_score >= score, "Failed to improve the likelihood");
+  assert_string(initial_score >= score, "Failed to improve the likelihood");
   if (initial_score >= score) {
     std::swap(parameters, initial_params);
   }
