@@ -16,7 +16,7 @@ extern "C" {
 #include <vector>
 
 #include "debug.h"
-int __VERBOSE__ = EMIT_LEVEL_WARNING;
+int __VERBOSE__ = EMIT_LEVEL_PROGRESS;
 #include "model.hpp"
 #include "msa.hpp"
 #include "tree.hpp"

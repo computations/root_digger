@@ -723,7 +723,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
     set_subst_rates_uniform();
     set_empirical_freqs();
     ++root_index;
-    debug_print(EMIT_LEVEL_INFO, "Root %lu/%lu", root_index, root_count);
+    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu/%lu", root_index, root_count);
 
     move_root(rl);
     std::vector<model_params_t> subst_rates;
@@ -1164,9 +1164,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       gamma_alphas.push_back(1.0);
     }
 
-    debug_print(EMIT_LEVEL_INFO,
-                "Finding best root location for root %lu / %lu", root_index,
-                root_count);
+    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu / %lu", root_index, root_count);
 
     root_location_t cur_best_rl;
     double cur_best_lh = -INFINITY;
