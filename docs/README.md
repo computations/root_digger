@@ -21,20 +21,9 @@ the `bin` directory, along with `rd_test`, which is the test suite.
 
 # Usage
 
-    ./rd --msa <MSA FILE> --tree <TREE FILE> --model <MODEL FILE>
+    ./rd --msa <MSA FILE> --tree <TREE FILE> --data-type <DNA or AA>
 
 The MSA file can be in any format that is supported by `libpll`, which
 at the time of writing is one of: "relaxed" phylip or fasta. The tree
-file should contain a metric tree in newick format. The model file
-should be a comma separated list of numbers which specifies the
-subsitution model. For example, if you have some DNA data, and your
-substitution rate matrix looks like this:
+file should contain a metric tree in newick format.
 
-    *, a, b, c,
-    d, *, e, f,
-    g, h, *, i,
-    j, k, l, *,
-
-then the file should have the contents
-
-    a, b, c, d, e, f, g, h, i, j, k, l
