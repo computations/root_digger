@@ -339,15 +339,14 @@ int main(int argv, char **argc) {
                              cli_options.br_tolerance, cli_options.factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
-      final_tree_string = std::move(model.rooted_tree(final_rl).newick());
     } else {
       auto tmp = model.exhaustive_search(
           cli_options.abs_tolerance, cli_options.bfgs_tol,
           cli_options.br_tolerance, cli_options.factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
-      final_tree_string = std::move(model.unrooted_tree().newick());
     }
+    final_tree_string = std::move(model.rooted_tree(final_rl).newick());
     if (!cli_options.silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }
