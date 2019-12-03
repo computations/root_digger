@@ -27,7 +27,7 @@ def render_node(node):
     if hasattr(node, 'LWR'):
         lwr = float(node.LWR)
         label = ete3.faces.TextFace("{:.4}".format(lwr), fgcolor='Green')
-        if abs(lwr - 1.0) < 1e-12:
+        if abs(lwr) > 1e-7:
             label.inner_border.type = 0
             label.inner_border.width = 1
         node.add_face(label, column=cur_col)
