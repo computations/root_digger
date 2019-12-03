@@ -197,6 +197,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   attributes |= PLL_ATTRIB_NONREV;
   // attributes |= PLL_ATTRIB_PATTERN_TIP;
 
+  size_t total_weight = 0;
   for (size_t partition_index = 0; partition_index < msas.size();
        ++partition_index) {
     auto &msa = msas[partition_index];
@@ -205,6 +206,11 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
         _submodels, _tree.branch_count(), _n_rate_cats, _tree.branch_count(),
         attributes));
     _partition_weights.push_back(msa.total_weight());
+    total_weight+= msa.total_weight();
+  }
+
+  for(auto&& pw : _partition_weights){
+    pw /= (double)total_weight;
   }
 }
 
@@ -1072,8 +1078,8 @@ double model_t::gd_freqs(model_params_t &initial_freqs,
 double model_t::bfgs_gamma(double &initial_alpha, const root_location_t &rl,
                            size_t partition_index, double pgtol,
                            double factor) {
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1.0 - 1e-4 * 3;
+  constexpr double p_min = 0.2;
+  constexpr double p_max = 10000.0;
   constexpr double epsilon = 1e-4;
   model_params_t alpha(1);
   alpha[0] = initial_alpha;
@@ -1241,7 +1247,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
   debug_print(EMIT_LEVEL_DEBUG, "LWR denom: %f, %e", total_lh, total_lh - 1);
 
   for (auto kv : mapped_likelihoods) {
-    double lwr = exp(kv.second - max_lh) / total_lh;
+    double lwr = exp((kv.second - max_lh)) / total_lh;
     _tree.annotate_branch(kv.first, "LWR", std::to_string(lwr));
     _tree.annotate_lh(kv.first, kv.second);
     _tree.annotate_ratio(kv.first, kv.first.brlen_ratio);

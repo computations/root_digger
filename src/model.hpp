@@ -102,7 +102,7 @@ private:
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;
-  std::vector<unsigned int> _partition_weights;
+  std::vector<double> _partition_weights;
   std::minstd_rand _random_engine;
   uint64_t _seed;
   bool _early_stop;
@@ -111,7 +111,7 @@ private:
    * more, we can add support for more models..
    */
   static constexpr unsigned int _submodels = 1;
-  static constexpr unsigned int _n_rate_cats = 1;
+  static constexpr unsigned int _n_rate_cats = 4;
 };
 
 #endif
