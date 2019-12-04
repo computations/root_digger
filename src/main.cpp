@@ -143,7 +143,7 @@ struct cli_options_t {
   double factor = 1e4;
   double br_tolerance = 1e-12;
   double bfgs_tol = 1e-7;
-  unsigned int states = 0;
+  const unsigned int states = 4;
   bool silent = false;
   bool exhaustive = false;
   initialized_flag_t early_stop;
@@ -157,23 +157,22 @@ int main(int argv, char **argc) {
       {"model", required_argument, 0, 0},      /* 2 */
       {"freqs", required_argument, 0, 0},      /* 3 */
       {"seed", required_argument, 0, 0},       /* 4 */
-      {"states", required_argument, 0, 0},     /* 5 */
-      {"verbose", no_argument, 0, 0},          /* 6 */
-      {"silent", no_argument, 0, 0},           /* 7 */
-      {"min-roots", required_argument, 0, 0},  /* 8 */
-      {"root-ratio", required_argument, 0, 0}, /* 9 */
-      {"atol", required_argument, 0, 0},       /* 10 */
-      {"brtol", required_argument, 0, 0},      /* 11 */
-      {"bfgstol", required_argument, 0, 0},    /* 12 */
-      {"factor", required_argument, 0, 0},     /* 13 */
-      {"partition", required_argument, 0, 0},  /* 14 */
-      {"treefile", required_argument, 0, 0},   /* 15 */
-      {"exhaustive", no_argument, 0, 0},       /* 16 */
-      {"early-stop", no_argument, 0, 0},       /* 17 */
-      {"no-early-stop", no_argument, 0, 0},    /* 18 */
-      {"data-type", required_argument, 0, 0},  /* 19 */
-      {"version", no_argument, 0, 0},          /* 20 */
-      {"debug", no_argument, 0, 0},            /* 21 */
+      {"verbose", no_argument, 0, 0},          /* 5 */
+      {"silent", no_argument, 0, 0},           /* 6 */
+      {"min-roots", required_argument, 0, 0},  /* 7 */
+      {"root-ratio", required_argument, 0, 0}, /* 8 */
+      {"atol", required_argument, 0, 0},       /* 9 */
+      {"brtol", required_argument, 0, 0},      /* 10 */
+      {"bfgstol", required_argument, 0, 0},    /* 11 */
+      {"factor", required_argument, 0, 0},     /* 12 */
+      {"partition", required_argument, 0, 0},  /* 13 */
+      {"treefile", required_argument, 0, 0},   /* 14 */
+      {"exhaustive", no_argument, 0, 0},       /* 15 */
+      {"early-stop", no_argument, 0, 0},       /* 16 */
+      {"no-early-stop", no_argument, 0, 0},    /* 17 */
+      {"data-type", required_argument, 0, 0},  /* 18 */
+      {"version", no_argument, 0, 0},          /* 19 */
+      {"debug", no_argument, 0, 0},            /* 20 */
       {0, 0, 0, 0},
   };
 
@@ -203,60 +202,53 @@ int main(int argv, char **argc) {
       case 4: // seed
         cli_options.seed = atol(optarg);
         break;
-      case 5: // states
-        cli_options.states = atol(optarg);
-        break;
-      case 6: // verbose
+      case 5: // verbose
         __VERBOSE__ += 1;
         break;
-      case 7: // silent
+      case 6: // silent
         __VERBOSE__ = 0;
         cli_options.silent = true;
         break;
-      case 8: // min-roots
+      case 7: // min-roots
         cli_options.min_roots = atol(optarg);
         break;
-      case 9: // root-ratio
+      case 8: // root-ratio
         cli_options.root_ratio = atof(optarg);
         break;
-      case 10: // atol
+      case 9: // atol
         cli_options.abs_tolerance = atof(optarg);
         break;
-      case 11: // brtol
+      case 10: // brtol
         cli_options.br_tolerance = atof(optarg);
         break;
-      case 12: // bfgs_tol
+      case 11: // bfgs_tol
         cli_options.bfgs_tol = atof(optarg);
         break;
-      case 13: // factor
+      case 12: // factor
         cli_options.factor = atof(optarg);
         break;
-      case 14: // partition
+      case 13: // partition
         cli_options.partition_filename = optarg;
         break;
-      case 15: // treefile
+      case 14: // treefile
         cli_options.output_tree_filename = optarg;
         break;
-      case 16: // exhaustive
+      case 15: // exhaustive
         cli_options.exhaustive = true;
         if (!cli_options.early_stop.initalized()) {
           cli_options.early_stop = initialized_flag_t::initialized_false;
         }
         break;
-      case 17: // early-stop
+      case 16: // early-stop
         cli_options.early_stop = initialized_flag_t::initialized_true;
         break;
-      case 18: // no-early-stop
+      case 17: // no-early-stop
         cli_options.early_stop = initialized_flag_t::initialized_false;
         break;
-      case 19: // data-type
-        cli_options.data_type = optarg;
-        cli_options.states = data_type_to_states(cli_options.data_type);
-        break;
-      case 20: // version
+      case 18: // version
         print_version();
         return 0;
-      case 21: // debug
+      case 19: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
       default:
@@ -277,8 +269,6 @@ int main(int argv, char **argc) {
 
     if (!cli_options.model_filename.empty()) {
       model_params = parse_model_file(cli_options.model_filename);
-      cli_options.states =
-          static_cast<unsigned int>(std::ceil(std::sqrt(model_params.size())));
     } else if (cli_options.states == 0) {
       std::cout << "Please give either a model file, or a number of states to "
                    "the model"
