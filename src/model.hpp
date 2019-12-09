@@ -38,7 +38,8 @@ model_params_t random_params(size_t size, uint64_t seed);
 
 class model_t {
 public:
-  model_t(rooted_tree_t t, const std::vector<msa_t> &msa, uint64_t seed, bool early_stop);
+  model_t(rooted_tree_t t, const std::vector<msa_t> &msa,
+          const std::vector<size_t> &rate_cats, uint64_t seed, bool early_stop);
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
@@ -55,6 +56,7 @@ public:
   exhaustive_search(double atol, double pgtol, double brtol, double factor);
 
   const rooted_tree_t &rooted_tree(const root_location_t &root);
+  const rooted_tree_t &virtual_rooted_tree(const root_location_t &root);
   const rooted_tree_t &unrooted_tree();
 
   void initialize_partitions(const std::vector<msa_t> &);
@@ -98,20 +100,22 @@ private:
   double bfgs_gamma(double &intial_alpha, const root_location_t &rl,
                     size_t partition_index, double pgtol, double factor);
   double gd_gamma(double &intial_alpha, const root_location_t &rl,
-                    size_t partition_index);
+                  size_t partition_index);
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;
   std::vector<double> _partition_weights;
+  std::vector<std::vector<double>> _rate_weights;
+  std::vector<std::vector<unsigned int>> _param_indicies;
   std::minstd_rand _random_engine;
   uint64_t _seed;
+  // unsigned int _n_rate_cats = 2;
   bool _early_stop;
   /*
    * Only one submodel will be used for the time being. If there is desire for
    * more, we can add support for more models..
    */
   static constexpr unsigned int _submodels = 1;
-  static constexpr unsigned int _n_rate_cats = 4;
 };
 
 #endif

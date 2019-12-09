@@ -136,6 +136,7 @@ struct cli_options_t {
   std::string freqs_filename;
   std::string partition_filename;
   std::string data_type;
+  std::vector<size_t> rate_cats{1};
   uint64_t seed = std::random_device()();
   size_t min_roots = 1;
   double root_ratio = 0.05;
@@ -170,7 +171,7 @@ int main(int argv, char **argc) {
       {"exhaustive", no_argument, 0, 0},       /* 15 */
       {"early-stop", no_argument, 0, 0},       /* 16 */
       {"no-early-stop", no_argument, 0, 0},    /* 17 */
-      {"data-type", required_argument, 0, 0},  /* 18 */
+      {"rate-cats", required_argument, 0, 0},  /* 18 */
       {"version", no_argument, 0, 0},          /* 19 */
       {"debug", no_argument, 0, 0},            /* 20 */
       {0, 0, 0, 0},
@@ -245,10 +246,13 @@ int main(int argv, char **argc) {
       case 17: // no-early-stop
         cli_options.early_stop = initialized_flag_t::initialized_false;
         break;
-      case 18: // version
+      case 18: // rate-cats
+        cli_options.rate_cats = {(size_t)atol(optarg)};
+        break;
+      case 19: // version
         print_version();
         return 0;
-      case 19: // debug
+      case 20: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
       default:
@@ -311,7 +315,7 @@ int main(int argv, char **argc) {
         EMIT_LEVEL_INFO, "early stop: %d",
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive));
     model_t model{
-        tree, msa, cli_options.seed,
+        tree, msa, cli_options.rate_cats, cli_options.seed,
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)};
     try {
       model.initialize_partitions(msa);
@@ -329,14 +333,16 @@ int main(int argv, char **argc) {
                              cli_options.br_tolerance, cli_options.factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
+      final_tree_string = std::move(model.rooted_tree(final_rl).newick());
     } else {
       auto tmp = model.exhaustive_search(
           cli_options.abs_tolerance, cli_options.bfgs_tol,
           cli_options.br_tolerance, cli_options.factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
+      final_tree_string =
+          std::move(model.virtual_rooted_tree(final_rl).newick());
     }
-    final_tree_string = std::move(model.rooted_tree(final_rl).newick());
     if (!cli_options.silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }
