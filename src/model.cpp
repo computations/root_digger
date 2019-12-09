@@ -102,15 +102,15 @@ void model_t::set_subst_rates_random(size_t p_index, size_t states) {
 }
 
 void model_t::set_gamma_rates(size_t p_index) {
-  double rate_cats[_n_rate_cats] = {0};
-  pll_compute_gamma_cats(1.0, _n_rate_cats, rate_cats, PLL_GAMMA_RATES_MEAN);
-  pll_set_category_rates(_partitions[p_index], rate_cats);
+  pll_compute_gamma_cats(1.0, _rate_weights[p_index].size(),
+                         _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
+  pll_set_category_rates(_partitions[p_index], _rate_weights[p_index].data());
 }
 
 void model_t::set_gamma_rates(size_t p_index, double alpha) {
-  double rate_cats[_n_rate_cats] = {0};
-  pll_compute_gamma_cats(alpha, _n_rate_cats, rate_cats, PLL_GAMMA_RATES_MEAN);
-  pll_set_category_rates(_partitions[p_index], rate_cats);
+  pll_compute_gamma_cats(alpha, _rate_weights[p_index].size(),
+                         _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
+  pll_set_category_rates(_partitions[p_index], _rate_weights[p_index].data());
 }
 
 void model_t::update_invariant_sites(size_t p_index) {
@@ -125,8 +125,12 @@ void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
 
   for (int i = 0; i < msa.count(); ++i) {
     try {
-      pll_set_tip_states(_partitions[p_index], label_map.at(msa.label(i)),
-                         msa.map(), msa.sequence(i));
+      auto result =
+          pll_set_tip_states(_partitions[p_index], label_map.at(msa.label(i)),
+                             msa.map(), msa.sequence(i));
+      if (result == PLL_FAILURE) {
+        throw std::runtime_error("failed to set tip " + std::to_string(i));
+      }
     } catch (const std::exception &e) {
       throw std::runtime_error(std::string("Could not find taxa ") +
                                msa.label(i) + " in tree");
@@ -172,11 +176,16 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
 }
 
 model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
-                 uint64_t seed, bool early_stop)
+                 const std::vector<size_t> &rate_cats, uint64_t seed,
+                 bool early_stop)
     : _seed{seed}, _early_stop{early_stop} {
 
   _random_engine = std::minstd_rand(_seed);
   _tree = std::move(tree);
+  for (auto rc : rate_cats) {
+    _rate_weights.emplace_back(rc, 0.0);
+    _param_indicies.emplace_back(rc, 0);
+  }
 
   for (auto &msa : msas) {
     if (!msa.constiency_check(_tree.label_set())) {
@@ -203,13 +212,14 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
     auto &msa = msas[partition_index];
     _partitions.push_back(pll_partition_create(
         _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
-        _submodels, _tree.branch_count(), _n_rate_cats, _tree.branch_count(),
-        attributes));
+        _submodels, _tree.branch_count(), _rate_weights[partition_index].size(),
+        _tree.branch_count(), attributes));
     _partition_weights.push_back(msa.total_weight());
-    total_weight+= msa.total_weight();
+    set_gamma_rates(partition_index);
+    total_weight += msa.total_weight();
   }
 
-  for(auto&& pw : _partition_weights){
+  for (auto &&pw : _partition_weights) {
     pw /= (double)total_weight;
   }
 }
@@ -229,14 +239,13 @@ double model_t::compute_lh(const root_location_t &root_location) {
   GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
                           branch_lengths);
 
-  unsigned int params[4] = {0, 0, 0, 0};
   double lh = 0.0;
 
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    int result =
-        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
-                                 branch_lengths.data(), pmatrix_indices.size());
+    int result = pll_update_prob_matrices(
+        partition, _param_indicies[i].data(), pmatrix_indices.data(),
+        branch_lengths.data(), pmatrix_indices.size());
 
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
@@ -245,8 +254,8 @@ double model_t::compute_lh(const root_location_t &root_location) {
     pll_update_partials(partition, ops.data(), ops.size());
 
     lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
-                                         _tree.root_scaler_index(), params,
-                                         nullptr) *
+                                         _tree.root_scaler_index(),
+                                         _param_indicies[i].data(), nullptr) *
           _partition_weights[i];
   }
   return lh;
@@ -643,13 +652,11 @@ void model_t::move_root(const root_location_t &root_location) {
   GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
                           branch_lengths);
 
-  unsigned int params[4] = {0, 0, 0, 0};
-
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    int result =
-        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
-                                 branch_lengths.data(), pmatrix_indices.size());
+    int result = pll_update_prob_matrices(
+        partition, _param_indicies[i].data(), pmatrix_indices.data(),
+        branch_lengths.data(), pmatrix_indices.size());
 
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
@@ -803,6 +810,12 @@ const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
   return _tree;
 }
 
+const rooted_tree_t &model_t::virtual_rooted_tree(const root_location_t &root) {
+  _tree.root_by(root);
+  _tree.unroot();
+  return _tree;
+}
+
 const rooted_tree_t &model_t::unrooted_tree() {
   _tree.unroot();
   return _tree;
@@ -815,7 +828,7 @@ void model_t::initialize_partitions(const std::vector<msa_t> &msa) {
     update_invariant_sites(partition_index);
     set_empirical_freqs(partition_index);
     set_subst_rates_random(partition_index, msa[partition_index]);
-    set_gamma_rates(partition_index);
+    // set_gamma_rates(partition_index);
   }
 }
 

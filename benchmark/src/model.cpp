@@ -9,7 +9,7 @@ static void BM_model_constructor(benchmark::State &state) {
   uint64_t seed = std::rand();
   model_params_t freqs{.25, .25, .25, .25};
   for (auto _ : state) {
-    model_t{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
   }
 }
 
@@ -21,7 +21,7 @@ static void BM_LH_computation(benchmark::State &state) {
   rooted_tree_t tree{data_files_dna[data_keys[state.range(0)]].second};
   uint64_t seed = std::rand();
   model_params_t freqs{.25, .25, .25, .25};
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   auto rl = tree.root_location(state.range(1));
   for (auto _ : state) {
@@ -42,7 +42,7 @@ static void BM_DLH_computation(benchmark::State &state) {
   rooted_tree_t tree{data_files_dna[data_keys[state.range(0)]].second};
   uint64_t seed = std::rand();
   model_params_t freqs{.25, .25, .25, .25};
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   auto rl = tree.root_location(state.range(1));
   for (auto _ : state) {
@@ -62,7 +62,7 @@ static void BM_LH_root_computation(benchmark::State &state) {
   msa.emplace_back(data_files_dna["101.phy"].first);
   rooted_tree_t tree{data_files_dna["101.phy"].second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1},seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   auto rl = tree.root_location(state.range(0));
   model.compute_lh(rl);
