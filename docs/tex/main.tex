@@ -3,6 +3,7 @@
 \usepackage{hyperref}
 \usepackage{graphicx}
 \usepackage{xcolor}
+\usepackage{float}
 
 \title{Root Digger: a root placement program for phylogenetic trees}
 \author{Ben Bettisworth, Alexandros Stamatakis}
@@ -42,37 +43,44 @@
 % - What this method is
 % - Why should we use this method
 
-When inferring phylogenetic trees, it is common to infer unrooted trees. This
-due to a common assumption: reversibility of the character substituion process
-\cite{felsenstein_evolutionary_1981}. By making this assumption, the ability to
-distinguish a root is lost. A rooting is desirable, though, as it can resolve
-long standing disputes regarding the placment of large clades on the tree of
-life \cite{dunn_animal_2014}.
+When inferring phylogenetic trees, many phyogenetic inference tools
+\cite{stamatakis_raxml_2014} \cite{nguyen_iq-tree:_2015} will infer an unrooted
+tree. This due to a common (and default) assumption: reversibility of the
+character substituion process \cite{felsenstein_evolutionary_1981}. This
+assumption makes the problem of infering a phylogentic tree much more tractable,
+but by making this assumption the ability to distinguish a root is lost. A
+rooted phylogenetic tree is desirable, though, as it can resolve long standing
+disputes regarding the placment of large clades on the tree of life
+\cite{dunn_animal_2014} for example.
 
-There are several methods to root an existing phylogenetic tree, which generally
-fall into one of three categories: methods which use additional topological
-information not present in the molecular data; methods which utilize some
-variation of the molecular clock hypothesis; and methods which use a
+There are several methods to recover the root on an existing phylogenetic tree,
+which generally fall into one of three categories: methods which use additional
+topological information not present in the molecular data; methods which utilize
+some variation of the molecular clock hypothesis; and methods which use a
 non-reversable model.
 
 Methods that use additional topological information take advantage of prior
 knowledge about the world, which isn't present in the data that is used to infer
 a tree. In particular, knowledge about species which are distantly related can
-be used to add an outgroup to phylogenetic analysis. This outgroup can then be
-used to place the root on the tree.
+be used to add a so-called outgroup to phylogenetic analysis. This outgroup can
+then be used to place the root on the tree, as the most recent common anscestor
+of the ingroup and the outgroup must be the root of the tree.
 
 There are challenges to adding an outgroup to an analysis. Gatsey et.al.
 \cite{gatesy_how_2007} \BenComment{How do I cite papers directly, should I just
   use the number?} showed how adding a single taxa to an analysis can
 significantly impact the resulting tree topology, even for the taxa which were
-already present in the analysis. Holland \cite{holland_outgroup_2003}
-investigates this phenomenon in simulations, and that outgroups effecting the
-topology of ingroups can be uncomfortably common.
+already present in the analysis (the ingroup). Holland
+\cite{holland_outgroup_2003} investigates this phenomenon in simulations, and
+finds that outgroups effecting the topology of ingroups can be uncomfortably
+common.
 
 Alternativly, molecular clock analysis can be used to place a root without prior
 topological knowledge\cite{yang_computational_2006}. The molecular clock
 hypothesis says that base substitution "ticks" at stochastically constant rate.
 Using this assumption, or some variant, a likely root can be placed on the root.
+A simple version of this analysis is midpoint rooting, which uses a constant and
+static molecular clock assumption.
 
 Molecular clock analysis has its own difficulties. In particular, the clock
 does not "tick" at a constant rate all over the tree as shown in
@@ -85,8 +93,21 @@ analysis using a non-reversable model. By using a non-reversable model, we can
 place a direction of time for the branches on a tree
 \cite{yap_rooting_2005}. Several software packages are able to infer a
 phylogenetic tree under an unreversable model, thereby inferring a root
-\cite{nguyen_iq-tree:_2015} \cite{ronquist_mrbayes_2003}. \BenComment{Write a
-  bit here about why these existing solutions are slow}
+\cite{nguyen_iq-tree:_2015} \cite{ronquist_mrbayes_2003}.
+
+Non-reversible models for phylogenetic trees come in many forms. For example,
+accounting for duplication, transfer and loss events yields a non-reversible
+model. In particular, duplication events has been used to root a tree
+\cite{emms_stride:_2017}.
+
+A natural alternative to produce a non-reversible model is to drop the
+reversibility assumption of the standard phylogenetic inference models.
+Unfortunately, dropping this assumption can significantly effect the time
+required to find a good (high likelihood) phylogenetic tree. As a workaround, an
+unrooted tree which has already been inferred can be evaluated for possible root
+locations under a non-reversible model. With this method, we can find the most
+likely root. To this end, we introduce a phylogenetic tool called \RootDiggertt,
+which performs this analysis.
 
 %In phylogenetic analysis, it is common to infer an unrooted tree. This is due to
 %several factors, including: speed of analysis
@@ -117,14 +138,14 @@ of the tree as one of these Markov processes, we can calculate the likelihood of
 both the subsutution processes, and the choosen topology of the tree.
 
 Since it is commonly assumed that the Markovian process is reversible, the tree
-that results from this process lacks a root. If we eliminate the reversibility
+that results from this process lacks a root. When we relax the reversibility
 assumption, then we also loose the benefits of the pulley principle
 \cite{felsenstein_evolutionary_1981}. Since the root location effects the
-likelihood of the tree, then multiple rootings must be attempted for each tree.
-In the worst case, this increases the work {\em per tree} by a factor of
-$\mathcal{O}(n)$. While there are methods to reduce the amount of work required,
-eliminating the reversibility assumption drastically increases the effort
-required to infer a tree.
+likelihood of the tree, then multiple rootings need to be attempted for each
+tree in order to find the highest likelihood.  In the worst case, this increases
+the work {\em per tree} by a factor of $\mathcal{O}(n)$. While there are methods
+to reduce the amount of work required, eliminating the reversibility assumption
+drastically increases the effort required to infer a tree.
 
 Instead attempting to find the root for every tree encountered during the tree
 search, we can instead infer an unrooted tree using a reversible model, and then
@@ -134,23 +155,25 @@ during intermediate trees. There are still additional challenges though, as the
 likelihood function for rooting on a phylogenetic tree is filled with local
 maxima \cite{huelsenbeck_inferring_2002}.
 
-\RootDigger starts by selecting a set of branches at random (with replacement).
-The set of random branches will be used as the initial root location for the
-next stages of the search. The search then proceeds by setting the initial model
-parameters to be uniform, and then:
+\RootDiggertt{} has two modes, search and exhaustive. In search mode,
+the program starts by selecting a set of branches at random (with
+replacement).  The set of random branches will be used as the initial root
+location for the next stages of the search. The search then proceeds by setting
+the initial model parameters to be uniform, and then:
 
 \begin{enumerate}
   \item Optimize Rates (via BFGS).
   \item Optimize Frequencies (via BFGS).
-  \item Find and move to the next best root.
+  \item Find and move to the next best root (via Recursive Brent's Method).
   \item Check stopping criterion:
         \begin{itemize}
-          \item Is the current root location the same as the last iteration's root, taking
-                into account branch lengths?
-          \item Is the distance from the current log likelihood to previous log
-                likelihood?
+          \item (In early stop mode) Is the current root location the same as
+                the last iteration's root, taking into account branch lengths?
+          \item Is the difference between the current log likelihood to previous
+                log likelihood less than some tolerance?
         \end{itemize}
-  \item Repeat from 1 for a maximum of 1000 iterations.
+  \item If a stopping criterion is met: stop; otherwise repeat from 1 for a
+        maximum of 1000 iterations.
 \end{enumerate}
 
 Step 3 is performed by first calculating the top 5\% of root locations at the
@@ -182,6 +205,13 @@ half and searched for appropriate \footnotemark windows.
 \footnotetext{Appropriate here means that the sign of the function in question has
   opposite signs at the endpoints of the window.}
 
+In exhaustive mode, \RootDiggertt{} performs the same steps with two
+differences: every root is tried, not just a subset; and the root location is
+limited to the current branch. This has the effect of finding the best
+likelihood that a root is placed along this branch. The best root location for
+each branch, and a likelihood weight ratio is reported
+\cite{strimmer_inferring_2002}.
+
 \section{The Software}
 
 In order to implement both phylogenetic inference and non-reverable models,
@@ -199,7 +229,18 @@ github\footnote{\url{https://github.com/computations/root_digger}}.
 
 \section{Experiments and Results}
 
-To validate we ran experiments using the following pipeline:
+
+To validate \RootDiggertt{}, we conducted several experiments on both simulated
+data and emperical data. Furthermore, we also used Likelihood Weight Ratios
+(LWR) \cite{strimmer_inferring_2002} to asses the confidence in a root
+placement. Finally, we investigated how model selection effects the placement
+and confidence in a particular root placement.
+
+\subsection{Simulations}
+
+We first investigated using simulated data using a pipeline, which was to test
+against simulated data, and compare to IQ-TREE \cite{nguyen_iq-tree:_2015}. The
+pipeline is:
 
 \begin{enumerate}
   \item Generate a random tree with ETE3 \cite{huerta-cepas_ete_2016} and random
@@ -213,20 +254,15 @@ To validate we ran experiments using the following pipeline:
         \end{enumerate}
 \end{enumerate}
 
-Additionally, we repeat the pipeline for a specified number of iterations. We
-could vary two parameters: sites and taxa. The results from these experiements
-are summarized in table \ref{table:results}. The distance given is the average
-distance from the branch with the true root to the infered root location over
-100 trials. In addition to the simulated pipeline, we validated root digger with
-emperical data. The emperical datasets used are listed in
-table~\ref{table:datasets}.
-
-\begin{table}
-  \begin{center}
-    \include{tables/datasets}
-    \label{table:datasets}
-  \end{center}
-\end{table}
+Additionally, we repeat the pipeline for a specified number of iterations in
+order to determine how much the initial seed matters. Furthermore, we vary two
+additional parameters parameters: sites and taxa. The results from these
+experiments are summarized in table \ref{table:results}. The distance given is
+the average distance from the branch with the true root to the inferred root
+location over 100 trials. In addition to the simulated pipeline, we validated
+root digger with empirical data. The empirical datasets used are listed in
+table~\ref{table:datasets}.  These experiments were timed, and the results can
+be found in table \ref{table:time_results}
 
 \begin{table}
   \begin{center}
@@ -235,45 +271,135 @@ table~\ref{table:datasets}.
   \end{center}
 \end{table}
 
-\BenComment{TODO: Time benchmarks}
+\begin{table}
+  \begin{center}
+    \include{tables/time_results}
+    \label{table:time_results}
+  \end{center}
+\end{table}
+
+
+\subsection{Empirical Data}
+
+The empirical datasets were chosen to have an existing, strongly supported
+outgroup. The experiments were run on datasets with the outgroup included, as
+well as with the outgroup removed.
+
+\begin{table}[H]
+  \begin{center}
+    \include{tables/datasets}
+    \label{table:datasets}
+  \end{center}
+\end{table}
+
+\begin{table}
+  \begin{center}
+    \include{tables/emperical_results}
+    \label{table:emperical_results}
+  \end{center}
+\end{table}
+
+\subsection{Likelihood weight ratios}
+
+Additional experiments were conducted to investigate the nature of the
+distribution of root placements. To do this, we ran \RootDiggertt{} on the empirical
+datasets listed in table \ref{table:datasets} in exhaustive mode without early
+stop. This mode calculates a likelihood weight ratio for a root placement on
+each branch, and reports it.
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{figs/spiders/missing_species_no_outgroup_lwr.png}
+    \caption{SpidersMissingSpecies dataset analyzed without an outgroup.}
+    \label{fig:spiders-missing-species-no-outgroup}
+  \end{center}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{figs/spiders/missing_species_outgroup_lwr.png}
+    \caption{SpidersMissingSpecies dataset analyzed with an outgroup.}
+    \label{fig:spiders-missing-species-outgroup}
+  \end{center}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{figs/spiders/mito_no_outgroup_lwr.png}
+    \caption{SpidersMitocondrial dataset analyzed without an outgroup.}
+    \label{fig:spiders-mito-no-outgroup}
+  \end{center}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{figs/spiders/mito_outgroup_lwr.png}
+    \caption{SpidersMitocondrial dataset analyzed with an outgroup.}
+    \label{fig:spiders-mito-outgroup}
+  \end{center}
+\end{figure}
+
+%\begin{figure}[H]
+%  \begin{center}
+%    \includegraphics[width=.75\linewidth]{figs/ficus/ficus_no_outgroup_lwr.png}
+%    \caption{Ficus dataset analyzed without an outgroup.}
+%    \label{fig:ficus-no-outgroup}
+%  \end{center}
+%\end{figure}
+%
+%\begin{figure}[H]
+%  \begin{center}
+%    \includegraphics[width=.75\linewidth]{figs/ficus/ficus_outgroup_lwr.png}
+%    \caption{Ficus dataset analyzed with an outgroup.}
+%    \label{fig:ficus-outgroup}
+%  \end{center}
+%\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.5\linewidth]{figs/angio/cds12_no_outgroup_lwr.png}
+    \caption{AngiospermsCDS12 dataset analyzed without an outgroup.}
+    \label{fig:angio-cds12-no-outgroup}
+  \end{center}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.5\linewidth]{figs/angio/cds12_outgroup_lwr.png}
+    \caption{AngiospermsCDS12 dataset analyzed with an outgroup.}
+    \label{fig:angio-cds12-outgroup}
+  \end{center}
+\end{figure}
+
+\subsection{Effect of model selection on results}
+
+We also investigated the effect of model selection on the results. We did this
+by running \RootDiggertt{} in exhaustive mode with a varying number of rate
+categories for the SpidersMitocondrial dataset. The result of this analysis can
+be seen in figures~\ref{fig:spiders1rate} and \ref{fig:spiders2rate}. Of
+particular note is that increasing the number of rate categories not only
+moves the root to an erroneous location, it increases the confidence
+significantly.
+
+\begin{figure}[H]
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{figs/spiders/1rate.png}
+    \caption{SpidersMitocondrial dataset analyzed with 1 rate category.}
+    \label{fig:spiders1rate}
+  \end{center}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{figs/spiders/2rate.png}
+    \caption{SpidersMitocondrial dataset analyzed with 2 rate categories.}
+    \label{fig:spiders2rate}
+  \end{center}
+\end{figure}
+
+\section{Discussion}
 
 \section{Conclusion}
-
-\BenComment{Update this section with the new results}
-
-Placing a root by a non-reversable model is challenging. Traditional
-optimization methods have many difficulties finding true optima in a space with
-many local optima. Nevertheless, a root can be placed efficiently and accuratly.
-
-We did find evidence of a form of long branch attraction. In figures
-?? and ?? we can see examples of this. In these
-cases, an interior branch is exceptionally (50x) longer than the rest of the
-braches. We claim that while this is concerning, it is also a pathalogical case.
-Normally, a taxa with such a long branch length leading to it would be
-considered an outgroup.
-
-Other than the pathelogical cases of extremely long branches, we found that
-\RootDigger manages to place the root with good accuracy, normally exceeding
-60\%, more often falling in the 75\% range. This suggests a good convergence,
-where multiple runs of \RootDigger strongly reinforce the true location of the
-root.
-
-We found that with our method, the root was reasonably stable for various
-lengths of alignments. This suggests that the placement of a root on a tree can
-be done even when large quantities of data are not present.
-
-Going forward, there are several improvements to the software that can be done.
-First is implementing an analytical derivative for the likelihood of a placement
-of a root along a given branch. \RootDigger spends \~ 40\% of its time,
-calculating this derivative. While computing the derivative analyticallly
-wouldn't eliminate the time spent on calculating derivatives, it will likely
-reduce it by at least half.
-
-Secondly, there are feature improvements that could be made. Currently,
-\RootDigger only supports single partition models with the UNREST (called 12.12
-in IQ-TREE) model. An obvious improvement is to increase the number of models
-that are supported, particularly those models which are a part of the Lie Group
-\cite{woodhams_new_2015}.
 
 \bibliographystyle{acm}
 \bibliography{main}
