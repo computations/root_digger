@@ -22,7 +22,7 @@ TEST_CASE("model_t constructor", "[model_t]") {
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
   }
 }
@@ -36,7 +36,7 @@ TEST_CASE("model_t constructor with partitions", "[model_t]") {
   parts.push_back(parse_partition_info("DNA, PART_1= 101-200"));
   auto msa = unparted_msa.partition(parts);
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1,1}, seed, false};
 }
 
 TEST_CASE("model_t compute lh", "[model_t]") {
@@ -45,7 +45,7 @@ TEST_CASE("model_t compute lh", "[model_t]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   for (size_t i = 0; i < tree.root_count(); ++i) {
     if (tree.root_location(i).edge->back == nullptr) {
@@ -64,7 +64,7 @@ TEST_CASE("model_t compute lh, all data", "[!hide][all_data][model_t]") {
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
     for (size_t i = 0; i < tree.root_count(); ++i) {
       if (tree.root_location(i).edge->back == nullptr) {
@@ -83,7 +83,7 @@ TEST_CASE("model_t compute dlh/da", "[model_t][opt]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   for (size_t i = 0; i < tree.root_count(); ++i) {
     if (tree.root_location(i).edge->back == nullptr) {
@@ -104,7 +104,7 @@ TEST_CASE("model_t compute dlh/da, all data",
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
     for (size_t i = 0; i < tree.root_count(); ++i) {
       if (tree.root_location(i).edge->back == nullptr) {
@@ -125,7 +125,7 @@ TEST_CASE("model_t optimize root locations on individual roots",
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   for (size_t i = 0; i < tree.root_count(); ++i) {
     if (tree.root_location(i).edge->back == nullptr) {
@@ -143,7 +143,7 @@ TEST_CASE("model_t optimize root locations on individual roots, all data",
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
     for (size_t i = 0; i < tree.root_count(); ++i) {
       if (tree.root_location(i).edge->back == nullptr) {
@@ -160,7 +160,7 @@ TEST_CASE("model_t optimize root locations with beg points", "[model_t][opt]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   for (size_t i = 0; i < tree.root_count(); ++i) {
     if (tree.root_location(i).edge->back == nullptr) {
@@ -180,7 +180,7 @@ TEST_CASE("model_t optimize root locations with beg points, all data",
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
     for (size_t i = 0; i < tree.root_count(); ++i) {
       if (tree.root_location(i).edge->back == nullptr) {
@@ -199,7 +199,7 @@ TEST_CASE("model_t optimize root locations with end points", "[model_t][opt]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   for (size_t i = 0; i < tree.root_count(); ++i) {
     if (tree.root_location(i).edge->back == nullptr) {
@@ -219,7 +219,7 @@ TEST_CASE("model_t optimize root locations with end points, all data",
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
     for (size_t i = 0; i < tree.root_count(); ++i) {
       if (tree.root_location(i).edge->back == nullptr) {
@@ -238,7 +238,7 @@ TEST_CASE("model_t optimize whole tree", "[model_t]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   auto rl = model.optimize_root_location().first;
   CHECK(rl.brlen_ratio >= 0.0);
@@ -253,7 +253,7 @@ TEST_CASE("model_t optimize whole tree, all data",
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
     auto rl = model.optimize_root_location().first;
     CHECK(rl.brlen_ratio >= 0.0);
@@ -267,7 +267,7 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   for (size_t i = 0; i < tree.root_count(); ++i) {
     if (tree.root_location(i).edge->back == nullptr) {
@@ -288,7 +288,7 @@ TEST_CASE("model_t liklihood computation, all data",
     msa.emplace_back(ds.first);
     rooted_tree_t tree{ds.second};
     uint64_t seed = std::rand();
-    model_t model{tree, msa, seed, false};
+    model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
     for (size_t i = 0; i < tree.root_count(); ++i) {
       if (tree.root_location(i).edge->back == nullptr) {
@@ -308,10 +308,10 @@ TEST_CASE("model_t optimize all", "[model_t]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   auto initial_rl = model.optimize_root_location();
-  auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e-7, 1e7);
+  auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
   auto final_rl = tmp.first;
   auto final_lh = tmp.second;
   CHECK(final_lh >= initial_rl.second);
@@ -324,7 +324,7 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   auto initial_rl = model.optimize_root_location();
   auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e-7, 1e7);
@@ -334,13 +334,13 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   CHECK(model.compute_lh(final_rl) == Approx(final_lh));
 }
 
-TEST_CASE("model_t move root", "[model_t]") {
+TEST_CASE("model_t move root", "[!hide][model_t]") {
   auto ds = data_files_dna["101.phy"];
   std::vector<msa_t> msa;
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
-  model_t model{tree, msa, seed, false};
+  model_t model{tree, msa, {1}, seed, false};
 
   model.set_subst_rates(
       0, {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});

@@ -10,6 +10,9 @@ parser.add_argument('--tree', type=str)
 parser.add_argument('--image', type=str)
 args = parser.parse_args()
 
+color1 = "#1f77b4"
+color2 = "#ff7f0e"
+
 if not os.path.isfile(args.tree):
     print("file not found")
     os.exit(1)
@@ -26,14 +29,15 @@ def render_node(node):
         cur_col += 1
     if hasattr(node, 'LWR'):
         lwr = float(node.LWR)
-        label = ete3.faces.TextFace("{:.4}".format(lwr), fgcolor='Green')
-        if abs(lwr) > 1e-7:
-            label.inner_border.type = 0
-            label.inner_border.width = 1
+        label = ete3.faces.TextFace("{:.4}".format(lwr), fgcolor=color1)
+        if abs(lwr) < 1e-7:
+            return
+        # label.inner_border.type = 0
+        # label.inner_border.width = 1
         node.add_face(label, column=cur_col)
     if hasattr(node, 'alpha'):
         alpha = float(node.alpha)
-        label = ete3.faces.TextFace("{:.3}".format(alpha), fgcolor='Red')
+        label = ete3.faces.TextFace("{:.3}".format(alpha), fgcolor=color2)
         node.add_face(label, column=cur_col)
     if hasattr(node, 'foo'):
         label = ete3.faces.TextFace(node.foo, fgcolor='Green')
@@ -45,8 +49,8 @@ def render_node(node):
 
 ts = ete3.TreeStyle()
 ts.layout_fn = render_node
-leg1 = ete3.faces.TextFace("Likelihood Weight Ratio", fgcolor="Green")
-leg2 = ete3.faces.TextFace("Alpha", fgcolor="Red")
+leg1 = ete3.faces.TextFace("Likelihood Weight Ratio", fgcolor=color1)
+leg2 = ete3.faces.TextFace("Alpha", fgcolor=color2)
 ts.legend.add_face(leg1, column=0)
 ts.legend.add_face(leg2, column=0)
 ts.show_leaf_name = False
