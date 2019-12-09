@@ -1164,6 +1164,8 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
   double best_lh = -INFINITY;
   size_t root_count = _tree.root_count();
   std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
+  debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
+
   for (auto rl : _tree.roots()) {
     set_subst_rates_uniform();
     set_empirical_freqs();
@@ -1182,8 +1184,6 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
       gamma_alphas.push_back(1.0);
     }
-
-    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu / %lu", root_index, root_count);
 
     root_location_t cur_best_rl;
     double cur_best_lh = -INFINITY;
@@ -1239,6 +1239,8 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
 
       rl = cur_rl;
     }
+
+    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu / %lu", root_index, root_count);
 
     mapped_likelihoods.emplace_back(cur_best_rl, cur_best_lh);
     if (cur_best_lh > best_lh) {
