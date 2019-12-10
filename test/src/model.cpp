@@ -340,13 +340,14 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   CHECK(model.compute_lh(final_rl) == Approx(final_lh));
 }
 
-TEST_CASE("model_t move root", "[!hide][model_t]") {
+TEST_CASE("model_t move root", "[model_t]") {
   auto ds = data_files_dna["101.phy"];
   std::vector<msa_t> msa;
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
   model_t model{tree, msa, {1}, seed, false};
+  model.initialize_partitions(msa);
 
   model.set_subst_rates(
       0, {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
@@ -358,4 +359,15 @@ TEST_CASE("model_t move root", "[!hide][model_t]") {
       CHECK(root_lh[i] == Approx(root_lh[j]));
     }
   }
+}
+
+TEST_CASE("model_t exhaustive search", "[model_t]"){
+  auto ds = data_files_dna["10.fasta"];
+  std::vector<msa_t> msa;
+  msa.emplace_back(ds.first);
+  rooted_tree_t tree{ds.second};
+  uint64_t seed = std::rand();
+  model_t model{tree, msa, {1}, seed, false};
+  model.initialize_partitions(msa);
+  model.exhaustive_search(1e-3, 1e-3, 1e-3, 1e12);
 }
