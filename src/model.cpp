@@ -204,7 +204,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   }
 
   attributes |= PLL_ATTRIB_NONREV;
-  // attributes |= PLL_ATTRIB_PATTERN_TIP;
+  attributes |= PLL_ATTRIB_SITE_REPEATS;
 
   size_t total_weight = 0;
   for (size_t partition_index = 0; partition_index < msas.size();
