@@ -131,6 +131,7 @@ TEST_CASE("model_t optimize root locations on individual roots",
     if (tree.root_location(i).edge->back == nullptr) {
       continue;
     }
+    model.compute_lh(tree.root_location(i));
     model.optimize_alpha(tree.root_location(i), 1e-7);
   }
 }
@@ -149,6 +150,7 @@ TEST_CASE("model_t optimize root locations on individual roots, all data",
       if (tree.root_location(i).edge->back == nullptr) {
         continue;
       }
+      model.compute_lh(tree.root_location(i));
       model.optimize_alpha(tree.root_location(i), 1e-7);
     }
   }
@@ -168,6 +170,7 @@ TEST_CASE("model_t optimize root locations with beg points", "[model_t][opt]") {
     }
     auto rl = tree.root_location(i);
     rl.brlen_ratio = 0.0;
+    model.compute_lh(rl);
     model.optimize_alpha(rl, 1e-7);
   }
 }
@@ -188,6 +191,7 @@ TEST_CASE("model_t optimize root locations with beg points, all data",
       }
       auto rl = tree.root_location(i);
       rl.brlen_ratio = 0.0;
+      model.compute_lh(rl);
       model.optimize_alpha(rl, 1e-7);
     }
   }
@@ -207,6 +211,7 @@ TEST_CASE("model_t optimize root locations with end points", "[model_t][opt]") {
     }
     auto rl = tree.root_location(i);
     rl.brlen_ratio = 1.0;
+    model.compute_lh(rl);
     model.optimize_alpha(rl, 1e-7);
   }
 }
@@ -227,6 +232,7 @@ TEST_CASE("model_t optimize root locations with end points, all data",
       }
       auto rl = tree.root_location(i);
       rl.brlen_ratio = 1.0;
+      model.compute_lh(rl);
       model.optimize_alpha(rl, 1e-7);
     }
   }
