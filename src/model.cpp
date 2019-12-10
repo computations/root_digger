@@ -645,8 +645,6 @@ std::pair<root_location_t, double> model_t::optimize_root_location() {
 }
 
 void model_t::move_root(const root_location_t &root_location) {
-  compute_lh(root_location);
-  return;
   std::vector<pll_operation_t> ops;
   std::vector<unsigned int> pmatrix_indices;
   std::vector<double> branch_lengths;
