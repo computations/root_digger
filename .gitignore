@@ -5,3 +5,4 @@ build/*
 tags
 *.tar.gz
 exp/*
+compile_commands.json
