@@ -286,6 +286,10 @@ int main(int argv, char **argc) {
 
     debug_print(EMIT_LEVEL_INFO, "abs_tolerance: %f",
                 cli_options.abs_tolerance);
+    if (cli_options.exhaustive &&
+        cli_options.early_stop.convert_with_default(!cli_options.exhaustive)) {
+      debug_string(EMIT_LEVEL_IMPORTANT, "INFO: Early stop is enabled");
+    }
 
     const pll_state_t *map = nullptr;
     if (cli_options.states == 4)
@@ -311,9 +315,6 @@ int main(int argv, char **argc) {
 
     rooted_tree_t tree{cli_options.tree_filename};
 
-    debug_print(
-        EMIT_LEVEL_INFO, "early stop: %d",
-        cli_options.early_stop.convert_with_default(!cli_options.exhaustive));
     model_t model{
         tree, msa, cli_options.rate_cats, cli_options.seed,
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)};
