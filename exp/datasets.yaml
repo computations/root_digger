@@ -1,0 +1,67 @@
+angio:
+    directory: angiosperms
+    datasets:
+        - msa: cds_outgroup_removed.fasta
+          tree: cds_outgroup_removed_opt_brlen.tree
+          results: cds_no_outgroup_lwr.newick
+          image: cds_no_outgroup.png
+          log: cds_no_outgroup.log
+        - msa: cds12_outgroup_removed.fasta
+          tree: cds12_outgroup_removed_opt_brlen.tree
+          results: cds12_no_outgroup_lwr.newick
+          image: cds12_no_outgroup.png
+          log: cds12_no_outgroup.log
+        - msa: cds.fasta
+          tree: cds.tree
+          results: cds_with_outgroup_lwr.newick
+          image: cds_with_outgroup.png
+          log: cds_with_outgroup.log
+        - msa: cds12.fasta
+          tree: cds12.tree
+          results: cds12_with_outgroup_lwr.newick
+          image: cds12_with_outgroup.png
+          log: cds12_with_outgroup.log
+ficus:
+    directory: ficus
+    datasets:
+        - msa: ficus.fasta
+          tree: ficus_rooted_removed_outgroup_opt.nwk
+          results: ficus_no_outgroup_lwr.newick
+          image: ficus_no_outgroup.png
+          log: ficus_no_outgroup.log
+        - msa: ficus_outgroup.fasta
+          tree: ficus_outgroup.tree
+          results: ficus_with_outgroup_lwr.newick
+          image: ficus_with_outgroup.png
+          log: ficus_with_outgroup.log
+grasses:
+    directory: grasses
+    datasets:
+        - msa: plastid245.fasta
+          tree: plastid245_brlen_opt.nwk
+          results: plastid245_no_outgroup_lwr.nwk
+          image: plastid245_no_outgroup.png
+          log: plastid245_no_outgroup.log
+spiders:
+    directory: spiders
+    datasets:
+        - msa: missing_species.fasta
+          tree: ml_missing_species_opt_brlen.tree
+          results: missing_species_no_outgroup_lwr.tree
+          image: missing_species_no_outgroup.png
+          log: missing_species_no_outgroup.log
+        - msa: missing_species_outgroup.fasta
+          tree: ml_missing_species_outgroup.nwk
+          results: missing_species_with_outgroup_lwr.newick
+          image: missing_species_with_outgroup.png
+          log: missing_species_with_outgroup.log
+        - msa: mitocondrial.fasta
+          tree: mitocondrial_opt_brlen.tree
+          results: mito_no_outgroup_lwr.newick
+          image: mito_no_outgroup.png
+          log: mito_no_outgroup.log
+        - msa: mitocondrial_outgroup.fasta
+          tree: ml_missing_species_outgroup.nwk
+          results: mito_with_outgroup_lwr.newick
+          image: mito_with_outgroup.png
+          log: mito_no_outgroup.log
