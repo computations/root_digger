@@ -18,7 +18,9 @@ import itertools
 import Bio
 import ete3
 import numpy
+import plotnine
 import progressbar
+import pandas
 from Bio import SeqIO
 
 progressbar.streams.flush()
@@ -45,8 +47,7 @@ CONTROL_FILE = """
 """
 
 RD = os.path.abspath(
-    "../bin/rd"
-) + " --msa {msa} --tree {tree} --states 4 --seed {seed} --force"
+    "../bin/rd") + " --msa {msa} --tree {tree} --seed {seed} --force"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
@@ -594,6 +595,9 @@ class summary:
             'iq_right_clade',
         ]
 
+    def make_times_header(self):
+        return ['tree', 'alignment', 'rd_time', 'iq_time']
+
     def write(self, prefix):
         csv_filename = prefix + '.csv'
         header = self.make_header()
@@ -607,6 +611,14 @@ class summary:
         with open(json_filename, 'w') as results_file:
             json.dump([r.dict() for r in self.generate_rows(json=True)],
                       results_file)
+        csv_exp_times_filename = prefix + '_times.csv'
+        with open(csv_exp_times_filename, 'w') as results_file:
+            header = self.make_times_header()
+            results_file.write(','.join(header))
+            results_file.write('\n')
+            for row in self.generate_time_row():
+                results_file.write(row.make_row(header))
+                results_file.write('\n')
 
     def generate_rows(self, json=False):
         for k in self._experiments:
@@ -624,15 +636,31 @@ class summary:
                 stats['true_tree'] = self.true_tree(k)
                 stats['left_clade'] = self.left_clades_list(k)
                 stats['right_clade'] = self.right_clades_list(k)
+                stats['times'] = self.times_list(k)
             else:
                 stats['left_clade'] = self.left_clades(k)
                 stats['right_clade'] = self.right_clades(k)
             yield summary_row(k, stats)
 
+    def generate_time_row(self):
+        for k in self._experiments:
+            times = self.times_list(k)
+            for t1, t2 in zip(times['rd'], times['iq']):
+                stats = {}
+                stats = {'time' : {'rd' : t1, 'iq': t2}}
+                yield summary_row(k, stats)
+
+
     def true_tree(self, k):
         if not self._rd_results[0][k].true_tree is None:
             return self._rd_results[0][k].true_tree
         return self._iq_results[k].true_tree
+
+    def times_list(self, k):
+        return {
+            'rd': summary._list_attr(self._rd_results, k, 'time'),
+            'iq': summary._list_attr(self._iq_results, k, 'time')
+        }
 
     def mean_times(self, k):
         return {
@@ -735,6 +763,12 @@ class summary:
                 else:
                     counts[k] = 1
             return counts
+        return None
+
+    @staticmethod
+    def _list_attr(results, e, key):
+        if not None in results:
+            return [getattr(r[e], key) for r in results]
         return None
 
     @staticmethod
@@ -864,8 +898,9 @@ def map_root_iq(true_tree, left_clades, right_clades):
             node.iq_map += 1
 
 
-def produce_mapped_root_images(json_results_filename, map_iqtree=True,
-        map_rd=True):
+def produce_mapped_root_images(json_results_filename,
+                               map_iqtree=True,
+                               map_rd=True):
     with open(json_results_filename) as json_file:
         results = json.load(json_file)
     for result in results:
@@ -884,8 +919,8 @@ def produce_mapped_root_images(json_results_filename, map_iqtree=True,
                         str(node.rd_map) if hasattr(node, 'rd_map') else (0),
                         fgcolor='Green')
                     if node.rd_map == 100:
-                        rd_label.inner_border.type=0
-                        rd_label.inner_border.width=1
+                        rd_label.inner_border.type = 0
+                        rd_label.inner_border.width = 1
                     node.add_face(rd_label, column=0)
             if map_iqtree:
                 if hasattr(node, 'iq_map'):
@@ -893,11 +928,11 @@ def produce_mapped_root_images(json_results_filename, map_iqtree=True,
                         str(node.iq_map) if hasattr(node, 'iq_map') else (0),
                         fgcolor='Red')
                     if node.iq_map == 100:
-                        iq_label.inner_border.type=0
-                        iq_label.inner_border.width=1
+                        iq_label.inner_border.type = 0
+                        iq_label.inner_border.width = 1
                     node.add_face(iq_label, column=0)
             if node.name:
-                node.add_face(ete3.faces.TextFace(node.name), column = 1)
+                node.add_face(ete3.faces.TextFace(node.name), column=1)
 
         ts = ete3.TreeStyle()
         cur_col = 0
