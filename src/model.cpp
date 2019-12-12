@@ -1193,11 +1193,11 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
         set_gamma_rates(i, gamma_alphas[i]);
-        debug_string(EMIT_LEVEL_DEBUG, "Optimizing Freqs");
+        debug_string(EMIT_LEVEL_DEBUG, "Optimizing gamma rates");
         bfgs_gamma(gamma_alphas[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_DEBUG, "Optmizing Rates");
+        debug_string(EMIT_LEVEL_DEBUG, "Optmizing rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_DEBUG, "Optimizing Freqs");
+        debug_string(EMIT_LEVEL_DEBUG, "Optimizing freqs");
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
       }
 
