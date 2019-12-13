@@ -37,6 +37,7 @@ def check_done(msa):
 def run_rd(msa, tree, treefile, image, log):
     if check_done(msa):
         return
+    print("rd: ", msa)
     with open(log, 'a') as logfile:
         subprocess.run(produce_rd_command(msa, tree, treefile), stdout=logfile)
     set_done(msa)
