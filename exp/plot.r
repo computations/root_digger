@@ -19,6 +19,6 @@ json_data[, alignment_name := paste(alignment, "Sites"), by=list(alignment)]
 bins = ceiling(2 * data_len^(1/3))
 
 ggplot(data = json_data, aes(x = rd_time)) + geom_histogram(aes(y = ..count../sum(..count..)), bins = bins) + 
-    facet_grid(tree_name ~ alignment_name) + labs(x = "Time(s)", y = "Density")
+    facet_wrap(tree_name ~ alignment_name, scales="free") + labs(x = "Time(s)", y = "Density") + theme_minimal()
 
 ggsave("ggtest.png")

@@ -5,11 +5,13 @@ import subprocess
 import yaml
 import os
 import datetime
+import importlib
+
+drawlh = importlib.import_module('drawlh')
 
 RD = os.path.abspath(
     "../bin/rd"
 ) + " --msa {msa} --tree {tree} --exhaustive --early-stop --treefile {treefile}"
-
 
 def produce_rd_command(msa, tree, treefile):
     return RD.format(msa=msa, tree=tree, treefile=treefile).split(' ')
@@ -32,7 +34,9 @@ def check_done(msa):
     return os.path.exists(make_done_file(msa))
 
 
-def run_rd(msa, tree, treefile, log):
+def run_rd(msa, tree, treefile, image, log):
+    if check_done(msa):
+        return
     with open(log, 'a') as logfile:
         subprocess.run(produce_rd_command(msa, tree, treefile), stdout=logfile)
     set_done(msa)
@@ -42,13 +46,14 @@ def make_file_paths(directory_root, dataset):
     msa = os.path.join(directory_root, ds['msa'])
     tree = os.path.join(directory_root, ds['tree'])
     results = os.path.join(directory_root, ds['results'])
+    image = os.path.join(directory_root, ds['image'])
     log = os.path.join(directory_root, ds['log'])
-    return (msa, tree, results, log)
+    return (msa, tree, results, image, log)
 
 
 def verify_dataset(directory_root, datasets):
     for ds in datasets:
-        msa, tree, results, log = make_file_paths(directory_root, ds)
+        msa, tree, results, image, log = make_file_paths(directory_root, ds)
         if not os.path.exists(msa):
             raise Exception("msa file: " + msa + " does not exist")
         if not os.path.exists(tree):
@@ -68,3 +73,12 @@ for k, d in datasets.items():
 
 tp = multiprocessing.pool.ThreadPool()
 tp.starmap(run_rd, jobs)
+
+for k, d in datasets.items():
+    directory_root = d['directory']
+    for ds in d['datasets']:
+        try:
+            _, tree, results, image, _ = make_file_paths(directory_root, ds)
+            drawlh.draw_lh(tree, image, results, False)
+        except Exception as e:
+            print(directory_root,":", ds['msa'], ":", e)
