@@ -45,6 +45,7 @@ static void BM_DLH_computation(benchmark::State &state) {
   model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   auto rl = tree.root_location(state.range(1));
+  model.compute_lh(rl);
   for (auto _ : state) {
     benchmark::DoNotOptimize(model.compute_dlh(rl));
   }
