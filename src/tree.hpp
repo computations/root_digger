@@ -37,18 +37,20 @@ pll_utree_t *parse_tree_file(const std::string &tree_filename);
 
 class rooted_tree_t {
 public:
-  rooted_tree_t() : _tree{nullptr}, _roots{} {}
+  rooted_tree_t() : _tree{nullptr}, _roots{}, _rooted{false} {}
 
   rooted_tree_t(const std::string &tree_filename)
-      : _tree{parse_tree_file(tree_filename)}, _roots{} {
+      : _tree{parse_tree_file(tree_filename)}, _roots{}, _rooted{false} {
     if (_tree == nullptr) {
       throw std::invalid_argument("Tree file could not be parsed");
     }
     generate_root_locations();
+    add_root_space();
   }
 
   rooted_tree_t(rooted_tree_t &&other)
-      : _tree{std::move(other._tree)}, _roots{std::move(other._roots)} {
+      : _tree{std::move(other._tree)}, _roots{std::move(other._roots)},
+        _rooted{other._rooted} {
     other._tree = nullptr;
   }
 
@@ -115,7 +117,7 @@ public:
 
 private:
   void generate_root_locations();
-  void deduplicate_roots();
+  void add_root_space();
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;
   void find_path(pll_unode_t *n1, pll_unode_t *n2);
@@ -130,6 +132,7 @@ private:
   std::unordered_map<pll_unode_t *,
                      std::vector<std::pair<std::string, std::string>>>
       _root_annotations;
+  bool _rooted;
 };
 
 #endif

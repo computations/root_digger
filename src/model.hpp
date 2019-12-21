@@ -45,7 +45,8 @@ public:
   double compute_lh_root(const root_location_t &root);
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root, double atol);
-  std::pair<root_location_t, double> optimize_root_location();
+  std::pair<root_location_t, double> optimize_root_location(size_t min_roots,
+                                                            double root_ratio);
 
   std::pair<root_location_t, double> optimize_all(size_t min_roots,
                                                   double root_ratio,

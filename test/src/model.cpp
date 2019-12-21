@@ -246,7 +246,7 @@ TEST_CASE("model_t optimize whole tree", "[model_t]") {
   uint64_t seed = std::rand();
   model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
-  auto rl = model.optimize_root_location().first;
+  auto rl = model.optimize_root_location(1, .05).first;
   CHECK(rl.brlen_ratio >= 0.0);
   CHECK(rl.brlen_ratio <= 1.0);
 }
@@ -261,7 +261,7 @@ TEST_CASE("model_t optimize whole tree, all data",
     uint64_t seed = std::rand();
     model_t model{tree, msa, {1}, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
-    auto rl = model.optimize_root_location().first;
+    auto rl = model.optimize_root_location(1, .05).first;
     CHECK(rl.brlen_ratio >= 0.0);
     CHECK(rl.brlen_ratio <= 1.0);
   }
@@ -316,7 +316,7 @@ TEST_CASE("model_t optimize all", "[model_t]") {
   uint64_t seed = std::rand();
   model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
-  auto initial_rl = model.optimize_root_location();
+  auto initial_rl = model.optimize_root_location(1, .05);
   auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
   auto final_rl = tmp.first;
   auto final_lh = tmp.second;
@@ -332,7 +332,7 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   uint64_t seed = std::rand();
   model_t model{tree, msa, {1}, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
-  auto initial_rl = model.optimize_root_location();
+  auto initial_rl = model.optimize_root_location(1, .05);
   auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e-7, 1e7);
   auto final_rl = tmp.first;
   auto final_lh = tmp.second;

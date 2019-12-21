@@ -619,14 +619,15 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
       "Initial derivatives failed when optimizing alpha, ran out of cases");
 }
 
-std::pair<root_location_t, double> model_t::optimize_root_location() {
+std::pair<root_location_t, double>
+model_t::optimize_root_location(size_t min_roots, double root_ratio) {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
   _tree.root_by(_tree.root_location(0));
 
   /* start by making a list of "good" roots, with the current model*/
 
-  auto sorted_roots = suggest_roots(1, .05);
+  auto sorted_roots = suggest_roots(min_roots, root_ratio);
   for (auto &sr : sorted_roots) {
     auto &rl = sr.first;
     debug_print(EMIT_LEVEL_DEBUG, "working rl: %s", rl.label().c_str());
@@ -771,7 +772,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       }
 
       debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
-      auto cur = optimize_root_location();
+      auto cur = optimize_root_location(min_roots, root_ratio);
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur.second);
 
