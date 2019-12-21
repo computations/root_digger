@@ -12,7 +12,18 @@ pll_utree_t *parse_tree_file(const std::string &tree_filename) {
 
 rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
   _tree = pll_utree_clone(other._tree);
+  _rooted = other._rooted;
   generate_root_locations();
+  add_root_space();
+}
+
+void clean_root_unode(pll_unode_t *node) {
+  assert(!node->data);
+
+  node->length = -1;
+  node->node_index = -1;
+
+  node->back = nullptr;
 }
 
 rooted_tree_t::~rooted_tree_t() {
@@ -21,6 +32,10 @@ rooted_tree_t::~rooted_tree_t() {
       free(n);
   };
   if (_tree != nullptr) {
+    // pll_utree_destroy works by traversing the tree. We just need to make sure
+    // that the extra roots are actually part of the tree in order to not leak
+    // memory.
+    root_by(_roots[0]);
     pll_utree_destroy(_tree, deallocate_data);
   }
 }
@@ -28,13 +43,16 @@ rooted_tree_t::~rooted_tree_t() {
 rooted_tree_t &rooted_tree_t::operator=(rooted_tree_t &&other) {
   _tree = std::move(other._tree);
   _roots = std::move(other._roots);
+  _rooted = other._rooted;
   other._tree = nullptr;
   return *this;
 }
 
 rooted_tree_t &rooted_tree_t::operator=(const rooted_tree_t &other) {
   _tree = pll_utree_clone(other._tree);
+  _rooted = other._rooted;
   generate_root_locations();
+  add_root_space();
   return *this;
 }
 
@@ -103,6 +121,29 @@ void rooted_tree_t::generate_root_locations() {
   }
 }
 
+void rooted_tree_t::add_root_space() {
+  size_t new_size = _tree->inner_count + _tree->tip_count + 1;
+  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count;
+  _tree->nodes =
+      (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * new_size);
+  assert(new_size > 0);
+  pll_unode_t *new_root_left = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
+  pll_unode_t *new_root_right = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
+  new_root_left->next = new_root_right;
+  new_root_right->next = new_root_left;
+
+  new_root_left->clv_index = new_root_right->clv_index = new_size;
+  new_root_left->scaler_index = new_root_right->scaler_index =
+      _tree->inner_count - 1;
+
+  new_root_left->node_index = total_unodes + 1;
+
+  new_root_right->node_index = total_unodes + 2;
+  new_root_right->pmatrix_index = _tree->edge_count - 1;
+
+  _tree->nodes[new_size - 1] = new_root_left;
+}
+
 std::vector<pll_unode_t *> rooted_tree_t::edge_traverse() const {
   std::vector<pll_unode_t *> trav_buf(inner_count());
   unsigned int trav_size = 0;
@@ -142,9 +183,9 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
   if (rooted()) {
     unroot();
   }
-  /* make the roots */
-  pll_unode_t *new_root_left = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
-  pll_unode_t *new_root_right = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
+  size_t tree_size = _tree->inner_count + _tree->tip_count + 1;
+  pll_unode_t *new_root_left = _tree->nodes[tree_size - 1];
+  pll_unode_t *new_root_right = new_root_left->next;
 
   new_root_left->next = new_root_right;
   new_root_right->next = new_root_left;
@@ -161,30 +202,25 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
   right_child->length = new_root_right->length =
       root_location.brlen_compliment();
 
-  size_t new_size = _tree->inner_count + _tree->tip_count + 1;
   size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count;
 
-  _tree->nodes =
-      (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * (new_size));
-
-  _tree->nodes[new_size - 1] = new_root_left;
   _tree->inner_count += 1;
   _tree->edge_count += 1;
   _tree->vroot = new_root_left;
 
-  new_root_left->clv_index = new_root_right->clv_index = new_size - 1;
+  new_root_left->clv_index = new_root_right->clv_index = tree_size - 1;
   new_root_left->scaler_index = new_root_right->scaler_index =
       _tree->inner_count - 1;
 
-  new_root_left->node_index = total_unodes + 1;
   new_root_left->pmatrix_index = left_child->pmatrix_index;
-
+  
   new_root_right->node_index = total_unodes + 2;
   right_child->pmatrix_index = new_root_right->pmatrix_index =
       _tree->edge_count - 1;
   new_root_right->pmatrix_index = _tree->edge_count - 1;
 
   _current_rl = root_location;
+  _rooted = true;
 }
 
 void rooted_tree_t::update_root(root_location_t root) {
@@ -208,33 +244,21 @@ void rooted_tree_t::unroot() {
   right_child->back = left_child;
   left_child->back = right_child;
 
-  double new_length = root_left->length + root_right->length;
-  right_child->length = left_child->length = new_length;
+  right_child->length = left_child->length = _current_rl.saved_brlen;
 
-  root_left->back = nullptr;
-  root_right->back = nullptr;
-
-  root_left->next = nullptr;
-  root_right->next = nullptr;
-
-  assert(!root_left->data);
-  assert(!root_right->data);
-
-  free(root_left);
-  free(root_right);
+  clean_root_unode(root_left);
+  clean_root_unode(root_right);
 
   _tree->vroot = left_child->next != nullptr ? left_child : right_child;
   if (_tree->vroot->next == nullptr) {
     throw std::runtime_error("unrooted to a tip");
   }
 
-  size_t new_size = _tree->inner_count + _tree->tip_count - 1;
-  _tree->nodes =
-      (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * new_size);
   _tree->inner_count -= 1;
   _tree->edge_count -= 1;
 
   right_child->pmatrix_index = left_child->pmatrix_index;
+  _rooted = false;
 }
 
 bool rooted_tree_t::rooted() const {
