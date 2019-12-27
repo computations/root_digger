@@ -8,7 +8,7 @@ import os
 parser = argparse.ArgumentParser()
 parser.add_argument('--tree', type=str)
 parser.add_argument('--image', type=str)
-parser.add_argument('--draw-names', action='store_true')
+parser.add_argument('--draw-names', action='store_true', default=False)
 parser.add_argument('--root', type=str)
 
 color1 = "#1f77b4"
@@ -121,4 +121,5 @@ def draw_lh(root, image, tree, draw_names):
 if __name__ == "__main__":
     args = parser.parse_args()
     draw_names = args.draw_names
-    draw_lh(args.root, args.image, args.tree)
+
+    draw_lh(args.root, args.image, args.tree, args.draw_names)
