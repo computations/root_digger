@@ -1,0 +1,22 @@
+digraph {
+node [shape = box, fontname="Fira Code"]
+edge [fontname="Fira Code"]
+init [label = "Initalize model\n parameters"];
+scan [label = "Choose putative\n root locations"];
+move_root [label = "Move root to\n next in set"];
+optimize [label = "Optimize model\n parameters"];
+
+new_root_set [label = "Find promising\n new roots"];
+optimize_alpha [label = "Optimize α\n for all roots"];
+pick_best [label = "Pick best\n root"];
+
+stop [label = "Stop?"]
+finish [label = "Finish"];
+
+init -> scan;
+scan -> move_root -> optimize;
+optimize -> new_root_set -> optimize_alpha -> pick_best -> stop;
+stop -> move_root [label = "Otherwise"];
+stop -> finish [label = "Δℒ < atol"];
+stop -> finish [label = "Δα < brtol"];
+}
