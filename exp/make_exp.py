@@ -595,6 +595,12 @@ class summary:
     def make_times_header(self):
         return ['tree', 'alignment', 'rd_time', 'iq_time']
 
+    def make_dists_header(self):
+        return [
+            'tree', 'alignment', 'rd_dist', 'iq_dist', 'rd_path_dist',
+            'iq_path_dist'
+        ]
+
     def write(self, prefix):
         csv_filename = prefix + '.csv'
         header = self.make_header()
@@ -614,6 +620,14 @@ class summary:
             results_file.write(','.join(header))
             results_file.write('\n')
             for row in self.generate_time_row():
+                results_file.write(row.make_row(header))
+                results_file.write('\n')
+        csv_exp_dists_filename = prefix + '_dists.csv'
+        with open(csv_exp_dists_filename, 'w') as results_file:
+            header = self.make_dists_header()
+            results_file.write(','.join(header))
+            results_file.write('\n')
+            for row in self.generate_distance_row():
                 results_file.write(row.make_row(header))
                 results_file.write('\n')
 
@@ -643,10 +657,26 @@ class summary:
         for k in self._experiments:
             times = self.times_list(k)
             for t1, t2 in zip(times['rd'], times['iq']):
-                stats = {}
-                stats = {'time' : {'rd' : t1, 'iq': t2}}
+                stats = {'time': {'rd': t1, 'iq': t2}}
                 yield summary_row(k, stats)
 
+    def generate_distance_row(self):
+        for k in self._experiments:
+            dists = self.dists_list(k)
+            path_dists = self.path_dists_list(k)
+            for d1, d2, p1, p2 in zip(dists['rd'], dists['iq'],
+                                      path_dists['rd'], path_dists['iq']):
+                stats = {
+                    'dist': {
+                        'rd': d1,
+                        'iq': d2
+                    },
+                    'path_dist': {
+                        'rd': p1,
+                        'iq': p2
+                    }
+                }
+                yield summary_row(k, stats)
 
     def true_tree(self, k):
         if not self._rd_results[0][k].true_tree is None:
@@ -657,6 +687,18 @@ class summary:
         return {
             'rd': summary._list_attr(self._rd_results, k, 'time'),
             'iq': summary._list_attr(self._iq_results, k, 'time')
+        }
+
+    def dists_list(self, k):
+        return {
+            'rd': summary._list_attr(self._rd_results, k, 'root_distance'),
+            'iq': summary._list_attr(self._iq_results, k, 'root_distance')
+        }
+
+    def path_dists_list(self, k):
+        return {
+            'rd': summary._list_attr(self._rd_results, k, 'path_distance'),
+            'iq': summary._list_attr(self._iq_results, k, 'path_distance')
         }
 
     def mean_times(self, k):
