@@ -15,7 +15,6 @@ import sys
 import json
 import itertools
 
-import Bio
 import ete3
 import numpy
 import plotnine
@@ -47,7 +46,7 @@ CONTROL_FILE = """
 """
 
 RD = os.path.abspath(
-    "../bin/rd") + " --msa {msa} --tree {tree} --seed {seed} --force"
+    "../bin/rd") + " --msa {msa} --tree {tree} --seed {seed} --verbose"
 IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
