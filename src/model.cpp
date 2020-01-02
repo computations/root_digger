@@ -739,7 +739,6 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
     ++root_index;
     debug_print(EMIT_LEVEL_PROGRESS, "Root %lu/%lu", root_index, root_count);
 
-    move_root(rl);
     std::vector<model_params_t> subst_rates;
     std::vector<model_params_t> freqs;
 
@@ -755,6 +754,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
     double cur_best_lh = -INFINITY;
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
+      move_root(rl);
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
