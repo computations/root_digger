@@ -774,7 +774,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
       auto cur = optimize_root_location(min_roots, root_ratio);
 
-      debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur.second);
+      debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.9f", iter, cur.second);
 
       if (_early_stop) {
         if (rl.edge == cur.first.edge &&
@@ -791,10 +791,13 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
         break;
       }
 
-      if (cur.second > cur_best_lh) {
-        cur_best_rl = cur.first;
-        cur_best_lh = cur.second;
+      if (cur.second < cur_best_lh) {
+        /* We failed to make any progress, so just give up */
+        break;
       }
+
+      cur_best_rl = cur.first;
+      cur_best_lh = cur.second;
 
       rl = cur_best_rl;
     }
