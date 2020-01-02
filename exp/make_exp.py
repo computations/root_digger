@@ -17,9 +17,7 @@ import itertools
 
 import ete3
 import numpy
-import plotnine
 import progressbar
-import pandas
 from Bio import SeqIO
 
 progressbar.streams.flush()
