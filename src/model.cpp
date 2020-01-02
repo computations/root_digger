@@ -778,13 +778,14 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
 
       if (_early_stop) {
         if (rl.edge == cur.first.edge &&
-            fabs(rl.brlen_ratio - cur.first.brlen_ratio) < atol) {
+            fabs(rl.brlen_ratio - cur.first.brlen_ratio) < brtol) {
           cur_best_rl = cur.first;
           cur_best_lh = cur.second;
           break;
         }
       }
-      if (fabs(cur.second - cur_best_lh) < brtol) {
+
+      if (fabs(cur.second - cur_best_lh) < atol) {
         cur_best_rl = cur.first;
         cur_best_lh = cur.second;
         break;
