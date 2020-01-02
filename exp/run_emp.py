@@ -9,7 +9,7 @@ import importlib
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--prefix', type=str, default='')
+parser.add_argument('--prefix', type=str, required=True)
 args = parser.parse_args()
 
 drawlh = importlib.import_module('drawlh')
