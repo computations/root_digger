@@ -248,7 +248,7 @@ These modes will be discussed individually, starting with placement mode.
 
 The process for exhaustive search is similar, with the core optimization
 routines being shared with search mode.
-The major difference is that all branches are attempted: 
+The major difference is that all branches are attempted:
 
 \begin{enumerate}
     \item For every branch on the tree:
@@ -316,7 +316,7 @@ confidence in a particular root placement.
 
 Testing with simulated data was done to both validate the software and to
 compare against IQ-TREE \cite{nguyen_iq-tree:_2015}.
-This required producing a pipeline that 
+This required producing a pipeline that
 
 \begin{enumerate} \item Generated a random tree with ETE3
         \cite{huerta-cepas_ete_2016} and random model parameters.
@@ -335,27 +335,79 @@ Additionally, we repeat the pipeline for a specified number of iterations in
 order to determine how much the initial random seed affects the estimated root
 placement.
 Furthermore, we vary two additional parameters: MSA sites and taxa.
-The results from these experiments are summarized in table \ref{table:results}.
+The results from these experiments are summarized in shown in histograms in
+\ref{fig:}.
 The distance given is the average distance from the branch with the true root
 to the inferred root location over 100 trials.
 In addition to the simulated pipeline, we validated root digger with empirical
 data.
 The empirical datasets used are listed in table~\ref{table:datasets}.
-These experiments were timed, and the results can be found in table
-\ref{table:time_results} 
+These experiments were timed, and the results of the timing can be found in figures
+\ref{fig:iq_time_results} and \ref{fig:rd_time_results}.
 
-\begin{table} \begin{center} \include{tables/results} \label{table:results}
-  \end{center} \end{table} 
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.9\linewidth]{./figs/timing_plots/iq_dist_hist.png}
+    \caption{Histogram of IQ-TREE topological distance results.
+    \label{fig:iq_dist_results}}
+\end{center}
+\end{figure}
 
-\begin{table} \begin{center} \include{tables/time_results}
-    \label{table:time_results} \end{center} \end{table} 
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.9\linewidth]{./figs/timing_plots/rd_dist_hist.png}
+    \caption{Histogram of \RootDiggertt{} topological distance results
+    \label{fig:rd_dist_results}}
+\end{center}
+\end{figure}
 
-\subsection{Empirical Data} 
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.9\linewidth]{./figs/timing_plots/iq_time_hist.png}
+  \caption{Histogram of IQ-TREE times
+  \label{fig:iq_time_results}}
+\end{center}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.9\linewidth]{./figs/timing_plots/rd_time_hist.png}
+    \caption{Histogram of \RootDiggertt{} times
+    \label{fig:rd_time_results}}
+\end{center}
+\end{figure}
+
+\begin{figure}
+  \includegraphics{figs/sim_results/100_1000.png}
+  \caption{Simulation results for 100 taxa and 1000
+  sites. \label{fig:sim-results-100t-1000s}}
+\end{figure}
+
+\begin{figure}
+  \includegraphics{figs/sim_results/100_8000.png}
+  \caption{Simulation results for 100 taxa and 8000
+  sites. \label{fig:sim-results-100t-8000s}}
+\end{figure}
+
+\begin{figure}
+  \includegraphics{figs/sim_results/50_1000.png}
+  \caption{Simulation results for 50 taxa and 1000
+  sites. \label{fig:sim-results-50t-1000s}}
+\end{figure}
+
+\begin{figure}
+  \includegraphics{figs/sim_results/50_8000.png}
+  \caption{Simulation results for 100 taxa and 8000
+  sites. \label{fig:sim-results-50t-8000s}}
+\end{figure}
+
+\subsection{Empirical Data}
 
 The empirical datasets were chosen to have an existing, strongly supported
 outgroup.
 The experiments were run on datasets with the outgroup included, as well as
-with the outgroup removed.
+with the outgroup removed. The results the emperical data can be seen in figures
+\ref{fig:spiders-missing-species-no-outgroup} - \ref{fig:angio-cds12-outgroup}
 
 \begin{table}[H]
   \begin{center}
@@ -364,12 +416,12 @@ with the outgroup removed.
   \end{center}
 \end{table}
 
-\begin{table}
-  \begin{center}
-    \include{tables/emperical_results}
-    \label{table:emperical_results}
-  \end{center}
-\end{table}
+%\begin{table}
+%  \begin{center}
+%    \include{tables/emperical_results}
+%    \label{table:emperical_results}
+%  \end{center}
+%\end{table}
 
 \subsection{Likelihood weight ratios}
 
@@ -383,7 +435,7 @@ branch, and reports it.
 \begin{figure}
   \begin{center}
     \includegraphics[width=.75\linewidth]{
-      figs/spiders/missing_species_no_outgroup_lwr.png}
+    ./figs/spiders/missing_species_no_outgroup.png}
     \caption{SpidersMissingSpecies dataset analyzed without an outgroup.}
     \label{fig:spiders-missing-species-no-outgroup}
   \end{center}
@@ -391,9 +443,8 @@ branch, and reports it.
 
 \begin{figure}
   \begin{center}
-
     \includegraphics[width=.75\linewidth]{
-      figs/spiders/missing_species_outgroup_lwr.png}
+    ./figs/spiders/missing_species_with_outgroup.png}
     \caption{SpidersMissingSpecies dataset analyzed with an outgroup.}
     \label{fig:spiders-missing-species-outgroup}
   \end{center}
@@ -401,8 +452,7 @@ branch, and reports it.
 
 \begin{figure}
   \begin{center}
-
-    \includegraphics[width=.75\linewidth]{figs/spiders/mito_no_outgroup_lwr.png}
+    \includegraphics[width=.75\linewidth]{./figs/spiders/mito_no_outgroup.png}
     \caption{SpidersMitocondrial dataset analyzed without an outgroup.}
     \label{fig:spiders-mito-no-outgroup}
   \end{center}
@@ -410,7 +460,7 @@ branch, and reports it.
 
 \begin{figure}
   \begin{center}
-    \includegraphics[width=.75\linewidth]{figs/spiders/mito_outgroup_lwr.png}
+    \includegraphics[width=.75\linewidth]{./figs/spiders/mito_with_outgroup.png}
     \caption{SpidersMitocondrial dataset analyzed with an outgroup.}
     \label{fig:spiders-mito-outgroup}
   \end{center}
@@ -434,7 +484,7 @@ branch, and reports it.
 
 \begin{figure}
   \begin{center}
-    \includegraphics[width=.5\linewidth]{figs/angio/cds12_no_outgroup_lwr.png}
+    \includegraphics[width=.5\linewidth]{figs/angio/cds12_no_outgroup.png}
     \caption{AngiospermsCDS12 dataset analyzed without an outgroup.}
     \label{fig:angio-cds12-no-outgroup}
   \end{center}
@@ -442,7 +492,7 @@ branch, and reports it.
 
 \begin{figure}
   \begin{center}
-    \includegraphics[width=.5\linewidth]{figs/angio/cds12_outgroup_lwr.png}
+    \includegraphics[width=.5\linewidth]{./figs/angio/cds12_with_outgroup.png}
     \caption{AngiospermsCDS12 dataset analyzed with an outgroup.}
     \label{fig:angio-cds12-outgroup}
   \end{center}
@@ -479,22 +529,29 @@ significantly.
 
 \begin{figure}[H]
   \begin{center}
-    \includegraphics[width=.3\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup.png}
-    \includegraphics[width=.3\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup_noes.png}
+    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup.png}
+    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup_noes.png}
     \caption{Effect of early stopping on results. Left is with early stopping,
     Left is without. Dataset is AngiospermsCDS12}
   \end{center}
 \end{figure}
 \begin{figure}[H]
   \begin{center}
-    \includegraphics[width=.3\linewidth]{figs/early_stop_tests/es_test_mito_no_outgroup.png}
-    \includegraphics[width=.3\linewidth]{figs/early_stop_tests/es_test_mito_no_outgroup_noes.png}
+    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_mito_no_outgroup.png}
+    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_mito_no_outgroup_noes.png}
     \caption{Effect of early stopping on results. Left is with early stopping,
     Left is without. Dataset is SpidersMitocondrial.}
   \end{center}
 \end{figure}
 
 \section{Discussion}
+
+
+\RootDiggertt{} is substantially faster than IQ-TREE, as is shown when comparing
+figures \ref{fig:iq_time_results} and \ref{fig:rd_time_results}. Furthermore,
+the performance of \RootDiggertt{} compared to IQ-TREE is less, but not
+excessively so.
+
 
 \section{Conclusion}
 
