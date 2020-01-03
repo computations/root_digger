@@ -939,7 +939,8 @@ def map_root_iq(true_tree, left_clades, right_clades):
 
 def produce_mapped_root_images(json_results_filename,
                                map_iqtree=True,
-                               map_rd=True):
+                               map_rd=True,
+                               print_node_name=False):
     with open(json_results_filename) as json_file:
         results = json.load(json_file)
     for result in results:
@@ -970,7 +971,7 @@ def produce_mapped_root_images(json_results_filename,
                         iq_label.inner_border.type = 0
                         iq_label.inner_border.width = 1
                     node.add_face(iq_label, column=0)
-            if node.name:
+            if node.name and print_node_name:
                 node.add_face(ete3.faces.TextFace(node.name), column=1)
 
         ts = ete3.TreeStyle()

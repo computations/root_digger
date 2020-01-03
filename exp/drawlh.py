@@ -71,12 +71,23 @@ def extract_node_with_clade_pair(tree, clade_pair):
         return (tree & clade_pair[0][0])
     if len(clade_pair[1]) == 1:
         return (tree & clade_pair[1][0])
+    is_mono_cp1, _, _ = tree.check_monophyly(values = clade_pair[0], target_attr
+            = 'name')
+    if is_mono_cp1:
+        return tree.get_common_ancestor(clade_pair[0])
+
+    is_mono_cp2, _, _ = tree.check_monophyly(values = clade_pair[1], target_attr
+            = 'name')
+    if is_mono_cp2:
+        return tree.get_common_ancestor(clade_pair[1])
     clade = clade_pair[0] if len(clade_pair[0]) <= len(clade_pair[1]) else\
         clade_pair[1]
     ca0 = tree.get_common_ancestor(clade_pair[0])
     ca1 = tree.get_common_ancestor(clade_pair[1])
     if ca0 in tree.children and ca1 in tree.children:
+        print('return tree')
         return tree
+    print("last return")
     return tree.get_common_ancestor(clade)
 
 def mark_root(tree, rooted_tree):
