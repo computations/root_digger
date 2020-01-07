@@ -311,19 +311,18 @@ confidence in a particular root placement.
 
 \subsection{Simulations}
 
-\BenComment{Give more details about the run options for both root digger and
-  IQ-tree here}
-
 Testing with simulated data was done to both validate the software and to
 compare against IQ-TREE \cite{nguyen_iq-tree:_2015}.
-This required producing a pipeline that
+To this end, we created a pipeline to
 
-\begin{enumerate} \item Generated a random tree with ETE3
+\begin{enumerate} 
+  \item Generate a random tree with ETE3
         \cite{huerta-cepas_ete_2016} and random model parameters.
-  \item Simulated an MSA with indelible \cite{fletcher_indelible:_2009}
-  \item Ran RootDigger and IQ-TREE \cite{nguyen_iq-tree:_2015} on the simulated
+  \item Simulate an MSA with indelible \cite{fletcher_indelible:_2009}
+  \item Run RootDigger and IQ-TREE \cite{nguyen_iq-tree:_2015} on the simulated
         MSA, given the generated random tree.
-  \item Computed comparisons
+    \item Repeat from (2) for a total of 100 iterations
+  \item Compute comparisons
         \begin{enumerate}
           \item Calculated rooted RF distance with ETE3
                 \cite{robinson_comparison_1981}
@@ -331,33 +330,29 @@ This required producing a pipeline that
         \end{enumerate}
 \end{enumerate}
 
-Additionally, we repeat the pipeline for a specified number of iterations in
-order to determine how much the initial random seed affects the estimated root
-placement.
-Furthermore, we vary two additional parameters: MSA sites and taxa.
-The results from these experiments are summarized in shown in histograms in
-\ref{fig:}.
-The distance given is the average distance from the branch with the true root
-to the inferred root location over 100 trials.
-In addition to the simulated pipeline, we validated root digger with empirical
-data.
-The empirical datasets used are listed in table~\ref{table:datasets}.
+Both IQ-TREE and \RootDiggertt{} were given the same model options for all the
+runs. For all runs, the UNREST model with no rate categories was used.
+Furthermore, we vary two additional parameters: MSA sites and taxa. In total, we
+ran 9 simulated trials with MSA sizes of 1000, 4000, and 8000 sites as well as
+tree sizes of 10, 50, and 100 taxa.
+The results from these experiments are summarized in shown in figures
+\ref{fig:top_error_boxplot} and \ref{fig:norm_error_boxplot}.
 These experiments were timed, and the results of the timing can be found in figures
 \ref{fig:iq_time_results} and \ref{fig:rd_time_results}.
 
 \begin{figure}
   \begin{center}
-    \includegraphics[width=.9\linewidth]{./figs/timing_plots/iq_dist_hist.png}
-    \caption{Histogram of IQ-TREE topological distance results.
-    \label{fig:iq_dist_results}}
+    \includegraphics[width=.9\linewidth]{./figs/sim_results/melted_dist_box.png}
+    \caption{Box plots of Topological error.
+    \label{fig:top_error_boxplot}}
 \end{center}
 \end{figure}
 
 \begin{figure}
   \begin{center}
-    \includegraphics[width=.9\linewidth]{./figs/timing_plots/rd_dist_hist.png}
-    \caption{Histogram of \RootDiggertt{} topological distance results
-    \label{fig:rd_dist_results}}
+    \includegraphics[width=.9\linewidth]{./figs/sim_results/melted_norm_dist_box.png}
+    \caption{Box plots of normalized topological error.
+    \label{fig:norm_error_boxplot}}
 \end{center}
 \end{figure}
 
@@ -403,11 +398,23 @@ These experiments were timed, and the results of the timing can be found in figu
 
 \subsection{Empirical Data}
 
+In addition to simulated data, we conducted tests with empirical data. The
+datasets used are described in \ref{table:datasets}.
 The empirical datasets were chosen to have an existing, strongly supported
 outgroup.
+For each of the empirical datasets, we ran \RootDiggertt{} in exhaustive mode to
+obtain likelihood weight ratios (LWR) for each branch.
+Annotations are suppressed for branches with a small LWR (less than $0.0001$).
+The trees with annotated LWR are shown in figures
+\ref{fig:spiders-missing-species-no-outgroup} - \ref{fig:angio-cds12-outgroup}.
 The experiments were run on datasets with the outgroup included, as well as
-with the outgroup removed. The results the emperical data can be seen in figures
-\ref{fig:spiders-missing-species-no-outgroup} - \ref{fig:angio-cds12-outgroup}
+with the outgroup removed.
+
+There was some preprocessing performed. Since the branch lengths in some
+datasets were not specified in substitutions per site, the branch lengths were
+re-optimized using RAxML-NG \cite{kozlov_raxml-ng:_2019} version
+\texttt{0.9.0git}. The original model was used when it was known, otherwise the
+branch lengths were optimized using GTR+G.
 
 \begin{table}[H]
   \begin{center}
@@ -422,15 +429,6 @@ with the outgroup removed. The results the emperical data can be seen in figures
 %    \label{table:emperical_results}
 %  \end{center}
 %\end{table}
-
-\subsection{Likelihood weight ratios}
-
-Additional experiments were conducted to investigate the probability
-distribution of root placements.
-To do this, we ran \RootDiggertt{} on the empirical datasets listed in table
-\ref{table:datasets} in exhaustive mode without early stopping.
-This mode calculates a likelihood weight ratio for a root placement on each
-branch, and reports it.
 
 \begin{figure}
   \begin{center}
@@ -527,33 +525,58 @@ significantly.
 
 \subsection{Effect of early stopping on result}
 
-\begin{figure}[H]
-  \begin{center}
-    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup.png}
-    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup_noes.png}
-    \caption{Effect of early stopping on results. Left is with early stopping,
-    Left is without. Dataset is AngiospermsCDS12}
-  \end{center}
-\end{figure}
+Finally, we investigated the effect of the early stopping criterion on the
+final LWR results. To do this, we ran \RootDiggertt{} in exhaustive mode on all
+empirical datasets with early stopping enabled and disabled, resulting in paired
+runs which could be compared. For most runs, the results with and without
+early stopping showed no difference. One of the runs that showed differences is
+shown in figure \ref{fig:es_mito}.
+
+%\begin{figure}[H]
+%  \begin{center}
+%    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup.png}
+%    \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_cds12_no_outgroup_noes.png}
+%    \caption{Effect of early stopping on results. Left is with early stopping,
+%    Left is without. Dataset is AngiospermsCDS12}
+%    \label{fig:es_angio}
+%  \end{center}
+%\end{figure}
 \begin{figure}[H]
   \begin{center}
     \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_mito_no_outgroup.png}
     \includegraphics[width=.4\linewidth]{figs/early_stop_tests/es_test_mito_no_outgroup_noes.png}
     \caption{Effect of early stopping on results. Left is with early stopping,
     Left is without. Dataset is SpidersMitocondrial.}
+    \label{fig:es_mito}
   \end{center}
 \end{figure}
 
 \section{Discussion}
 
-
 \RootDiggertt{} is substantially faster than IQ-TREE, as is shown when comparing
 figures \ref{fig:iq_time_results} and \ref{fig:rd_time_results}. Furthermore,
-the performance of \RootDiggertt{} compared to IQ-TREE is less, but not
-excessively so.
+the accuracy of root placement of \RootDiggertt{} is nearly the same as IQ-TREE.
+
+In Huelsenbeck \cite{huelsenbeck_inferring_2002}, it was shown that the prior
+probability of a root placement on a sample tree did not have a strong signal.
+When peforming our verficiation of \RootDiggertt{} using emperical data, we
+found that this was often not the case. For example on the AngiospermsCDS12
+dataset (see figure \ref{fig:angio-cds12-no-outgroup}), we found a clear signal
+for the root placcment. Even in cases when the signal was not as strong, for
+example SpidersMitocondrial (see figure \ref{fig:spiders-mito-no-outgroup}),
+there is a much stronger signal for root placment than Huelsenbeck would suggest
+we would get with this kind of analysis (which is to say, non-reversible
+subsitution analysis). We suspect that this is due to Huelsenbeck performing the
+analysis on a 4 taxon tree. By only using 4 taxa, the rate matrix is less
+constrained by the data present, which leads to overfitting the rate matrix. 
+
 
 
 \section{Conclusion}
+
+We have shown that some datasets are particularly well suited to this form of
+analysis, and that \RootDiggertt{} can be a simple alternative to similar forms
+of root inference, such as molecular clock anaylsis or the use of an outgroup.
 
 \bibliographystyle{acm}
 \bibliography{main}
