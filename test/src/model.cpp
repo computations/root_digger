@@ -371,3 +371,13 @@ TEST_CASE("model_t exhaustive search", "[model_t]"){
   model.initialize_partitions(msa);
   model.exhaustive_search(1e-3, 1e-3, 1e-3, 1e12);
 }
+
+TEST_CASE("model_t different rate categories", "[model_t]"){
+  auto ds = data_files_dna["10.fasta"];
+  std::vector<msa_t> msa;
+  msa.emplace_back(ds.first);
+  rooted_tree_t tree{ds.second};
+  uint64_t seed = std::rand();
+  std::vector<size_t> rate_cats = {4};
+  model_t model{tree, msa, rate_cats, seed, false};
+}
