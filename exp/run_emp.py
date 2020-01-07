@@ -85,6 +85,8 @@ dataset_filename = os.path.abspath(args.datasets)
 with open(dataset_filename) as infile:
     datasets = yaml.load(infile, Loader=yaml.FullLoader)
 
+datasets_prefix = os.path.split(dataset_filename)[0]
+
 jobs = []
 if not os.path.exists(args.prefix):
     os.mkdir(args.prefix)
@@ -96,8 +98,8 @@ for k, d in datasets.items():
     #directory_root = os.path.join(args.prefix,d['directory'])
     directory_root = d['directory']
     for ds in d['datasets']:
-        verify_dataset(directory_root, args.datasets_prefix, args.prefix, ds)
-        jobs.append(make_file_paths(directory_root, args.datasets_prefix, args.prefix, ds))
+        verify_dataset(directory_root, datasets_prefix, args.prefix, ds)
+        jobs.append(make_file_paths(directory_root, datasets_prefix, args.prefix, ds))
 
 tp = multiprocessing.pool.ThreadPool()
 tp.starmap(run_rd, jobs)
@@ -107,7 +109,7 @@ for k, d in datasets.items():
     for ds in d['datasets']:
         try:
             _, tree, results, image, _, _ = make_file_paths(
-                directory_root, args.datasets_prefix, args.prefix, ds)
+                directory_root, datasets_prefix, args.prefix, ds)
             drawlh.draw_lh(tree, image, results, False)
         except Exception as e:
             print(directory_root, ":", ds['msa'], ":", e)
