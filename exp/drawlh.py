@@ -6,8 +6,8 @@ import argparse
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--tree', type=str)
-parser.add_argument('--image', type=str)
+parser.add_argument('--tree', type=str, required=True)
+parser.add_argument('--image', type=str, required=True)
 parser.add_argument('--draw-names', action='store_true', default=False)
 parser.add_argument('--root', type=str)
 
