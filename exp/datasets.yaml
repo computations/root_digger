@@ -8,6 +8,7 @@ angio:
           log: cds_no_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
         - msa: cds12_outgroup_removed.fasta
           tree: cds12_outgroup_removed_opt_brlen.tree
           results: cds12_no_outgroup_lwr.newick
@@ -15,6 +16,7 @@ angio:
           log: cds12_no_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
         - msa: cds.fasta
           tree: cds_brlen_opt.tree
           results: cds_with_outgroup_lwr.newick
@@ -22,6 +24,7 @@ angio:
           log: cds_with_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
         - msa: cds12.fasta
           tree: cds12_opt_brlen.tree
           results: cds12_with_outgroup_lwr.newick
@@ -29,6 +32,7 @@ angio:
           log: cds12_with_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
 ficus:
     directory: ficus
     datasets:
@@ -39,6 +43,7 @@ ficus:
           log: ficus_no_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
         - msa: ficus_outgroup.fasta
           tree: ficus_outgroup_opt_brlen.tree
           results: ficus_with_outgroup_lwr.newick
@@ -46,6 +51,7 @@ ficus:
           log: ficus_with_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
 grasses:
     directory: grasses
     datasets:
@@ -56,6 +62,7 @@ grasses:
           log: plastid245_no_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
 spiders:
     directory: spiders
     datasets:
@@ -66,6 +73,7 @@ spiders:
           log: missing_species_no_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
         - msa: missing_species_outgroup.fasta
           tree: ml_missing_species_outgroup.nwk
           results: missing_species_with_outgroup_lwr.newick
@@ -73,6 +81,7 @@ spiders:
           log: missing_species_with_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
         - msa: mitocondrial.fasta
           tree: mitocondrial_opt_brlen.tree
           results: mito_no_outgroup_lwr.newick
@@ -80,6 +89,7 @@ spiders:
           log: mito_no_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4
         - msa: mitocondrial_outgroup.fasta
           tree: ml_mito_outgroup.nwk
           results: mito_with_outgroup_lwr.newick
@@ -87,3 +97,4 @@ spiders:
           log: mito_with_outgroup.log
           options:
               early-stop: true
+              rate-cats: 4

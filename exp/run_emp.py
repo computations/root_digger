@@ -22,12 +22,22 @@ RD = os.path.abspath(
 ) + " --msa {msa} --tree {tree} --exhaustive --treefile {treefile} {options}"
 
 
-def produce_rd_command(msa, tree, treefile, early_stop):
-    options = ''
-    if early_stop:
-        options += '--early-stop'
-    return RD.format(msa=msa, tree=tree, treefile=treefile,
-                     options=options).split(' ')
+def produce_rd_options(options_dict):
+    opts = []
+    if options_dict['early-stop']:
+        opts.append('--early-stop')
+
+    opts.append('--rate-cats')
+    opts.append(options_dict['rate-cats'])
+
+    return ' '.join([str(o) for o in opts])
+
+
+def produce_rd_command(msa, tree, treefile, options_dict):
+    return RD.format(msa=msa,
+                     tree=tree,
+                     treefile=treefile,
+                     options=produce_rd_options(options_dict)).split(' ')
 
 
 def make_done_file(log):
@@ -53,8 +63,7 @@ def run_rd(msa, tree, treefile, image, log, options):
         return
     print("rd: ", log)
     with open(log, 'a') as logfile:
-        subprocess.run(produce_rd_command(msa, tree, treefile,
-                                          options['early-stop']),
+        subprocess.run(produce_rd_command(msa, tree, treefile, options),
                        stdout=logfile)
     set_done(log)
 
@@ -99,7 +108,8 @@ for k, d in datasets.items():
     directory_root = d['directory']
     for ds in d['datasets']:
         verify_dataset(directory_root, datasets_prefix, args.prefix, ds)
-        jobs.append(make_file_paths(directory_root, datasets_prefix, args.prefix, ds))
+        jobs.append(
+            make_file_paths(directory_root, datasets_prefix, args.prefix, ds))
 
 tp = multiprocessing.pool.ThreadPool()
 tp.starmap(run_rd, jobs)
