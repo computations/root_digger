@@ -75,7 +75,7 @@ spiders:
               early-stop: true
               rate-cats: 4
         - msa: missing_species_outgroup.fasta
-          tree: ml_missing_species_outgroup.nwk
+          tree: missing_species_brlen_opt.nwk
           results: missing_species_with_outgroup_lwr.newick
           image: missing_species_with_outgroup.png
           log: missing_species_with_outgroup.log
@@ -91,7 +91,7 @@ spiders:
               early-stop: true
               rate-cats: 4
         - msa: mitocondrial_outgroup.fasta
-          tree: ml_mito_outgroup.nwk
+          tree: mitocondrial_outgroup_brlen_opt.nwk
           results: mito_with_outgroup_lwr.newick
           image: mito_with_outgroup.png
           log: mito_with_outgroup.log
