@@ -75,6 +75,29 @@ private:
   value_t value;
 };
 
+struct cli_options_t {
+  std::string msa_filename;
+  std::string tree_filename;
+  std::string output_tree_filename;
+  std::string model_filename;
+  std::string freqs_filename;
+  std::string partition_filename;
+  std::string data_type;
+  std::vector<size_t> rate_cats{1};
+  uint64_t seed = std::random_device()();
+  size_t min_roots = 1;
+  double root_ratio = 0.05;
+  double abs_tolerance = 1e-7;
+  double factor = 1e4;
+  double br_tolerance = 1e-12;
+  double bfgs_tol = 1e-7;
+  const unsigned int states = 4;
+  bool silent = false;
+  bool exhaustive = false;
+  bool echo = false;
+  initialized_flag_t early_stop;
+};
+
 void print_usage() {
   std::cout
       << "Usage: rd [options]\n"
@@ -128,27 +151,6 @@ size_t data_type_to_states(std::string data_type) {
       "Unrecognized data type, unable to determine correct number of states");
 }
 
-struct cli_options_t {
-  std::string msa_filename;
-  std::string tree_filename;
-  std::string output_tree_filename;
-  std::string model_filename;
-  std::string freqs_filename;
-  std::string partition_filename;
-  std::string data_type;
-  std::vector<size_t> rate_cats{1};
-  uint64_t seed = std::random_device()();
-  size_t min_roots = 1;
-  double root_ratio = 0.05;
-  double abs_tolerance = 1e-7;
-  double factor = 1e4;
-  double br_tolerance = 1e-12;
-  double bfgs_tol = 1e-7;
-  const unsigned int states = 4;
-  bool silent = false;
-  bool exhaustive = false;
-  initialized_flag_t early_stop;
-};
 
 int main(int argv, char **argc) {
   auto start_time = std::chrono::system_clock::now();
@@ -174,6 +176,7 @@ int main(int argv, char **argc) {
       {"rate-cats", required_argument, 0, 0},  /* 18 */
       {"version", no_argument, 0, 0},          /* 19 */
       {"debug", no_argument, 0, 0},            /* 20 */
+      {"echo", no_argument, 0,0},            /*21*/
       {0, 0, 0, 0},
   };
 
@@ -255,6 +258,9 @@ int main(int argv, char **argc) {
       case 20: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
+      case 21: //echo
+        cli_options.echo = true;
+        break;
       default:
         throw std::invalid_argument("An argument was not recognized");
       }
@@ -284,7 +290,7 @@ int main(int argv, char **argc) {
     if (!cli_options.silent)
       print_run_header(start_time, cli_options.seed);
 
-    debug_print(EMIT_LEVEL_INFO, "abs_tolerance: %f",
+    debug_print(EMIT_LEVEL_INFO, "abs_tolerance: %.08f",
                 cli_options.abs_tolerance);
     if (cli_options.exhaustive &&
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)) {
@@ -322,6 +328,14 @@ int main(int argv, char **argc) {
       model.initialize_partitions(msa);
     } catch (const invalid_empirical_frequencies_exception &) {
       model.initialize_partitions_uniform_freqs(msa);
+    }
+
+    if(!tree.sanity_check()){
+      std::cout<< "Failed Sanity Check" << std::endl;
+    }
+
+    if (cli_options.echo){
+      std::cout<<tree.newick()<<std::endl;
     }
 
     root_location_t final_rl;
