@@ -1171,24 +1171,25 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
   std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
   debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
 
+  std::vector<model_params_t> subst_rates;
+  std::vector<model_params_t> freqs;
+  std::vector<double> gamma_alphas;
+
+  for (size_t p = 0; p < _partitions.size(); ++p) {
+    size_t subst_size = _partitions[p]->states;
+    subst_size = subst_size * subst_size - subst_size;
+    freqs.push_back(
+        model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
+    subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
+    gamma_alphas.push_back(1.0);
+  }
+
   for (auto rl : _tree.roots()) {
     set_subst_rates_uniform();
     set_empirical_freqs();
     ++root_index;
 
     move_root(rl);
-    std::vector<model_params_t> subst_rates;
-    std::vector<model_params_t> freqs;
-    std::vector<double> gamma_alphas;
-
-    for (size_t p = 0; p < _partitions.size(); ++p) {
-      size_t subst_size = _partitions[p]->states;
-      subst_size = subst_size * subst_size - subst_size;
-      freqs.push_back(
-          model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
-      subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
-      gamma_alphas.push_back(1.0);
-    }
 
     root_location_t cur_best_rl;
     double cur_best_lh = -INFINITY;
