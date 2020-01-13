@@ -163,11 +163,13 @@ By formulating the problem this way, we can use single parameter optimization
 techniques such as Brent's Method\footnotemark{}, which are computationally
 more efficient compared to multi-parameter optimization routines.
 
-\footnotetext{We could compute a derivative, but the library that we use
-  computes log-likelihoods, and we require plain likelihoods to compute a
-  second
-  derivative.
-  The effort to rewrite the functions that would compute this derivative was
+\footnotetext{
+  Brent's Method is picked over Newton's Method because it does not require a
+  second derivative to optimize the funciton.
+
+  We computed an analytical version of the second derivative, but the library
+  that we use doesn't support calculating some of the values involved.
+  The effort to rewrite the functions that would compute these values
   deemed to be too much relative to the savings.
   In principle, the computation could be done.
 }
@@ -439,14 +441,14 @@ branch lengths were optimized using GTR+G.
   \end{center}
 \end{figure}
 
-\begin{figure}
-  \begin{center}
-    \includegraphics[width=.75\linewidth]{
-    ./figs/spiders/missing_species_with_outgroup.png}
-    \caption{SpidersMissingSpecies dataset analyzed with an outgroup.}
-    \label{fig:spiders-missing-species-outgroup}
-  \end{center}
-\end{figure}
+%\begin{figure}
+%  \begin{center}
+%    \includegraphics[width=.75\linewidth]{
+%    ./figs/spiders/missing_species_with_outgroup.png}
+%    \caption{SpidersMissingSpecies dataset analyzed with an outgroup.}
+%    \label{fig:spiders-missing-species-outgroup}
+%  \end{center}
+%\end{figure}
 
 \begin{figure}
   \begin{center}
@@ -456,17 +458,17 @@ branch lengths were optimized using GTR+G.
   \end{center}
 \end{figure}
 
-\begin{figure}
-  \begin{center}
-    \includegraphics[width=.75\linewidth]{./figs/spiders/mito_with_outgroup.png}
-    \caption{SpidersMitocondrial dataset analyzed with an outgroup.}
-    \label{fig:spiders-mito-outgroup}
-  \end{center}
-\end{figure}
+%\begin{figure}
+%  \begin{center}
+%    \includegraphics[width=.75\linewidth]{./figs/spiders/mito_with_outgroup.png}
+%    \caption{SpidersMitocondrial dataset analyzed with an outgroup.}
+%    \label{fig:spiders-mito-outgroup}
+%  \end{center}
+%\end{figure}
 
 %\begin{figure}[H]
 %  \begin{center}
-%    \includegraphics[width=.75\linewidth]{figs/ficus/ficus_no_outgroup_lwr.png}
+%    \includegraphics[width=.75\linewidth]{figs/ficus/ficus_no_outgroup.png}
 %    \caption{Ficus dataset analyzed without an outgroup.}
 %    \label{fig:ficus-no-outgroup}
 %  \end{center}
@@ -474,7 +476,7 @@ branch lengths were optimized using GTR+G.
 %
 %\begin{figure}[H]
 %  \begin{center}
-%    \includegraphics[width=.75\linewidth]{figs/ficus/ficus_outgroup_lwr.png}
+%    \includegraphics[width=.75\linewidth]{figs/ficus/ficus_with_outgroup.png}
 %    \caption{Ficus dataset analyzed with an outgroup.}
 %    \label{fig:ficus-outgroup}
 %  \end{center}
@@ -496,30 +498,30 @@ branch lengths were optimized using GTR+G.
   \end{center}
 \end{figure}
 
-\subsection{Effect of model selection on results}
-
-We also investigated the effect of model selection on the results.
-We did this by running \RootDiggertt{} in exhaustive mode with a varying number
-of $\Gamma$ rate categories for the SpidersMitocondrial dataset.
-The result of this analysis can be seen in figures~\ref{fig:spiders1rate} and
-\ref{fig:spiders2rate}.
-Of particular note is that increasing the number of rate categories not only
-moves the root to an erroneous location, it also increases the confidence
-significantly.
-
-\begin{figure}[H]
+\begin{figure}
   \begin{center}
-    \includegraphics[width=.75\linewidth]{figs/spiders/1rate.png}
-    \caption{SpidersMitocondrial dataset analyzed with 1 rate category.}
-    \label{fig:spiders1rate}
+    \includegraphics[width=.5\linewidth]{./figs/grasses/plastid245_no_outgroup.png}
+    \caption{Grasses dataset analyzed without an outgroup.}
+    \label{fig:grasses}
   \end{center}
 \end{figure}
 
-\begin{figure}
+\subsection{Effect of model selection on results}
+
+We also investigated the effect of model selection on the results.  We did this
+by running \RootDiggertt{} in exhaustive mode with a varying number of $\Gamma$
+rate categories for the SpidersMitocondrial dataset. The result of this
+analysis can be seen in figure~\ref{fig:spiders-rate-compare}. Of particular
+note is that increasing the number of rate categories not only moves the root to
+an erroneous location, it also increases the confidence significantly.
+
+\begin{figure}[H]
   \begin{center}
-    \includegraphics[width=.75\linewidth]{figs/spiders/2rate.png}
-    \caption{SpidersMitocondrial dataset analyzed with 2 rate categories.}
-    \label{fig:spiders2rate}
+    \includegraphics[width=.4\linewidth]{figs/spiders/1rate.png}
+    \includegraphics[width=.4\linewidth]{figs/spiders/2rate.png}
+    \caption{SpidersMitocondrial dataset analyzed with varying rate categories.
+    Left is with 1 rate category, and right is with 2.}
+    \label{fig:spiders-rate-compare}
   \end{center}
 \end{figure}
 
@@ -568,9 +570,8 @@ there is a much stronger signal for root placment than Huelsenbeck would suggest
 we would get with this kind of analysis (which is to say, non-reversible
 subsitution analysis). We suspect that this is due to Huelsenbeck performing the
 analysis on a 4 taxon tree. By only using 4 taxa, the rate matrix is less
-constrained by the data present, which leads to overfitting the rate matrix. 
-
-
+constrained by the data present, which leads to overfitting the rate matrix. A
+possible investigation in the future could see if this is indeed the case.
 
 \section{Conclusion}
 
