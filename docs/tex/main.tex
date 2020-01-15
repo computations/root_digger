@@ -126,28 +126,31 @@ traditional tree inference techniques all possible rootings would need to be
 evaluated for each tree in order to find the rooting with highest likelihood.
 In the worst case, this increases the work {\em per tree} by a factor of
 $\mathcal{O}(n)$ where $n$ is the number of taxa present in the dataset.
-While there are heuristics to reduce the amount of work required
-\AlexisComment{For instance?
-  Citation!
-}\BenComment{I know this to be true, because I have talked with Benoit and
-  found some heuristics myself for this project.
-  I don't really know how to cite/explain this though.
-  I am really just trying to be charitable to the other tools.
-}, eliminating the reversibility assumption drastically increases the effort
+Eliminating the reversibility assumption drastically increases the effort
 required to infer a tree.
 
 As an alternative to the computationally expensive process of inferring a tree
-with a root, an unrooted tree which has already been inferred under a
-reversible model can be evaluated for possible root locations under a
-non-reversible model.
+with a root, an unrooted tree which has already been inferred under a reversible
+model can be evaluated for possible root locations under a non-reversible model.
 This is faster, as it skips the expensive step of looking for good rootings
-during intermediate trees.
-With this method, we can find the most likely root location for a given
-phylogenetic tree.
-There are still challenges though, as the likelihood function for rooting a
-phylogenetic tree may exhibit several local maxima
-\cite{huelsenbeck_inferring_2002}, though these concerns were not found to be a
-major concern in our experiements.
+during intermediate trees.  With this method, we can find the most likely root
+location for a given phylogenetic tree.  There are still challenges though, as
+the likelihood function for rooting a phylogenetic tree may exhibit several
+local maxima \cite{huelsenbeck_inferring_2002}, though these concerns were not
+found to be a major concern in our experiements.
+
+\BenComment{Here, we need to talk about the software at a high level. What it
+takes, some important numbers, ect. Summarize and condense what you are about to
+tell them.}
+
+To this end, we have implemented an open source software tool \RootDiggertt{}
+which uses a non-reversible model of characters substitution to infer a root on
+an already inferred tree. \RootDiggertt{} supports two modes: search mode and
+exhaustive mode. In search mode, the optimal position for a root is searched
+for. In contrast, exhaustive mode calculates the probability of a root being
+positioned on every branch on the tree.
+
+\section{Methods}
 
 The input to \RootDiggertt{} then is a multi-species alignment (MSA) and a
 phylogenetic tree with branch lengths given in substitutions per site.
@@ -186,26 +189,17 @@ half and searched for appropriate\footnotemark{} windows.
   has opposite signs at the endpoints of the window.}
 
 \RootDiggertt{} offers a fast and a slow method, which are placement and
-exhaustive, respectively.
-Search mode simply finds the most likely root quickly.
-Exhaustive mode evaluates the likelihood of the root for every branch of a
-given tree, and reports the likelihood weight ratio
+exhaustive, respectively.  Search mode simply finds the most likely root
+quickly. Exhaustive mode evaluates the likelihood of the root for every branch
+of a given tree, and reports the likelihood weight ratio
 \cite{strimmer_inferring_2002} of a root on that branch for every branch on the
-tree.
-In addition to the two search methods, there is an optional early stop mode,
-which can be combined with either search method.
-In this early stop mode, the search will conclude if the root placement is
-nearly the same twice in a row.
-While this mode does improve search times substantially, the likelihood of the
-root placement will not be fully optimized.
-In practice, this does substantially effect the final root placement, but it
-does render comparison of likelihood results difficult \BenComment{Impossible?
-}.
-
-\section{Methods}
-
-%\AlexisComment{We need to better it... this, just give an overview then go inot
-%  the details, despite the uninformative mode print, then the commitee}
+tree.  In addition to the two search methods, there is an optional early stop
+mode, which can be combined with either search method.  In this early stop mode,
+the search will conclude if the root placement is nearly the same twice in a
+row.  While this mode does improve search times substantially, the likelihood of
+the root placement will not be fully optimized.  In practice, this does
+substantially effect the final root placement, but it does render comparison of
+likelihood results difficult \BenComment{Impossible?  }.
 
 As mentioned in the previous section, \RootDiggertt{} has 2 modes of operation.
 These modes will be discussed individually, starting with placement mode.
@@ -441,14 +435,14 @@ branch lengths were optimized using GTR+G.
   \end{center}
 \end{figure}
 
-%\begin{figure}
-%  \begin{center}
-%    \includegraphics[width=.75\linewidth]{
-%    ./figs/spiders/missing_species_with_outgroup.png}
-%    \caption{SpidersMissingSpecies dataset analyzed with an outgroup.}
-%    \label{fig:spiders-missing-species-outgroup}
-%  \end{center}
-%\end{figure}
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{
+    ./figs/spiders/missing_species_with_outgroup.png}
+    \caption{SpidersMissingSpecies dataset analyzed with an outgroup.}
+    \label{fig:spiders-missing-species-outgroup}
+  \end{center}
+\end{figure}
 
 \begin{figure}
   \begin{center}
@@ -458,13 +452,13 @@ branch lengths were optimized using GTR+G.
   \end{center}
 \end{figure}
 
-%\begin{figure}
-%  \begin{center}
-%    \includegraphics[width=.75\linewidth]{./figs/spiders/mito_with_outgroup.png}
-%    \caption{SpidersMitocondrial dataset analyzed with an outgroup.}
-%    \label{fig:spiders-mito-outgroup}
-%  \end{center}
-%\end{figure}
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=.75\linewidth]{./figs/spiders/mito_with_outgroup.png}
+    \caption{SpidersMitocondrial dataset analyzed with an outgroup.}
+    \label{fig:spiders-mito-outgroup}
+  \end{center}
+\end{figure}
 
 %\begin{figure}[H]
 %  \begin{center}
