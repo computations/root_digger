@@ -95,6 +95,7 @@ struct cli_options_t {
   bool silent = false;
   bool exhaustive = false;
   bool echo = false;
+  bool invariant_sites = false;
   initialized_flag_t early_stop;
 };
 
@@ -151,32 +152,32 @@ size_t data_type_to_states(std::string data_type) {
       "Unrecognized data type, unable to determine correct number of states");
 }
 
-
 int main(int argv, char **argc) {
   auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
-      {"msa", required_argument, 0, 0},        /* 0 */
-      {"tree", required_argument, 0, 0},       /* 1 */
-      {"model", required_argument, 0, 0},      /* 2 */
-      {"freqs", required_argument, 0, 0},      /* 3 */
-      {"seed", required_argument, 0, 0},       /* 4 */
-      {"verbose", no_argument, 0, 0},          /* 5 */
-      {"silent", no_argument, 0, 0},           /* 6 */
-      {"min-roots", required_argument, 0, 0},  /* 7 */
-      {"root-ratio", required_argument, 0, 0}, /* 8 */
-      {"atol", required_argument, 0, 0},       /* 9 */
-      {"brtol", required_argument, 0, 0},      /* 10 */
-      {"bfgstol", required_argument, 0, 0},    /* 11 */
-      {"factor", required_argument, 0, 0},     /* 12 */
-      {"partition", required_argument, 0, 0},  /* 13 */
-      {"treefile", required_argument, 0, 0},   /* 14 */
-      {"exhaustive", no_argument, 0, 0},       /* 15 */
-      {"early-stop", no_argument, 0, 0},       /* 16 */
-      {"no-early-stop", no_argument, 0, 0},    /* 17 */
-      {"rate-cats", required_argument, 0, 0},  /* 18 */
-      {"version", no_argument, 0, 0},          /* 19 */
-      {"debug", no_argument, 0, 0},            /* 20 */
-      {"echo", no_argument, 0,0},            /*21*/
+      {"msa", required_argument, 0, 0},             /* 0 */
+      {"tree", required_argument, 0, 0},            /* 1 */
+      {"model", required_argument, 0, 0},           /* 2 */
+      {"freqs", required_argument, 0, 0},           /* 3 */
+      {"seed", required_argument, 0, 0},            /* 4 */
+      {"verbose", no_argument, 0, 0},               /* 5 */
+      {"silent", no_argument, 0, 0},                /* 6 */
+      {"min-roots", required_argument, 0, 0},       /* 7 */
+      {"root-ratio", required_argument, 0, 0},      /* 8 */
+      {"atol", required_argument, 0, 0},            /* 9 */
+      {"brtol", required_argument, 0, 0},           /* 10 */
+      {"bfgstol", required_argument, 0, 0},         /* 11 */
+      {"factor", required_argument, 0, 0},          /* 12 */
+      {"partition", required_argument, 0, 0},       /* 13 */
+      {"treefile", required_argument, 0, 0},        /* 14 */
+      {"exhaustive", no_argument, 0, 0},            /* 15 */
+      {"early-stop", no_argument, 0, 0},            /* 16 */
+      {"no-early-stop", no_argument, 0, 0},         /* 17 */
+      {"rate-cats", required_argument, 0, 0},       /* 18 */
+      {"invariant-sites", required_argument, 0, 0}, /* 19 */
+      {"version", no_argument, 0, 0},               /* 20 */
+      {"debug", no_argument, 0, 0},                 /* 21 */
+      {"echo", no_argument, 0, 0},                  /* 22 */
       {0, 0, 0, 0},
   };
 
@@ -252,13 +253,16 @@ int main(int argv, char **argc) {
       case 18: // rate-cats
         cli_options.rate_cats = {(size_t)atol(optarg)};
         break;
-      case 19: // version
+      case 19:
+        cli_options.invariant_sites = true;
+        break;
+      case 20: // version
         print_version();
         return 0;
-      case 20: // debug
+      case 21: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
-      case 21: //echo
+      case 22: // echo
         cli_options.echo = true;
         break;
       default:
@@ -322,7 +326,11 @@ int main(int argv, char **argc) {
     rooted_tree_t tree{cli_options.tree_filename};
 
     model_t model{
-        tree, msa, cli_options.rate_cats, cli_options.seed,
+        tree,
+        msa,
+        cli_options.rate_cats,
+        cli_options.invariant_sites,
+        cli_options.seed,
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)};
     try {
       model.initialize_partitions(msa);
@@ -330,12 +338,12 @@ int main(int argv, char **argc) {
       model.initialize_partitions_uniform_freqs(msa);
     }
 
-    if(!tree.sanity_check()){
-      std::cout<< "Failed Sanity Check" << std::endl;
+    if (!tree.sanity_check()) {
+      std::cout << "Failed Sanity Check" << std::endl;
     }
 
-    if (cli_options.echo){
-      std::cout<<tree.newick()<<std::endl;
+    if (cli_options.echo) {
+      std::cout << tree.newick() << std::endl;
     }
 
     root_location_t final_rl;

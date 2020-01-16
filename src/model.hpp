@@ -39,7 +39,8 @@ model_params_t random_params(size_t size, uint64_t seed);
 class model_t {
 public:
   model_t(rooted_tree_t t, const std::vector<msa_t> &msa,
-          const std::vector<size_t> &rate_cats, uint64_t seed, bool early_stop);
+          const std::vector<size_t> &rate_cats, bool invariant_sites,
+          uint64_t seed, bool early_stop);
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
@@ -109,8 +110,8 @@ private:
   std::vector<std::vector<double>> _rate_weights;
   std::vector<std::vector<unsigned int>> _param_indicies;
   std::minstd_rand _random_engine;
+  bool _invariant_sites;
   uint64_t _seed;
-  // unsigned int _n_rate_cats = 2;
   bool _early_stop;
   /*
    * Only one submodel will be used for the time being. If there is desire for
