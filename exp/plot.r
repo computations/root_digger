@@ -2,6 +2,7 @@
 
 library("data.table")
 library("ggplot2")
+library("cowplot")
 timing_data <- fread("./simulated_exp/test_results_times.csv")
 
 trees <- unique(timing_data$tree)
@@ -29,6 +30,19 @@ ggplot(data = timing_data, aes(x = iq_time)) + geom_histogram(aes(y = ..count../
     y = "Density") + theme_minimal()
 
 ggsave("./simulated_exp/iq_time_hist.png")
+
+melted_time_data = melt(timing_data, measure.vars = c("rd_time", "iq_time"), id.vars = c("tree", 
+    "alignment", "tree_name", "alignment_name"))
+melted_time_data$ordered_tree_names = factor(melted_time_data$tree_name, levels = c("10 Taxa", 
+    "50 Taxa", "100 Taxa"))
+
+time_boxplot = ggplot(data = melted_time_data, aes(y = value, x = variable, fill = variable)) + 
+    geom_boxplot() + facet_wrap(ordered_tree_names ~ alignment_name, scales = "free", shrink=TRUE) + 
+    labs(title = "", x = "", y = "Time(s)", fill = "Program") + scale_fill_discrete(breaks = c("rd_time", 
+    "iq_time"), labels = c("RootDigger", "IQ-TREE")) + theme_minimal() + theme(axis.text.x = element_blank(), 
+    plot.title = element_text(hjust = 0.5))
+
+ggsave("./simulated_exp/melted_time_boxplot.png")
 
 distance_data <- fread("./simulated_exp/test_results_dists.csv")
 distance_data <- distance_data[order(tree, alignment)]
@@ -78,6 +92,9 @@ melted_path_distance_data = melt(distance_data, measure.vars = c("rd_path_dist",
 melted_normed_distance_data = melt(distance_data, measure.vars = c("rd_normed_distance", 
     "iq_normed_distance"), id.vars = c("tree", "alignment", "tree_name", "alignment_name"))
 
+melted_normed_distance_data$ordered_tree_names = factor(melted_normed_distance_data$tree_name, 
+    levels = c("10 Taxa", "50 Taxa", "100 Taxa"))
+
 variable_names <- list(rd_dist = "RootDigger Distance", iq_dist = "IQ-TREE Distance", 
     rd_path_dist = "RootDigger Path Distance", iq_path_dist = "IQ-TREE Path Distance", 
     rd_normed_distance = "RootDigger Normalized Distance", iq_normed_distance = "IQ-TREE Noramlized Distance")
@@ -102,10 +119,12 @@ ggplot(data = melted_path_distance_data, aes(y = value, x = variable, fill = var
     plot.title = element_text(hjust = 0.5))
 ggsave("./simulated_exp/melted_path_dist_box.png")
 
-ggplot(data = melted_normed_distance_data, aes(y = value, x = variable, fill = variable)) + 
-    geom_boxplot() + facet_grid(tree_name ~ alignment_name, scales = "free_y") + 
-    labs(title = "Normalized topological distance of inferred root to true root", 
-        x = "", y = "Distance", fill = "Program") + scale_fill_discrete(breaks = c("rd_normed_distance", 
-    "iq_normed_distance"), labels = c("RootDigger", "IQ-TREE")) + theme_minimal() + 
-    theme(axis.text.x = element_blank(), plot.title = element_text(hjust = 0.5))
+distance_boxplot = ggplot(data = melted_normed_distance_data, aes(y = value, x = variable, 
+    fill = variable)) + geom_boxplot() + facet_grid(ordered_tree_names ~ alignment_name, scales = "free_y") + 
+    labs(title = "", x = "", y = "Distance") + theme_minimal() + theme(axis.text.x = element_blank(), 
+    legend.position = "none", plot.title = element_text(hjust = 0.5))
 ggsave("./simulated_exp/melted_norm_dist_box.png")
+
+multi_plot <- plot_grid(distance_boxplot, time_boxplot, labels = "AUTO", rel_widths = c(1, 
+    1.4))
+ggsave("./simulated_exp/time_distance_boxplot.png", plot = multi_plot, width = 10)
