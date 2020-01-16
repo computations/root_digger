@@ -114,7 +114,8 @@ void model_t::set_gamma_rates(size_t p_index, double alpha) {
 }
 
 void model_t::update_invariant_sites(size_t p_index) {
-  pll_update_invariant_sites(_partitions[p_index]);
+  if (_invariant_sites)
+    pll_update_invariant_sites(_partitions[p_index]);
 }
 
 void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
@@ -176,9 +177,9 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
 }
 
 model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
-                 const std::vector<size_t> &rate_cats, uint64_t seed,
-                 bool early_stop)
-    : _seed{seed}, _early_stop{early_stop} {
+                 const std::vector<size_t> &rate_cats, bool invariant_sites,
+                 uint64_t seed, bool early_stop)
+    : _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
 
   _random_engine = std::minstd_rand(_seed);
   _tree = std::move(tree);
@@ -383,8 +384,8 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
   }
 
   /* case 2: midpoint is opposite sign of both beg and end
-   * There are at least 2 roots, so we recurse on both sides, and return the one
-   * with the best LH
+   * There are at least 2 roots, so we recurse on both sides, and return the
+   * one with the best LH
    */
   if ((d_beg.dlh > 0.0 && d_end.dlh > 0.0 && d_midpoint.dlh < 0.0) ||
       (d_beg.dlh < 0.0 && d_end.dlh < 0.0 && d_midpoint.dlh > 0.0)) {
@@ -549,8 +550,8 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
   }
 
   /* if we have gotten here, then we must have an "even" function so, grid
-   * search to find a midpoint which has an opposite sign value and use that to
-   * do bisection with
+   * search to find a midpoint which has an opposite sign value and use that
+   * to do bisection with
    */
 
   bool beg_end_pos = d_beg.dlh > 0.0 && d_end.dlh > 0.0;
@@ -579,8 +580,8 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
       if ((beg_end_pos && d_midpoint.dlh < 0.0) ||
           (!beg_end_pos && d_midpoint.dlh > 0.0)) {
         /*
-         * we have a midpoint, so now we need to figure out if it is a min or a
-         * maximum.
+         * we have a midpoint, so now we need to figure out if it is a min or
+         * a maximum.
          */
         auto r1 = brents(beg, d_beg, midpoint_root, d_midpoint, atol);
         auto r2 = brents(midpoint_root, d_midpoint, end, d_end, atol);
@@ -605,9 +606,9 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
   /*
    * If we got here, we can just return the best of beg or end, since it seems
    * like there is no root. If both beg and end are positive, then that means
-   * the liklihood _increases_ as we increase alpha, so the best liklihood is at
-   * the end. Likewise, if both are negative, then the best endpoint is at the
-   * begining.
+   * the liklihood _increases_ as we increase alpha, so the best liklihood is
+   * at the end. Likewise, if both are negative, then the best endpoint is at
+   * the begining.
    */
   if (beg_end_pos) {
     return end;
