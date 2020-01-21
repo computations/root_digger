@@ -1,4 +1,6 @@
 \documentclass{article}
+\usepackage{scrextend}
+\usepackage{ctable}
 \usepackage{multirow}
 \usepackage{hyperref}
 \usepackage{graphicx}
@@ -51,7 +53,7 @@
 
 When inferring phylogenetic trees, most phyogenetic inference tools
 \cite{nguyen_iq-tree:_2015, stamatakis_raxml_2014, minh_iq-tree_2019} will infer
-an unrooted tree. This is due to a standard for phylogenetic tools assumption:
+an unrooted tree. This is due to a standard assumption for phylogenetic tools:
 reversibility of the character substitution process
 \cite{felsenstein_evolutionary_1981}.  This yields the problem of inferring a
 phylogenetic tree computationally tractable.  However, by making this assumption
@@ -59,12 +61,11 @@ the ability to identify a root is lost. A rooted phylogenetic tree is desirable,
 though, as it can resolve long standing disputes regarding the placement of
 large clades on the tree of life \cite{dunn_animal_2014} for example.
 
-There are several methods to recover the root on an existing phylogenetic tree,
-which generally fall into one of three categories: methods which use additional
-topological information not present in the molecular data; methods which
-utilize some variation of the molecular clock hypothesis; and methods which use
-a non-reversible model.
-\doublespace
+There are, however, several methods to recover the root on an existing
+phylogenetic tree, which generally fall into one of three categories: methods
+which use additional topological information not present in the sequence data;
+methods which utilize some variation of the molecular clock hypothesis; and
+methods which utilize a non-reversible model.
 
 Methods that use additional topological information take advantage of prior
 knowledge about the world, which is not present in the data that is used to
@@ -136,9 +137,9 @@ not find this to be a major concern in our experiments (see the discussion).
 
 We implemented the open source software tool \RootDiggertt{} which uses a
 non-reversible model of character substitution to infer a root on an already
-inferred tree. The inputs to our tool is a multiple sequence alignment, and a
-phylogenetic tree, and produces a rooted tree. \RootDiggertt{} implements fast
-and a slow modes, called Search mode and Exhaustive mode, respectively. The
+inferred tree. The inputs to our tool are a multiple sequence alignment and a
+phylogenetic tree, and the tool yields a rooted tree. \RootDiggertt{} implements
+fast and a slow modes, called Search mode and Exhaustive mode, respectively. The
 search mode simply finds the most likely root quickly. The exhaustive mode
 evaluates the likelihood of the root for every branch of a given tree, and
 reports the likelihood weight ratio \cite{strimmer_inferring_2002} for placing a
@@ -150,10 +151,10 @@ the best root position is on the same branch as the previous iteration {\em and}
 the value inferred for the root position is sufficiently close, then the
 objective function is considered satisfied, and the current iteration
 terminates.  While the early stop optimization does improve rooting times
-substantially (around 1.7 times faster), the likelihood of the root placement
+substantially (around 1.7 times faster), the likelihood of each root placement
 will not be fully optimized.  In practice, this does not substantially effect
 the final root placement, but it does render comparison of the likelihood with
-results from other tools impossible.
+results from other tools invalid.
 
 \section{Methods}
 
@@ -162,14 +163,15 @@ phylogenetic tree with branch lengths in expected mean substitutions per site.
 \RootDiggertt{} then uses the tree and branch lengths to find the most likely
 root location by calculating the likelihood of a root location under a
 non-reversible model of DNA substitution (specifically, UNREST
-\cite{yang_estimating_1994}). The optimal position of the root along a branch is
-calculated by splitting the given branch in two branches with resulting branch
-lengths $\alpha t$ and $(1-\alpha) t$, $0 \leq \alpha \leq 1.0$.  We then find
-the maximum likelihood value of $\alpha$, and report the likelihood for given
-branch as the likelihood of the root location.  By formulating the problem this
-way, we can use single parameter optimization techniques such as Brent's
-Method\footnotemark{}, which are computationally more efficient compared to
-multi-parameter optimization routines.
+\cite{yang_estimating_1994} with a user specified number of rate categories).
+The optimal position of the root along a branch is calculated by splitting the
+given branch in two with resulting branch lengths $\alpha t$ and
+$(1-\alpha) t$, with $0 \leq \alpha \leq 1.0$.  We then find the maximum likelihood
+value of $\alpha$, and report the likelihood for given branch as the likelihood
+of the root location.  By formulating the problem this way, we can use single
+parameter optimization techniques such as Brent's Method\footnotemark{}, which
+are computationally more efficient compared to multi-parameter optimization
+routines.
 
 \footnotetext{
   Brent's Method is picked over Newton's Method because it does not require a
@@ -184,12 +186,13 @@ multi-parameter optimization routines.
 
 A quirk of Brent's and similar methods is that they find extrema by finding
 roots for the objective function's derivative. In order to find maxima, though,
-it is required that the objective function's value is checked. In addition,
-Brent's method will fail to find all extrema.  To compensate, we need to search
-for bracketing windows that can be used to safely find extrema.  Unfortunately,
-we are not aware of a general method for finding such bracketing windows, so a
-recursive method is employed, were the search range is reduced in half and
-searched for appropriate\footnotemark{} windows.
+it is required that the objective function's value is checked, as a root of the
+derivative could correspond to a minima. In addition, Brent's method will fail
+to find all extrema. To compensate, we need to search for bracketing windows
+that can be used to safely find extrema.  Unfortunately, we are not aware of a
+general method for finding such bracketing windows, so a recursive method is
+employed, were the search range is reduced in half and searched for
+appropriate\footnotemark{} windows.
 
 \footnotetext{Appropriate here means that the sign of the function in question
   has opposite signs at the endpoints of the window.}
@@ -217,7 +220,7 @@ These modes will be discussed individually, starting with placement mode:
                   \item Character substitution rates,
                   \item Base Frequencies.
                 \end{itemize}
-          \item Find best root location
+          \item Find the best root location for the current model
                 \begin{enumerate}
                   \item Create a list of high likelihood root locations
                         evaluated at the midpoint of every branch.
@@ -232,6 +235,7 @@ These modes will be discussed individually, starting with placement mode:
                   \item If early stopping is enabled, the new root location is
                         sufficiently close to the old root location by distance
                         along the branch (below \texttt{brtol}).
+                  \item More than 500 iterations have passed.
                 \end{itemize}
         \end{enumerate}
   \item Report the best found root, along with its likelihood
@@ -266,6 +270,7 @@ considered:
                   \item If early stopping is enabled, the new root location is
                         sufficiently close to the old root location by distance
                         along the branch (below \texttt{brtol}).
+                  \item More than 500 iterations have passed.
                 \end{itemize}
     \end{enumerate}
   \item Report the tree with annotations for every branch:
@@ -277,7 +282,10 @@ considered:
 \end{enumerate}
 
 We re-initialize the initial model parameters every iteration to avoid the many
-local minima, as discussed in \cite{huelsenbeck_inferring_2002}. 
+local minima, as discussed in \cite{huelsenbeck_inferring_2002}. In both modes,
+there is an upper limit to the number of iterations of 500. In empirical and
+simulated datasets this limit has never been met, and only exists to ensure
+that the program will eventually halt.
 
 \section{The Software}
 
@@ -343,10 +351,10 @@ iqtree -m 12.12 -s <MSA FILE> -g <TREE FILE>
 The \texttt{-m 12.12} argument to IQ-TREE specifies that the UNREST model should
 be used \cite{woodhams_new_2015} and the \texttt{-g <TREE FILE>} option
 constrains the tree search to the tree given. When given an fully resolved
-unrooted tree, this has the effect of rooting the constraint tree. We used this
-option to simulate what the operation of \RootDiggertt{}. A notable difference
-between results of IQ-TREE and \RootDiggertt{} is IQ-TREE will optimize
-branch lengths. For that reason, comparison of results will be done using
+unrooted tree, this has the effect of rooting the tree. We used this option to
+simulate the operation of \RootDiggertt{}. A notable difference between results
+of IQ-TREE and \RootDiggertt{} is IQ-TREE will optimize branch lengths. For that
+reason, comparison of results between the two tools will be done using
 topological distance.
 
 For all runs, the UNREST model was used. Furthermore, we vary two additional
@@ -424,8 +432,9 @@ of the empirical datasets, we ran \RootDiggertt{} in exhaustive mode to obtain
 likelihood weight ratios (LWR) for each branch.  Annotations are suppressed for
 branches with a small LWR (less than $0.0001$).  The trees with annotated LWR
 are shown in figures \ref{fig:spiders-missing-species-no-outgroup} -
-\ref{fig:angio-cds12-outgroup}.  We ran the experiments on the datasets with the
-outgroup included, as well as with the outgroup removed.
+\ref{fig:angio-cds12-outgroup} \BenComment{Figures suppressed to save paper}.
+We ran the experiments on the datasets with the outgroup included, as well as
+with the outgroup removed.
 
 There was some preprocessing performed. In order to be sure branch lengths in
 all datasets were specified in substitutions per site, the branch lengths were
@@ -434,12 +443,26 @@ re-optimized using RAxML-NG \cite{kozlov_raxml-ng:_2019} version
 known\BenComment{which datasets}, otherwise the
 branch lengths were optimized using GTR+G.
 
-\begin{table}[H]
-  \begin{center}
-    \include{tables/datasets}
-    \label{table:datasets}
-  \end{center}
-\end{table}
+\ctable[
+ cap = Empirical Datasets,
+ caption = Table of emperical datasets used for
+ validation.\label{table:datasets},
+ label = table:datasets,
+ pos=h,
+ ]
+{ l c c c c c}{\tnote{The paper states that PartitionFinder was used, but the
+  results were not provided.}}{\FL
+Dataset & \#Taxa & \#Sites & Model Used in Study & Model Used Here& Source \ML
+AngiospermsCDS12 & 35 & 864029 & GTRGAMMA & GTR + G4 & \cite{ran_phylogenomics_2018}\NN
+AngiospermsCDS12 & 35 & 864029 & GTRGAMMA & GTR + G4 &
+\cite{ran_phylogenomics_2018}\NN
+Grasses & 245 & 4973 &  GTR+ G + I&  GTR + G4 &\cite{christin_molecular_2014}\NN
+Ficus & 200 & 5552 & GTRCAT &  GTR + G4 &\cite{cruaud_extreme_2012}\NN
+SpidersMissingSpecies & 33 & 1097842 & Not stated in paper\tmark  & GTR + G4
+                      &\cite{leduc-robert_phylogeny_2018}\NN
+SpidersMitocondrial & 34 & 12479 & Not stated in paper\tmark &GTR + G4 &\cite{leduc-robert_phylogeny_2018} \LL
+}
+
 
 %\begin{table}
 %  \begin{center}
@@ -571,7 +594,7 @@ stop enabled is roughly 1.7 times faster.
 
 \RootDiggertt{} is substantially faster than IQ-TREE, as is shown when comparing
 figure~\ref{fig:timing-box-plot}. Furthermore, the accuracy of root placement of
-\RootDiggertt{} is nearly the same as IQ-TREE, as seen in
+\RootDiggertt{} is nearly the same as IQ-TREE, as also seen in
 figure~\ref{fig:timing-box-plot}.  Early stopping proved to be an effective
 technique to reduce execution times at an extremely marginal cost in accuracy.
 The largest observed difference on empirical datasets between using early stop
