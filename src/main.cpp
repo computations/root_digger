@@ -108,18 +108,27 @@ void print_usage() {
       << "           File containing the alignment.\n"
       << "    --tree [FILE]\n"
       << "           File containing the tree, with branch lengths.\n"
-      << "    --model [FILE]\n"
-      << "           Optional file containing the substitution model.\n"
-      << "           Ideally, this should be a non-reversible model.\n"
-      << "           If this is not given, then the parameters are inferred\n"
-      << "    --freqs [FILE]\n"
-      << "           Optional file containing the frequencies. If not\n"
-      << "           given, then empirical frequencies are used instead.\n"
       << "    --partition [FILE]\n"
       << "           Optional file containing the partition specification.\n"
       << "           Format is the same as RAxML-NG partition file.\n"
+      << "    --exhaustive\n"
+      << "           Enable exhaustive mode. This will attempt to root a tree\n"
+      << "           at every branch, and then report the results using LWR.\n"
+      << "    --early-stop\n"
+      << "           Enable early stopping. This will cause cause the search\n"
+      << "           to terminate when the root placement is sufficently\n"
+      << "           close for 2 consecutive iterations. How close they need\n"
+      << "           to be is controled by brtol. Is enabled by default for\n"
+      << "           search mode and disabled by default for exhaustive mode.\n"
+      << "    --no-early-stop\n"
+      << "           Force disable early stop.\n"
       << "    --seed [NUMBER]\n"
       << "           Random seed to use. Optional\n"
+      << "    --rate-cats [NUMBER]\n"
+      << "           Number of rate categories to use for the model. Default\n"
+      << "           is 1.\n"
+      << "    --invariant-sites [NUMBER]\n"
+      << "           Enable invariant sites. Default is off.\n"
       << "    --min-roots [NUMBER]\n"
       << "           Minimum number of roots to start from. Optional,\n"
       << "           Default is 1.\n"
@@ -129,6 +138,13 @@ void print_usage() {
       << "    --atol [NUMBER]\n"
       << "           Root optmization stopping tolerance. Increase this to \n"
       << "           improve results.Default is 1e-4\n"
+      << "    --brtol [NUMBER]\n"
+      << "           When early stop mode is enabled, this controls the\n"
+      << "           distance required to trigger. Default is 1e-12\n"
+      << "    --bfgstol [NUMBER]\n"
+      << "           Tolerance for the BFGS steps. Default is 1e-7\n"
+      << "    --factor [NUMBER]\n"
+      << "           Factor for the BFGS steps. Default is 1e4\n"
       << "    --silent\n"
       << "           Suppress output except for the final tree\n"
       << "    --verbose\n"
@@ -158,7 +174,6 @@ int main(int argv, char **argc) {
       {"msa", required_argument, 0, 0},             /* 0 */
       {"tree", required_argument, 0, 0},            /* 1 */
       {"model", required_argument, 0, 0},           /* 2 */
-      {"freqs", required_argument, 0, 0},           /* 3 */
       {"seed", required_argument, 0, 0},            /* 4 */
       {"verbose", no_argument, 0, 0},               /* 5 */
       {"silent", no_argument, 0, 0},                /* 6 */
@@ -201,68 +216,65 @@ int main(int argv, char **argc) {
       case 2: // model
         cli_options.model_filename = optarg;
         break;
-      case 3: // freqs
-        cli_options.freqs_filename = optarg;
-        break;
-      case 4: // seed
+      case 3: // seed
         cli_options.seed = atol(optarg);
         break;
-      case 5: // verbose
+      case 4: // verbose
         __VERBOSE__ += 1;
         break;
-      case 6: // silent
+      case 5: // silent
         __VERBOSE__ = 0;
         cli_options.silent = true;
         break;
-      case 7: // min-roots
+      case 6: // min-roots
         cli_options.min_roots = atol(optarg);
         break;
-      case 8: // root-ratio
+      case 7: // root-ratio
         cli_options.root_ratio = atof(optarg);
         break;
-      case 9: // atol
+      case 8: // atol
         cli_options.abs_tolerance = atof(optarg);
         break;
-      case 10: // brtol
+      case 9: // brtol
         cli_options.br_tolerance = atof(optarg);
         break;
-      case 11: // bfgs_tol
+      case 10: // bfgs_tol
         cli_options.bfgs_tol = atof(optarg);
         break;
-      case 12: // factor
+      case 11: // factor
         cli_options.factor = atof(optarg);
         break;
-      case 13: // partition
+      case 12: // partition
         cli_options.partition_filename = optarg;
         break;
-      case 14: // treefile
+      case 13: // treefile
         cli_options.output_tree_filename = optarg;
         break;
-      case 15: // exhaustive
+      case 14: // exhaustive
         cli_options.exhaustive = true;
         if (!cli_options.early_stop.initalized()) {
           cli_options.early_stop = initialized_flag_t::initialized_false;
         }
         break;
-      case 16: // early-stop
+      case 15: // early-stop
         cli_options.early_stop = initialized_flag_t::initialized_true;
         break;
-      case 17: // no-early-stop
+      case 16: // no-early-stop
         cli_options.early_stop = initialized_flag_t::initialized_false;
         break;
-      case 18: // rate-cats
+      case 17: // rate-cats
         cli_options.rate_cats = {(size_t)atol(optarg)};
         break;
-      case 19:
+      case 18:
         cli_options.invariant_sites = true;
         break;
-      case 20: // version
+      case 19: // version
         print_version();
         return 0;
-      case 21: // debug
+      case 20: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
-      case 22: // echo
+      case 21: // echo
         cli_options.echo = true;
         break;
       default:
