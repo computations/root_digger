@@ -26,6 +26,8 @@ def produce_rd_options(options_dict):
     opts = []
     if options_dict['early-stop']:
         opts.append('--early-stop')
+    if options_dict['invariant-sites']:
+        opts.append('--invariant-sites')
 
     opts.append('--rate-cats')
     opts.append(options_dict['rate-cats'])

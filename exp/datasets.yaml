@@ -9,6 +9,7 @@ angio:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
         - msa: cds12_outgroup_removed.fasta
           tree: cds12_outgroup_removed_opt_brlen.tree
           results: cds12_no_outgroup_lwr.newick
@@ -17,6 +18,7 @@ angio:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
         - msa: cds.fasta
           tree: cds_brlen_opt.tree
           results: cds_with_outgroup_lwr.newick
@@ -25,6 +27,7 @@ angio:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
         - msa: cds12.fasta
           tree: cds12_opt_brlen.tree
           results: cds12_with_outgroup_lwr.newick
@@ -33,6 +36,7 @@ angio:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
 ficus:
     directory: ficus
     datasets:
@@ -44,6 +48,7 @@ ficus:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
         - msa: ficus_outgroup.fasta
           tree: ficus_outgroup_opt_brlen.tree
           results: ficus_with_outgroup_lwr.newick
@@ -52,6 +57,7 @@ ficus:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
 grasses:
     directory: grasses
     datasets:
@@ -63,6 +69,7 @@ grasses:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: true
 spiders:
     directory: spiders
     datasets:
@@ -74,6 +81,7 @@ spiders:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
         - msa: missing_species_outgroup.fasta
           tree: missing_species_brlen_opt.nwk
           results: missing_species_with_outgroup_lwr.newick
@@ -82,6 +90,7 @@ spiders:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
         - msa: mitocondrial.fasta
           tree: mitocondrial_opt_brlen.tree
           results: mito_no_outgroup_lwr.newick
@@ -90,6 +99,7 @@ spiders:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
         - msa: mitocondrial_outgroup.fasta
           tree: mitocondrial_outgroup_brlen_opt.nwk
           results: mito_with_outgroup_lwr.newick
@@ -98,3 +108,4 @@ spiders:
           options:
               early-stop: true
               rate-cats: 4
+              invariant-sites: false
