@@ -70,20 +70,60 @@ model_params_t random_params(size_t size, uint64_t seed) {
   return mp;
 }
 
-std::vector<double> sample_dirichlet(std::minstd_rand engine, double alpha,
-                                     double beta, size_t size) {
-  std::vector<double> rand_sample(size);
-  static std::gamma_distribution<double> gd(alpha * (beta / (size * beta)),
-                                            1.0);
-  double sum = 0.0;
-  for (auto &f : rand_sample) {
-    f = gd(engine);
-    sum += f;
+model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
+                 const std::vector<size_t> &rate_cats, bool invariant_sites,
+                 uint64_t seed, bool early_stop)
+    : _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
+
+  _random_engine = std::minstd_rand(_seed);
+  _tree = std::move(tree);
+  for (auto rc : rate_cats) {
+    _rate_weights.emplace_back(rc, 0.0);
+    _param_indicies.emplace_back(rc, 0);
   }
-  for (auto &f : rand_sample) {
-    f /= sum;
+
+  for (auto &msa : msas) {
+    if (!msa.constiency_check(_tree.label_set())) {
+      throw std::invalid_argument(
+          "Taxa on the tree and in the MSA are inconsistient");
+    }
   }
-  return rand_sample;
+
+  unsigned int attributes = 0;
+  if (PLL_STAT(avx2_present)) {
+    attributes |= PLL_ATTRIB_ARCH_AVX2;
+  } else if (PLL_STAT(avx_present)) {
+    attributes |= PLL_ATTRIB_ARCH_AVX;
+  } else if (PLL_STAT(sse42_present)) {
+    attributes |= PLL_ATTRIB_ARCH_SSE;
+  }
+
+  attributes |= PLL_ATTRIB_NONREV;
+  attributes |= PLL_ATTRIB_SITE_REPEATS;
+
+  size_t total_weight = 0;
+  for (size_t partition_index = 0; partition_index < msas.size();
+       ++partition_index) {
+    auto &msa = msas[partition_index];
+    _partitions.push_back(pll_partition_create(
+        _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
+        _submodels, _tree.branch_count(), _rate_weights[partition_index].size(),
+        _tree.branch_count(), attributes));
+    _partition_weights.push_back(msa.total_weight());
+    set_gamma_rates(partition_index);
+    total_weight += msa.total_weight();
+  }
+
+  for (auto &&pw : _partition_weights) {
+    pw /= (double)total_weight;
+  }
+}
+
+model_t::~model_t() {
+  for (auto p : _partitions) {
+    if (p)
+      pll_partition_destroy(p);
+  }
 }
 
 void model_t::set_subst_rates(size_t p_index, const model_params_t &mp) {
@@ -174,62 +214,6 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
     f /= sum;
   }
   set_freqs(p_index, freqs);
-}
-
-model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
-                 const std::vector<size_t> &rate_cats, bool invariant_sites,
-                 uint64_t seed, bool early_stop)
-    : _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
-
-  _random_engine = std::minstd_rand(_seed);
-  _tree = std::move(tree);
-  for (auto rc : rate_cats) {
-    _rate_weights.emplace_back(rc, 0.0);
-    _param_indicies.emplace_back(rc, 0);
-  }
-
-  for (auto &msa : msas) {
-    if (!msa.constiency_check(_tree.label_set())) {
-      throw std::invalid_argument(
-          "Taxa on the tree and in the MSA are inconsistient");
-    }
-  }
-
-  unsigned int attributes = 0;
-  if (PLL_STAT(avx2_present)) {
-    attributes |= PLL_ATTRIB_ARCH_AVX2;
-  } else if (PLL_STAT(avx_present)) {
-    attributes |= PLL_ATTRIB_ARCH_AVX;
-  } else if (PLL_STAT(sse42_present)) {
-    attributes |= PLL_ATTRIB_ARCH_SSE;
-  }
-
-  attributes |= PLL_ATTRIB_NONREV;
-  attributes |= PLL_ATTRIB_SITE_REPEATS;
-
-  size_t total_weight = 0;
-  for (size_t partition_index = 0; partition_index < msas.size();
-       ++partition_index) {
-    auto &msa = msas[partition_index];
-    _partitions.push_back(pll_partition_create(
-        _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
-        _submodels, _tree.branch_count(), _rate_weights[partition_index].size(),
-        _tree.branch_count(), attributes));
-    _partition_weights.push_back(msa.total_weight());
-    set_gamma_rates(partition_index);
-    total_weight += msa.total_weight();
-  }
-
-  for (auto &&pw : _partition_weights) {
-    pw /= (double)total_weight;
-  }
-}
-
-model_t::~model_t() {
-  for (auto p : _partitions) {
-    if (p)
-      pll_partition_destroy(p);
-  }
 }
 
 double model_t::compute_lh(const root_location_t &root_location) {
@@ -811,6 +795,122 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
   return {best_rl, best_lh};
 }
 
+std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
+                                                              double pgtol,
+                                                              double brtol,
+                                                              double factor) {
+  size_t root_index = 0;
+  root_location_t best_rl;
+  double best_lh = -INFINITY;
+  size_t root_count = _tree.root_count();
+  std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
+  debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
+
+  for (auto rl : _tree.roots()) {
+    set_subst_rates_uniform();
+    set_empirical_freqs();
+    ++root_index;
+
+    move_root(rl);
+    std::vector<model_params_t> subst_rates;
+    std::vector<model_params_t> freqs;
+    std::vector<double> gamma_alphas;
+
+    for (size_t p = 0; p < _partitions.size(); ++p) {
+      size_t subst_size = _partitions[p]->states;
+      subst_size = subst_size * subst_size - subst_size;
+      freqs.push_back(
+          model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
+      subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
+      gamma_alphas.push_back(1.0);
+    }
+
+    root_location_t cur_best_rl;
+    double cur_best_lh = -INFINITY;
+
+    for (size_t iter = 0; iter < 1e3; ++iter) {
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        set_subst_rates(i, subst_rates[i]);
+        set_freqs_all_free(i, freqs[i]);
+        set_gamma_rates(i, gamma_alphas[i]);
+        debug_string(EMIT_LEVEL_DEBUG, "Optimizing gamma rates");
+        bfgs_gamma(gamma_alphas[i], rl, i, pgtol, factor);
+        debug_string(EMIT_LEVEL_DEBUG, "Optmizing rates");
+        bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
+        debug_string(EMIT_LEVEL_DEBUG, "Optimizing freqs");
+        bfgs_freqs(freqs[i], rl, i, pgtol, factor);
+      }
+
+      if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
+        break;
+      }
+
+      debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
+      auto cur_rl = optimize_alpha(rl, brtol);
+      double cur_lh = compute_lh_root(cur_rl);
+
+      debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur_lh);
+      debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
+                  (cur_lh - cur_best_lh));
+
+      if (_early_stop) {
+        if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
+          debug_print(EMIT_LEVEL_DEBUG,
+                      "Current BRlen ratio tolerances: %.7f, brtol: %.7f",
+                      fabs(rl.brlen_ratio - cur_rl.brlen_ratio), brtol);
+          cur_best_rl = cur_rl;
+          cur_best_lh = cur_lh;
+          break;
+        }
+      }
+
+      if ((cur_lh - cur_best_lh) < atol) {
+        if (cur_lh > cur_best_lh) {
+          cur_best_rl = cur_rl;
+          cur_best_lh = cur_lh;
+        }
+        break;
+      }
+
+      if (cur_lh > cur_best_lh) {
+        cur_best_rl = cur_rl;
+        cur_best_lh = cur_lh;
+      }
+
+      rl = cur_rl;
+    }
+
+    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu / %lu", root_index, root_count);
+
+    mapped_likelihoods.emplace_back(cur_best_rl, cur_best_lh);
+    if (cur_best_lh > best_lh) {
+      best_rl = cur_best_rl;
+      best_lh = cur_best_lh;
+    }
+  }
+
+  double max_lh = -INFINITY;
+
+  for (auto kv : mapped_likelihoods) {
+    max_lh = std::max(kv.second, max_lh);
+  }
+
+  double total_lh = 0;
+  for (auto kv : mapped_likelihoods) {
+    total_lh += exp(kv.second - max_lh);
+  }
+  debug_print(EMIT_LEVEL_DEBUG, "LWR denom: %f, %e", total_lh, total_lh - 1);
+
+  for (auto kv : mapped_likelihoods) {
+    double lwr = exp((kv.second - max_lh)) / total_lh;
+    _tree.annotate_branch(kv.first, "LWR", std::to_string(lwr));
+    _tree.annotate_lh(kv.first, kv.second);
+    _tree.annotate_ratio(kv.first, kv.first.brlen_ratio);
+  }
+
+  return {best_rl, best_lh};
+}
+
 const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
   _tree.root_by(root);
   return _tree;
@@ -1161,118 +1261,3 @@ void model_t::set_empirical_freqs() {
   }
 }
 
-std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
-                                                              double pgtol,
-                                                              double brtol,
-                                                              double factor) {
-  size_t root_index = 0;
-  root_location_t best_rl;
-  double best_lh = -INFINITY;
-  size_t root_count = _tree.root_count();
-  std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
-  debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
-
-  for (auto rl : _tree.roots()) {
-    set_subst_rates_uniform();
-    set_empirical_freqs();
-    ++root_index;
-
-    move_root(rl);
-    std::vector<model_params_t> subst_rates;
-    std::vector<model_params_t> freqs;
-    std::vector<double> gamma_alphas;
-
-    for (size_t p = 0; p < _partitions.size(); ++p) {
-      size_t subst_size = _partitions[p]->states;
-      subst_size = subst_size * subst_size - subst_size;
-      freqs.push_back(
-          model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
-      subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
-      gamma_alphas.push_back(1.0);
-    }
-
-    root_location_t cur_best_rl;
-    double cur_best_lh = -INFINITY;
-
-    for (size_t iter = 0; iter < 1e3; ++iter) {
-      for (size_t i = 0; i < _partitions.size(); ++i) {
-        set_subst_rates(i, subst_rates[i]);
-        set_freqs_all_free(i, freqs[i]);
-        set_gamma_rates(i, gamma_alphas[i]);
-        debug_string(EMIT_LEVEL_DEBUG, "Optimizing gamma rates");
-        bfgs_gamma(gamma_alphas[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_DEBUG, "Optmizing rates");
-        bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_DEBUG, "Optimizing freqs");
-        bfgs_freqs(freqs[i], rl, i, pgtol, factor);
-      }
-
-      if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
-        break;
-      }
-
-      debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
-      auto cur_rl = optimize_alpha(rl, brtol);
-      double cur_lh = compute_lh_root(cur_rl);
-
-      debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur_lh);
-      debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
-                  (cur_lh - cur_best_lh));
-
-      if (_early_stop) {
-        if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
-          debug_print(EMIT_LEVEL_DEBUG,
-                      "Current BRlen ratio tolerances: %.7f, brtol: %.7f",
-                      fabs(rl.brlen_ratio - cur_rl.brlen_ratio), brtol);
-          cur_best_rl = cur_rl;
-          cur_best_lh = cur_lh;
-          break;
-        }
-      }
-
-      if ((cur_lh - cur_best_lh) < atol) {
-        if (cur_lh > cur_best_lh) {
-          cur_best_rl = cur_rl;
-          cur_best_lh = cur_lh;
-        }
-        break;
-      }
-
-      if (cur_lh > cur_best_lh) {
-        cur_best_rl = cur_rl;
-        cur_best_lh = cur_lh;
-      }
-
-      rl = cur_rl;
-    }
-
-    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu / %lu", root_index, root_count);
-
-    mapped_likelihoods.emplace_back(cur_best_rl, cur_best_lh);
-    if (cur_best_lh > best_lh) {
-      best_rl = cur_best_rl;
-      best_lh = cur_best_lh;
-    }
-  }
-
-  double max_lh = -INFINITY;
-
-  for (auto kv : mapped_likelihoods) {
-    max_lh = std::max(kv.second, max_lh);
-  }
-
-  double total_lh = 0;
-  for (auto kv : mapped_likelihoods) {
-    total_lh += exp(kv.second - max_lh);
-  }
-  debug_print(EMIT_LEVEL_DEBUG, "LWR denom: %f, %e", total_lh, total_lh - 1);
-
-  for (auto kv : mapped_likelihoods) {
-    double lwr = exp((kv.second - max_lh)) / total_lh;
-    _tree.annotate_branch(kv.first, "LWR", std::to_string(lwr));
-    _tree.annotate_lh(kv.first, kv.second);
-    _tree.annotate_ratio(kv.first, kv.first.brlen_ratio);
-  }
-
-  return {best_rl, best_lh};
-}

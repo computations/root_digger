@@ -153,21 +153,6 @@ void print_usage() {
       << std::endl;
 }
 
-size_t data_type_to_states(std::string data_type) {
-  std::for_each(data_type.begin(), data_type.end(), tolower);
-  if (data_type == "dna" || data_type == "nt") {
-    return 4;
-  }
-  if (data_type == "protein" || data_type == "aa") {
-    return 20;
-  }
-  if (data_type == "codon") {
-    return 64;
-  }
-  throw std::runtime_error(
-      "Unrecognized data type, unable to determine correct number of states");
-}
-
 int main(int argv, char **argc) {
   auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
