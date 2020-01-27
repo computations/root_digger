@@ -348,14 +348,14 @@ class exp:
                 exp_key = (tree_name, align_name)
                 if self._run_rd:
                     self._rd_results_es.append(
-                        rd_result(tree_name, sites, exp_dir, true_tree_ete,
+                        rd_result(tree_name, align, exp_dir, true_tree_ete,
                                   True))
                     self._rd_results_nes.append(
-                        rd_result(tree_name, sites, exp_dir, true_tree_ete,
+                        rd_result(tree_name, align, exp_dir, true_tree_ete,
                                   False))
                 if self._run_iq:
                     self._iqtree_results.append(
-                        iqtree_result(tree_name, sites, exp_dir, true_tree_ete,
+                        iqtree_result(tree_name, align, exp_dir, true_tree_ete,
                                       align_filename))
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
