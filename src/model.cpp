@@ -75,6 +75,9 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
                  uint64_t seed, bool early_stop)
     : _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
 
+  if (_early_stop) {
+    debug_string(EMIT_LEVEL_IMPORTANT, "INFO: Early stop is enabled");
+  }
   _random_engine = std::minstd_rand(_seed);
   _tree = std::move(tree);
   for (auto rc : rate_cats) {
@@ -1260,4 +1263,3 @@ void model_t::set_empirical_freqs() {
     set_empirical_freqs(i);
   }
 }
-

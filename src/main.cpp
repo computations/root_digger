@@ -237,9 +237,6 @@ int main(int argv, char **argc) {
         break;
       case 14: // exhaustive
         cli_options.exhaustive = true;
-        if (!cli_options.early_stop.initalized()) {
-          cli_options.early_stop = initialized_flag_t::initialized_false;
-        }
         break;
       case 15: // early-stop
         cli_options.early_stop = initialized_flag_t::initialized_true;
@@ -295,7 +292,6 @@ int main(int argv, char **argc) {
                 cli_options.abs_tolerance);
     if (cli_options.exhaustive &&
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)) {
-      debug_string(EMIT_LEVEL_IMPORTANT, "INFO: Early stop is enabled");
     }
 
     const pll_state_t *map = nullptr;
@@ -333,10 +329,6 @@ int main(int argv, char **argc) {
       model.initialize_partitions(msa);
     } catch (const invalid_empirical_frequencies_exception &) {
       model.initialize_partitions_uniform_freqs(msa);
-    }
-
-    if (!tree.sanity_check()) {
-      std::cout << "Failed Sanity Check" << std::endl;
     }
 
     if (cli_options.echo) {
