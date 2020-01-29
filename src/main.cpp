@@ -127,7 +127,7 @@ void print_usage() {
       << "    --rate-cats [NUMBER]\n"
       << "           Number of rate categories to use for the model. Default\n"
       << "           is 1.\n"
-      << "    --invariant-sites [NUMBER]\n"
+      << "    --invariant-sites\n"
       << "           Enable invariant sites. Default is off.\n"
       << "    --min-roots [NUMBER]\n"
       << "           Minimum number of roots to start from. Optional,\n"
