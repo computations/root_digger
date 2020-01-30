@@ -1,0 +1,5 @@
+language: cpp
+script: make && bin/rd_test
+compiler:
+    - clang
+    - gcc
