@@ -11,7 +11,7 @@ matrix:
           - ubuntu-toolchain-r-test
           packages:
           - g++-6
-          - libgsl2
+          - libgsl0ldbl
     - os: linux
       dist: trusty
       env: CXX_COMPILER=g++-7
@@ -21,7 +21,7 @@ matrix:
           - ubuntu-toolchain-r-test
           packages:
           - g++-7
-          - libgsl2
+          - libgsl0ldbl
     - os: linux
       dist: trusty
       compiler: clang++
@@ -31,7 +31,7 @@ matrix:
           - ubuntu-toolchain-r-test
           packages:
           - g++-7
-          - libgsl2
+          - libgsl0ldbl
     - os: osx
       osx_image: xcode9.2
     - os: osx
