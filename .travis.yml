@@ -2,7 +2,7 @@ language: cpp
 script: make
 addons:
   apt:
-    packages: libgsl0-dev
+    packages: libgsl-dev
     update: true
   homebrew:
     packages: gsl
