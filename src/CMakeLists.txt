@@ -20,7 +20,7 @@ set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
 target_link_libraries(rd ${LINK_LIBS})
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
-    -Wmisleading-indentation -pedantic)
+    -pedantic)
 target_compile_definitions(rd PRIVATE
     GIT_REV=${RD_BUILD_VERSION}
     GIT_COMMIT=${RD_BUILD_COMMIT}
