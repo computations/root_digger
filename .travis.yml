@@ -1,5 +1,11 @@
 language: cpp
 script: make
+before_install:
+  - if [ -n "${C_COMPILER}" ]; then export CC="${C_COMPILER}"; fi
+  - if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
+  - wget ftp://ftp.gnu.org/gnu/gsl/gsl-2.5.tar.gz
+  - tar xf gsl-2.5.tar.gz
+  - pushd gsl-2.5; ./configure && make && sudo make install; popd
 matrix:
   include:
     - os: linux
@@ -11,7 +17,6 @@ matrix:
           - ubuntu-toolchain-r-test
           packages:
           - g++-6
-          - libgsl0ldbl
     - os: linux
       dist: trusty
       env: CXX_COMPILER=g++-7
@@ -21,7 +26,6 @@ matrix:
           - ubuntu-toolchain-r-test
           packages:
           - g++-7
-          - libgsl0ldbl
     - os: linux
       dist: trusty
       compiler: clang++
@@ -31,11 +35,7 @@ matrix:
           - ubuntu-toolchain-r-test
           packages:
           - g++-7
-          - libgsl0ldbl
     - os: osx
       osx_image: xcode9.2
     - os: osx
       osx_image: xcode8.3
-before_install:
-    - if [ -n "${C_COMPILER}" ]; then export CC="${C_COMPILER}"; fi
-    - if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
