@@ -1,5 +1,10 @@
 language: cpp
-script: make && bin/rd_test
+script: make
+addons:
+  apt:
+    packages: gsl
+  homebrew:
+    packages: gsl
 matrix:
   include:
     - os: linux
@@ -36,6 +41,3 @@ matrix:
       osx_image: xcode9.2
     - os: osx
       osx_image: xcode8.3
-compiler:
-    - clang
-    - gcc
