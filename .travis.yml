@@ -1,12 +1,9 @@
 language: cpp
 script: make
-addons:
-  apt:
-    packages: libgsl-dev
-    update: true
-  homebrew:
-    packages: gsl
-    update: true
+before_install:
+  - wget ftp://ftp.gnu.org/gnu/gsl/gsl-2.5.tar.gz
+  - tar xf gsl-2.5.tar.gz
+  - pushd gsl-2.5; ./configure && make && sudo make install; popd
 matrix:
   include:
     - os: linux
