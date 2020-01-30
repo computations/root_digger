@@ -3,8 +3,10 @@ script: make
 addons:
   apt:
     packages: libgsl0ldbl
+    update: true
   homebrew:
     packages: gsl
+    update: true
 matrix:
   include:
     - os: linux
