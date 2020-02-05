@@ -86,7 +86,7 @@ struct cli_options_t {
   std::vector<size_t> rate_cats{1};
   uint64_t seed = std::random_device()();
   size_t min_roots = 1;
-  double root_ratio = 0.05;
+  double root_ratio = 0.01;
   double abs_tolerance = 1e-7;
   double factor = 1e4;
   double br_tolerance = 1e-12;
@@ -134,7 +134,7 @@ void print_usage() {
       << "           Default is 1.\n"
       << "    --root-ratio [NUMBER]\n"
       << "           Proportion of potential starting roots to attempt\n"
-      << "           Default is 0.0\n"
+      << "           Default is 0.01\n"
       << "    --atol [NUMBER]\n"
       << "           Root optmization stopping tolerance. Increase this to \n"
       << "           improve results.Default is 1e-4\n"
