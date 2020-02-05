@@ -46,11 +46,11 @@ CONTROL_FILE = """
 
 RD_ES = os.path.abspath(
     "../bin/rd"
-) + " --msa {msa} --tree {tree} --seed {seed} --verbose --early-stop"
+) + " --msa {msa} --tree {tree} --seed {seed} --verbose --early-stop --rate-cats 4"
 RD_NES = os.path.abspath(
     "../bin/rd"
-) + " --msa {msa} --tree {tree} --seed {seed} --verbose --no-early-stop"
-IQTREE = "iqtree -m 12.12 -s {msa} -g {tree}"
+) + " --msa {msa} --tree {tree} --seed {seed} --verbose --no-early-stop --rate-cats 4"
+IQTREE = "iqtree -m 12.12+G4 -s {msa} -g {tree}"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
@@ -348,15 +348,15 @@ class exp:
                 exp_key = (tree_name, align_name)
                 if self._run_rd:
                     self._rd_results_es.append(
-                        rd_result(tree_name, align, exp_dir, true_tree_ete,
-                                  True))
+                        rd_result(tree_name, align_name, exp_dir,
+                                  true_tree_ete, True))
                     self._rd_results_nes.append(
-                        rd_result(tree_name, align, exp_dir, true_tree_ete,
-                                  False))
+                        rd_result(tree_name, align_name, exp_dir,
+                                  true_tree_ete, False))
                 if self._run_iq:
                     self._iqtree_results.append(
-                        iqtree_result(tree_name, align, exp_dir, true_tree_ete,
-                                      align_filename))
+                        iqtree_result(tree_name, align_name, exp_dir,
+                                      true_tree_ete, align_filename))
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
@@ -598,7 +598,9 @@ class summary:
         self._results = [e.rd_results_es() for e in experiments] + \
             [e.rd_results_nes() for e in experiments] + \
             [e.iqtree_results() for e in experiments]
-        self._results = [i for sl in self._results for i in sl]
+        self._results = [
+            i for sl in self._results if not sl is None for i in sl
+        ]
 
     def extract_keys(self):
         keys = set()
@@ -633,7 +635,8 @@ class summary:
         exps = set()
         exp_tuple = namedtuple('exp_tuple', 'taxa sites')
         for r in self._results:
-            exps.add(exp_tuple(r.taxa, r.sites))
+            if type(r.taxa) is list:
+                exps.add(exp_tuple(''.join(r.taxa), r.sites))
         return list(exps)
 
     def get_true_tree(self, taxa, sites):
