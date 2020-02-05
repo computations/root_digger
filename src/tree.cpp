@@ -28,6 +28,7 @@ void clean_root_unode(pll_unode_t *node) {
 
 rooted_tree_t::~rooted_tree_t() {
   auto deallocate_data = [](void *n) {
+    assert(n != (void *)0xdeadbeef);
     if (n)
       free(n);
   };
@@ -62,6 +63,18 @@ root_location_t rooted_tree_t::root_location(size_t index) const {
   }
   return _roots[index];
 }
+
+root_location_t rooted_tree_t::root_location(const std::string &name) const {
+  for (auto rl : _roots) {
+    if (rl.edge->label && name == rl.edge->label) {
+      return rl;
+    }
+  }
+  throw std::runtime_error{
+      std::string{"Can't find the root location with label: "} + name};
+}
+
+root_location_t rooted_tree_t::root_location() const { return _current_rl; }
 
 size_t rooted_tree_t::root_count() const { return _roots.size(); }
 
@@ -213,7 +226,7 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
       _tree->inner_count - 1;
 
   new_root_left->pmatrix_index = left_child->pmatrix_index;
-  
+
   new_root_right->node_index = total_unodes + 2;
   right_child->pmatrix_index = new_root_right->pmatrix_index =
       _tree->edge_count - 1;
@@ -271,6 +284,7 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   root_by(new_root);
   auto trav_buf = full_traverse();
   debug_string(EMIT_LEVEL_DEBUG, "traversal after root");
+
   for (auto node : trav_buf) {
     debug_print(EMIT_LEVEL_DEBUG,
                 "traversal node label: %s, pmatrix index: %d, clv index: %d",
@@ -417,7 +431,7 @@ bool rooted_tree_t::sanity_check() const {
   return branch_length_sanity_check();
 }
 
-inline void tag_nodes(pll_unode_t *n) {
+void tag_nodes(pll_unode_t *n) {
   pll_unode_t *start = n;
   do {
     n->data = (void *)0xdeadbeef;
@@ -425,46 +439,76 @@ inline void tag_nodes(pll_unode_t *n) {
   } while (n != nullptr && n != start);
 }
 
+void untag_nodes(pll_unode_t *n) {
+  pll_unode_t *start = n;
+  do {
+    n->data = (void *)0x0;
+    n = n->next;
+  } while (n != nullptr && n != start);
+}
+
 void rooted_tree_t::find_path(pll_unode_t *n1, pll_unode_t *n2) {
   pll_unode_t *start = n1;
   pll_unode_t *current = n1;
-  tag_nodes(n1);
   do {
-    if (find_path_recurse(current, n2))
+    if (find_path_recurse(current->back, n2))
       break;
     current = current->next;
   } while (current != nullptr && current != start);
 }
 
 bool rooted_tree_t::find_path_recurse(pll_unode_t *n1, pll_unode_t *n2) {
-  pll_unode_t *start = n1;
-  do {
+  if (n1 == n2) {
+    tag_nodes(n1);
+    return true;
+  }
+  if (n1->next) {
+    pll_unode_t *start = n1;
+    n1 = n1->next;
+    while (start != n1) {
+      if (n1 == n2) {
+        tag_nodes(n1);
+        return true;
+      } else if (find_path_recurse(n1->back, n2)) {
+        tag_nodes(n1);
+        return true;
+      }
+      n1 = n1->next;
+    }
+  } else {
     if (n1 == n2) {
       tag_nodes(n1);
-      return true;
     }
-    if (n1 != start && find_path_recurse(n1->back, n2)) {
-      tag_nodes(n1);
-      return true;
-    }
-    n1 = n1->next;
-  } while (n1 != nullptr && n1 != start);
+    return n1 == n2;
+  }
   return false;
 }
 
-/*
 std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_root_update_operations(
     const root_location_t &new_root) {
-  find_path(new_root.edge, _tree->vroot);
+
+  if (new_root.edge == _current_rl.edge ||
+      new_root.edge == _current_rl.edge->back) {
+    return {{}, {}, {}};
+  }
+
+  auto old_root = _current_rl;
+  root_by(new_root);
+  find_path(old_root.edge, _tree->vroot);
+  /* cover the old root */
+  tag_nodes(old_root.edge);
+  tag_nodes(old_root.edge->back);
+
   tag_nodes(_tree->vroot->back);
   tag_nodes(_tree->vroot->next->back);
   std::vector<pll_unode_t *> trav_buf(inner_count());
   unsigned int trav_size = 0;
 
   auto update_root_callback = [](pll_unode_t *n) -> int {
-    if (n->data) {
+    if (n->data == (void *)0xdeadbeef) {
+      n->data = 0x0;
       return PLL_SUCCESS;
     }
     return PLL_FAILURE;
@@ -487,24 +531,57 @@ rooted_tree_t::generate_root_update_operations(
   pll_utree_create_operations(trav_buf.data(), trav_buf.size() - 1,
                               branch_lengths.data(), pmatrix_indices.data(),
                               ops.data(), &matrix_count, &op_count);
+
   ops.resize(op_count);
   pmatrix_indices.resize(matrix_count);
   branch_lengths.resize(matrix_count);
 
+  ops.resize(op_count + 1);
+  pmatrix_indices.resize(matrix_count);
+  branch_lengths.resize(matrix_count);
+
+  auto root_op_it = ops.end() - 1;
+  pll_unode_t *root_node = _tree->vroot;
+  root_op_it->parent_clv_index = root_node->clv_index;
+  root_op_it->parent_scaler_index = root_node->scaler_index;
+
+  root_op_it->child1_clv_index = root_node->back->clv_index;
+  root_op_it->child1_scaler_index = root_node->back->scaler_index;
+  root_op_it->child1_matrix_index = root_node->back->pmatrix_index;
+
+  root_op_it->child2_clv_index = root_node->next->back->clv_index;
+  root_op_it->child2_scaler_index = root_node->next->back->scaler_index;
+  root_op_it->child2_matrix_index = root_node->next->back->pmatrix_index;
+
   clear_traversal_data();
+  untag_nodes(old_root.edge);
+  untag_nodes(old_root.edge->back);
+
+  untag_nodes(_tree->vroot->back);
+  untag_nodes(_tree->vroot->next->back);
 
   return std::make_tuple(ops, pmatrix_indices, branch_lengths);
 }
-*/
 
 void rooted_tree_t::clear_traversal_data() {
-  auto clear_data_callback = [](pll_unode_t *n, void *) -> int {
-    n->data = 0x0;
-    return PLL_SUCCESS;
-  };
-
-  pllmod_utree_traverse_apply(_tree->vroot, nullptr, nullptr,
-                              clear_data_callback, nullptr);
+  for (unsigned int i = 0; i < _tree->tip_count; ++i) {
+    _tree->nodes[i]->data = (void*)0x0;
+  }
+  for (unsigned int i = _tree->tip_count;
+       i < _tree->tip_count + _tree->inner_count; ++i) {
+    pll_unode_t *start = _tree->nodes[i];
+    pll_unode_t *node = start;
+    do {
+      node->data = (void*)0x0;
+      node = node->next;
+    } while (node && node != start);
+  }
+  pll_unode_t *start = _tree->vroot;
+  pll_unode_t *node = start;
+  do {
+    node->data = (void*)0x0;
+    node = node->next;
+  } while (node && node != start);
 }
 
 root_location_t rooted_tree_t::current_root() const {
