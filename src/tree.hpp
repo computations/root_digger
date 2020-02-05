@@ -61,6 +61,8 @@ public:
   rooted_tree_t &operator=(const rooted_tree_t &);
 
   root_location_t root_location(size_t) const;
+  root_location_t root_location(const std::string &) const;
+  root_location_t root_location() const;
   size_t root_count() const;
 
   unsigned int tip_count() const;
@@ -83,11 +85,9 @@ public:
   std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
   generate_derivative_operations(const root_location_t &root);
 
-  /*
   std::tuple<std::vector<pll_operation_t>, std::vector<unsigned int>,
              std::vector<double>>
   generate_root_update_operations(const root_location_t &new_root);
-  */
 
   void root_by(const root_location_t &);
   void update_root(root_location_t);
@@ -123,6 +123,7 @@ private:
   void find_path(pll_unode_t *n1, pll_unode_t *n2);
   bool find_path_recurse(pll_unode_t *n1, pll_unode_t *n2);
   void clear_traversal_data();
+  void clear_traversal_data(pll_unode_t *);
   void annotate_node(pll_unode_t *node_id, const std::string &key,
                      const std::string &value);
 

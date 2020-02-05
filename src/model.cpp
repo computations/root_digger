@@ -633,6 +633,33 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
   return best;
 }
 
+void model_t::move_root(const root_location_t &new_root){
+  std::vector<pll_operation_t> ops;
+  std::vector<unsigned int> pmatrix_indices;
+  std::vector<double> branch_lengths;
+
+  {
+    auto results = _tree.generate_root_update_operations(new_root);
+    ops = std::move(std::get<0>(results));
+    pmatrix_indices = std::move(std::get<1>(results));
+    branch_lengths = std::move(std::get<2>(results));
+  }
+
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    auto &partition = _partitions[i];
+    int result = pll_update_prob_matrices(
+        partition, _param_indicies[i].data(), pmatrix_indices.data(),
+        branch_lengths.data(), pmatrix_indices.size());
+
+    if (result == PLL_FAILURE) {
+      throw std::runtime_error(pll_errmsg);
+    }
+
+    pll_update_partials(partition, ops.data(), ops.size());
+  }
+}
+
+/*
 void model_t::move_root(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
   std::vector<unsigned int> pmatrix_indices;
@@ -654,6 +681,7 @@ void model_t::move_root(const root_location_t &root_location) {
     pll_update_partials(partition, ops.data(), ops.size());
   }
 }
+*/
 
 std::vector<std::pair<root_location_t, double>> model_t::suggest_roots() {
   return suggest_roots(1, 0.0);
@@ -814,7 +842,9 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
     set_empirical_freqs();
     ++root_index;
 
-    move_root(rl);
+    //move_root(rl);
+    _tree.root_by(rl);
+    compute_lh(rl);
     std::vector<model_params_t> subst_rates;
     std::vector<model_params_t> freqs;
     std::vector<double> gamma_alphas;
@@ -1239,7 +1269,7 @@ double model_t::gd_gamma(double &initial_alpha, const root_location_t &rl,
 }
 
 std::vector<double> model_t::compute_all_root_lh() {
-  _tree.root_by(_tree.roots()[0]);
+  compute_lh(_tree.roots()[0]);
   std::vector<double> root_lh;
   root_lh.reserve(_tree.roots().size());
   for (auto rl : _tree.roots()) {

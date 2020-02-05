@@ -335,6 +335,7 @@ int main(int argv, char **argc) {
       std::cout << tree.newick() << std::endl;
     }
 
+    model.compute_lh(tree.root_location(0));
     root_location_t final_rl;
     double final_lh;
     std::string final_tree_string;
