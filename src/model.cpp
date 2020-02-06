@@ -157,8 +157,13 @@ void model_t::set_gamma_rates(size_t p_index, double alpha) {
 }
 
 void model_t::update_invariant_sites(size_t p_index) {
-  if (_invariant_sites)
+  if (_invariant_sites) {
     pll_update_invariant_sites(_partitions[p_index]);
+  } else {
+    for (size_t i = 0; i < _submodels; ++i) {
+      pll_update_invariant_sites_proportion(_partitions[p_index], i, 0.0);
+    }
+  }
 }
 
 void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
@@ -611,7 +616,6 @@ std::pair<root_location_t, double>
 model_t::optimize_root_location(size_t min_roots, double root_ratio) {
   std::pair<root_location_t, double> best;
   best.second = -INFINITY;
-  _tree.root_by(_tree.root_location(0));
 
   /* start by making a list of "good" roots, with the current model*/
 
@@ -633,7 +637,7 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
   return best;
 }
 
-void model_t::move_root(const root_location_t &new_root){
+void model_t::move_root(const root_location_t &new_root) {
   std::vector<pll_operation_t> ops;
   std::vector<unsigned int> pmatrix_indices;
   std::vector<double> branch_lengths;
@@ -644,6 +648,9 @@ void model_t::move_root(const root_location_t &new_root){
     pmatrix_indices = std::move(std::get<1>(results));
     branch_lengths = std::move(std::get<2>(results));
   }
+  debug_print(EMIT_LEVEL_DEBUG,
+              "ops.size: %lu, pmats.size: %lu, brlens.size: %lu", ops.size(),
+              pmatrix_indices.size(), branch_lengths.size());
 
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
@@ -724,24 +731,9 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
                       double pgtol, double brtol, double factor) {
   double best_lh = -INFINITY;
   root_location_t best_rl;
-  std::vector<model_params_t> initial_subst;
-  initial_subst.reserve(_partitions.size());
-
-  for (auto p : _partitions) {
-    size_t params_size = p->states * p->states - p->states;
-    initial_subst.emplace_back(random_params(params_size, _random_engine()));
-  }
-
-  std::vector<model_params_t> initial_freqs;
-  initial_freqs.reserve(_partitions.size());
-  std::vector<double> gamma_alpha;
-
-  for (size_t i = 0; i < _partitions.size(); ++i) {
-    initial_freqs.emplace_back(_partitions[i]->frequencies[0],
-                               _partitions[i]->frequencies[0] +
-                                   _partitions[i]->states);
-    gamma_alpha.push_back(1.0);
-  }
+  std::vector<model_params_t> best_subst;
+  std::vector<model_params_t> best_freqs;
+  std::vector<double> best_gamma_alpha;
 
   set_subst_rates_uniform();
   set_empirical_freqs();
@@ -756,7 +748,18 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
     debug_print(EMIT_LEVEL_PROGRESS, "Root %lu/%lu", root_index, root_count);
 
     std::vector<model_params_t> subst_rates;
+    subst_rates.reserve(_partitions.size());
     std::vector<model_params_t> freqs;
+    freqs.reserve(_partitions.size());
+    std::vector<double> gamma_alpha;
+    gamma_alpha.reserve(_partitions.size());
+
+    std::vector<model_params_t> saved_subst_rates;
+    saved_subst_rates.resize(_partitions.size());
+    std::vector<model_params_t> saved_freqs;
+    saved_freqs.resize(_partitions.size());
+    std::vector<double> saved_gamma_alpha;
+    saved_gamma_alpha.resize(_partitions.size());
 
     for (size_t p = 0; p < _partitions.size(); ++p) {
       size_t subst_size = _partitions[p]->states;
@@ -764,13 +767,27 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       freqs.push_back(
           model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
       subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
+      gamma_alpha.push_back(1);
     }
 
     auto cur_best_rl = rl;
     double cur_best_lh = -INFINITY;
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
-      move_root(rl);
+
+      /* seems dumb, but I benchmarked this to be faster */
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        saved_subst_rates[i] = subst_rates[i];
+      }
+
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        saved_freqs[i] = freqs[i];
+      }
+
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        saved_gamma_alpha[i] = gamma_alpha[i];
+      }
+
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
@@ -783,18 +800,25 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
       }
 
-      if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
-        break;
-      }
-
       debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
       auto cur = optimize_root_location(min_roots, root_ratio);
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.9f", iter, cur.second);
 
+      if (cur.second < cur_best_lh) {
+        /* We failed to make any progress, so just give up */
+        debug_string(EMIT_LEVEL_DEBUG,
+                     "breaking due to failure to make progress");
+        std::swap(saved_subst_rates, subst_rates);
+        std::swap(saved_freqs, freqs);
+        std::swap(saved_gamma_alpha, gamma_alpha);
+        break;
+      }
+
       if (_early_stop) {
         if (rl.edge == cur.first.edge &&
             fabs(rl.brlen_ratio - cur.first.brlen_ratio) < brtol) {
+          debug_string(EMIT_LEVEL_DEBUG, "breaking due to early stop");
           cur_best_rl = cur.first;
           cur_best_lh = cur.second;
           break;
@@ -802,13 +826,9 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       }
 
       if (fabs(cur.second - cur_best_lh) < atol) {
+        debug_string(EMIT_LEVEL_DEBUG, "breaking due to atol");
         cur_best_rl = cur.first;
         cur_best_lh = cur.second;
-        break;
-      }
-
-      if (cur.second < cur_best_lh) {
-        /* We failed to make any progress, so just give up */
         break;
       }
 
@@ -818,11 +838,26 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       rl = cur_best_rl;
     }
 
+    debug_print(EMIT_LEVEL_DEBUG, "finished optimize_all root, cur_best_lh: %f",
+                cur_best_lh);
+
     if (cur_best_lh > best_lh) {
+      debug_print(EMIT_LEVEL_DEBUG, "found new lh, old: %f, new: %f", best_lh,
+                  cur_best_lh);
       best_rl = cur_best_rl;
       best_lh = cur_best_lh;
+      best_freqs = freqs;
+      best_subst = subst_rates;
+      best_gamma_alpha = gamma_alpha;
     }
   }
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    set_subst_rates(i, best_subst[i]);
+    set_freqs_all_free(i, best_freqs[i]);
+    set_gamma_rates(i, best_gamma_alpha[i]);
+  }
+
+  move_root(best_rl);
   return {best_rl, best_lh};
 }
 
@@ -842,7 +877,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
     set_empirical_freqs();
     ++root_index;
 
-    //move_root(rl);
+    // move_root(rl);
     _tree.root_by(rl);
     compute_lh(rl);
     std::vector<model_params_t> subst_rates;
