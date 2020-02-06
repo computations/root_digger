@@ -262,6 +262,7 @@ TEST_CASE("model_t optimize whole tree, all data",
     uint64_t seed = std::rand();
     model_t model{tree, msa, {1}, true, seed, false};
     model.initialize_partitions_uniform_freqs(msa);
+    model.compute_lh(tree.root_location(0));
     auto rl = model.optimize_root_location(1, .05).first;
     CHECK(rl.brlen_ratio >= 0.0);
     CHECK(rl.brlen_ratio <= 1.0);
@@ -319,11 +320,22 @@ TEST_CASE("model_t optimize all", "[model_t]") {
   model.initialize_partitions_uniform_freqs(msa);
   model.compute_lh(tree.root_location(0));
   auto initial_rl = model.optimize_root_location(1, .05);
-  auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
-  auto final_rl = tmp.first;
-  auto final_lh = tmp.second;
-  CHECK(final_lh >= initial_rl.second);
-  CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+
+  SECTION("one min root") {
+    auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto final_rl = tmp.first;
+    auto final_lh = tmp.second;
+    CHECK(final_lh >= initial_rl.second);
+    CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+  }
+
+  SECTION("three min roots") {
+    auto tmp = model.optimize_all(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto final_rl = tmp.first;
+    auto final_lh = tmp.second;
+    CHECK(final_lh >= initial_rl.second);
+    CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+  }
 }
 
 TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
@@ -334,6 +346,7 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   uint64_t seed = std::rand();
   model_t model{tree, msa, {1}, true, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
+  model.compute_lh(tree.root_location(0));
   auto initial_rl = model.optimize_root_location(1, .05);
   auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e-7, 1e7);
   auto final_rl = tmp.first;
@@ -387,19 +400,31 @@ TEST_CASE("model_t different rate categories", "[model_t]") {
 }
 
 TEST_CASE("model_t test no invariant sites", "[model_t]") {
-  //auto ds = data_files_dna["10.fasta"];
-  auto ds = data_files_dna["101.phy"];
+  auto ds = data_files_dna["10.fasta"];
   std::vector<msa_t> msa;
   msa.emplace_back(ds.first);
-  rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
+  rooted_tree_t tree{ds.second};
   model_t model{tree, msa, {1}, false, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   model.compute_lh(tree.root_location(0));
   auto initial_rl = model.optimize_root_location(1, .05);
-  auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
-  auto final_rl = tmp.first;
-  auto final_lh = tmp.second;
-  CHECK(final_lh >= initial_rl.second);
-  CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+
+  SECTION("one min root") {
+    auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto final_rl = tmp.first;
+    auto final_lh = tmp.second;
+    CHECK(final_lh >= initial_rl.second);
+    CHECK(model.compute_lh_root(final_rl) == Approx(final_lh));
+    CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+  }
+
+  SECTION("3 min roots") {
+    auto tmp = model.optimize_all(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto final_rl = tmp.first;
+    auto final_lh = tmp.second;
+    CHECK(final_lh >= initial_rl.second);
+    CHECK(model.compute_lh_root(final_rl) == Approx(final_lh));
+    CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+  }
 }
