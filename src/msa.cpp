@@ -1,6 +1,7 @@
 #include "msa.hpp"
 #include <cctype>
 #include <fstream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -47,10 +48,28 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
     }
     pll_fasta_close(fd);
     pll_msa_t *pll_msa = (pll_msa_t *)malloc(sizeof(pll_msa_t));
-    pll_msa->count = sequences.size();
-    pll_msa->length = expected_sequence_length;
-    pll_msa->sequence = (char **)malloc(sizeof(char *) * pll_msa->count);
-    pll_msa->label = (char **)malloc(sizeof(char *) * pll_msa->count);
+
+    if (sequences.size() >
+        static_cast<size_t>(std::numeric_limits<int>::max())) {
+      throw std::runtime_error(
+          "The size of the sequence is too large to cast safely");
+    }
+
+    if (expected_sequence_length >
+        static_cast<long int>(std::numeric_limits<int>::max())) {
+      throw std::runtime_error(
+          "The expected size of the sequence is too large to cast safely");
+    }
+
+    pll_msa->count = static_cast<int>(sequences.size());
+    pll_msa->length = static_cast<int>(expected_sequence_length);
+    if (pll_msa->count < 0) {
+      throw std::runtime_error("The MSA had a negative count (overflow?)");
+    }
+    pll_msa->sequence = (char **)malloc(
+        sizeof(char *) * static_cast<unsigned int>(pll_msa->count));
+    pll_msa->label = (char **)malloc(sizeof(char *) *
+                                     static_cast<unsigned int>(pll_msa->count));
     for (size_t i = 0; i < sequences.size(); ++i) {
       pll_msa->sequence[i] = sequences[i];
       pll_msa->label[i] = labels[i];
@@ -60,7 +79,7 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
   throw std::invalid_argument("Could not parse msa file");
 }
 
-std::string::const_iterator expect_next(std::string::const_iterator itr,
+static std::string::const_iterator expect_next(std::string::const_iterator itr,
                                         char c) {
   while (std::isspace(*itr)) {
     itr++;
@@ -121,7 +140,12 @@ partition_info_t parse_partition_info(const std::string &line) {
       itr++;
     }
     try {
-      begin = std::stol(std::string(start, itr));
+      auto tmp = std::stol(std::string(start, itr));
+      if (tmp < 0) {
+        throw std::runtime_error(
+            "There was a negative number in the partition specification");
+      }
+      begin = static_cast<size_t>(tmp);
     } catch (...) {
       throw std::runtime_error(
           std::string("Failed to parse beginning partition number") +
@@ -138,7 +162,12 @@ partition_info_t parse_partition_info(const std::string &line) {
       itr++;
     }
     try {
-      end = std::stol(std::string(start, itr));
+      auto tmp = std::stol(std::string(start, itr));
+      if (tmp < 0) {
+        throw std::runtime_error(
+            "There was a negative number in the partition specification");
+      }
+      end = static_cast<size_t>(tmp);
     } catch (...) {
       throw std::runtime_error(
           std::string("Failed to parse beginning partition number") +
@@ -184,13 +213,30 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
      * Since the range specification is [first, second], we have to add one to
      * include the endpoint
      */
-    _msa->length += (range.second - range.first) + 1;
+    size_t cur_partition_length = (range.second - range.first) + 1;
+    if (cur_partition_length >
+        static_cast<size_t>(std::numeric_limits<int>::max())) {
+      throw std::runtime_error("Partition range is too large to cast safely");
+    }
+    _msa->length += static_cast<int>(cur_partition_length);
     debug_print(EMIT_LEVEL_DEBUG, "%d", _msa->length);
   }
-  _msa->sequence = (char **)malloc(sizeof(char *) * other.count());
+
+  if (other.count() < 0) {
+    throw std::runtime_error("MSA from which we are copy constructing has a "
+                             "negative count (overflow?)");
+  }
+
+  _msa->sequence = (char **)malloc(static_cast<size_t>(sizeof(char *)) *
+                                   static_cast<size_t>(other.count()));
 
   for (int i = 0; i < other.count(); ++i) {
-    _msa->sequence[i] = (char *)malloc(sizeof(char) * _msa->length);
+    if (_msa->length < 0) {
+      throw std::runtime_error(
+          "The size of the MSA is less than 0 (overflow?)");
+    }
+    _msa->sequence[i] = (char *)malloc(static_cast<size_t>(sizeof(char)) *
+                                       static_cast<size_t>(_msa->length));
     size_t cur_idx = 0;
     char *other_sequence = other.sequence(i);
     for (auto range : partition.parts) {
@@ -200,7 +246,12 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
     }
   }
 
-  _msa->label = (char **)calloc(sizeof(char *), _msa->count);
+  if (_msa->count < 0) {
+    throw std::runtime_error(
+        "The current MSA count is less than 0 (overflow?)");
+  }
+  _msa->label =
+      (char **)calloc(sizeof(char *), static_cast<size_t>(_msa->count));
   for (int i = 0; i < _msa->count; ++i) {
     size_t label_size = strlen(other.label(i)) + 1;
     _msa->label[i] = (char *)malloc(sizeof(char) * label_size);
@@ -244,7 +295,9 @@ unsigned int msa_t::states() const { return _states; }
 
 int msa_t::count() const { return _msa->count; }
 
-int msa_t::length() const { return _msa->length; }
+unsigned int msa_t::length() const {
+  return static_cast<unsigned int>(_msa->length);
+}
 
 void msa_t::compress() {
   if (_weights != nullptr) {

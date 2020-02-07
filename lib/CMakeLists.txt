@@ -8,7 +8,7 @@ else()
     file(MAKE_DIRECTORY ${GSL_PREFIX})
     include(ExternalProject)
     ExternalProject_Add(gsl
-        URL ftp://ftp.gnu.org/gnu/gsl/gsl-2.5.tar.gz
+        URL http://mirror.checkdomain.de/gnu/gsl/gsl-2.5.tar.gz
         URL_HASH SHA1=9b3a32ba4f4e79fc6164fdc62e56003ae6e991e5
         SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/gsl
         CONFIGURE_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gsl/autogen.sh &&

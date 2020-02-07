@@ -27,13 +27,13 @@ int __VERBOSE__ = EMIT_LEVEL_PROGRESS;
 #define GIT_COMMIT_STRING STRINGIFY(GIT_COMMIT)
 #define BUILD_DATE_STRING STRINGIFY(BUILD_DATE)
 
-void print_version() {
+static void print_version() {
   debug_print(EMIT_LEVEL_IMPORTANT, "Version: %s", GIT_REV_STRING);
   debug_print(EMIT_LEVEL_IMPORTANT, "Build Commit: %s", GIT_COMMIT_STRING);
   debug_print(EMIT_LEVEL_IMPORTANT, "Build Date: %s", BUILD_DATE_STRING);
 }
 
-void print_run_header(
+static void print_run_header(
     const std::chrono::time_point<std::chrono::system_clock> &start_time,
     uint64_t seed) {
   time_t st = std::chrono::system_clock::to_time_t(start_time);
@@ -99,7 +99,7 @@ struct cli_options_t {
   initialized_flag_t early_stop;
 };
 
-void print_usage() {
+static void print_usage() {
   std::cout
       << "Usage: rd [options]\n"
       << "Version: " << GIT_REV_STRING << "\n"
@@ -202,7 +202,7 @@ int main(int argv, char **argc) {
         cli_options.model_filename = optarg;
         break;
       case 3: // seed
-        cli_options.seed = atol(optarg);
+        cli_options.seed = static_cast<uint64_t>(atol(optarg));
         break;
       case 4: // verbose
         __VERBOSE__ += 1;
@@ -212,7 +212,7 @@ int main(int argv, char **argc) {
         cli_options.silent = true;
         break;
       case 6: // min-roots
-        cli_options.min_roots = atol(optarg);
+        cli_options.min_roots = static_cast<size_t>(atol(optarg));
         break;
       case 7: // root-ratio
         cli_options.root_ratio = atof(optarg);
@@ -317,6 +317,15 @@ int main(int argv, char **argc) {
     }
 
     rooted_tree_t tree{cli_options.tree_filename};
+
+    if (cli_options.min_roots > tree.root_count()) {
+      throw std::runtime_error(
+          "Min roots is larger than the number of roots on the tree");
+    }
+
+    if (cli_options.root_ratio < 0) {
+      throw std::runtime_error("Root ratio is negative");
+    }
 
     model_t model{
         tree,

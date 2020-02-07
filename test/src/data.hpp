@@ -1,5 +1,5 @@
-#ifndef __RD_TEST_DATA_HPP_
-#define __RD_TEST_DATA_HPP_
+#ifndef RD_TEST_DATA_HPP
+#define RD_TEST_DATA_HPP
 #include <string>
 #include <map>
 #include <vector>

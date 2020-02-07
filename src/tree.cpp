@@ -3,6 +3,7 @@ extern "C" {
 #include <libpll/pll_tree.h>
 }
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <unordered_set>
 
@@ -10,20 +11,22 @@ pll_utree_t *parse_tree_file(const std::string &tree_filename) {
   return pll_utree_parse_newick_unroot(tree_filename.c_str());
 }
 
+static void clean_root_unode(pll_unode_t *node) {
+  assert(!node->data);
+
+  node->length = -1;
+  // We _want_ this to fail if we ever use it after without setting it. So we
+  // set it to a ridiculous value
+  node->node_index = std::numeric_limits<unsigned int>::max();
+
+  node->back = nullptr;
+}
+
 rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
   _tree = pll_utree_clone(other._tree);
   _rooted = other._rooted;
   generate_root_locations();
   add_root_space();
-}
-
-void clean_root_unode(pll_unode_t *node) {
-  assert(!node->data);
-
-  node->length = -1;
-  node->node_index = -1;
-
-  node->back = nullptr;
 }
 
 rooted_tree_t::~rooted_tree_t() {
@@ -89,7 +92,7 @@ unsigned int rooted_tree_t::branch_count() const {
 unsigned int rooted_tree_t::root_clv_index() const {
   return _tree->vroot->clv_index;
 }
-unsigned int rooted_tree_t::root_scaler_index() const {
+int rooted_tree_t::root_scaler_index() const {
   return _tree->vroot->scaler_index;
 }
 
@@ -135,8 +138,8 @@ void rooted_tree_t::generate_root_locations() {
 }
 
 void rooted_tree_t::add_root_space() {
-  size_t new_size = _tree->inner_count + _tree->tip_count + 1;
-  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count;
+  unsigned int new_size = _tree->inner_count + _tree->tip_count + 1;
+  unsigned int total_unodes = _tree->inner_count * 3 + _tree->tip_count;
   _tree->nodes =
       (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * new_size);
   assert(new_size > 0);
@@ -147,7 +150,7 @@ void rooted_tree_t::add_root_space() {
 
   new_root_left->clv_index = new_root_right->clv_index = new_size;
   new_root_left->scaler_index = new_root_right->scaler_index =
-      _tree->inner_count - 1;
+      static_cast<int>(_tree->inner_count - 1);
 
   new_root_left->node_index = total_unodes + 1;
 
@@ -196,7 +199,7 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
   if (rooted()) {
     unroot();
   }
-  size_t tree_size = _tree->inner_count + _tree->tip_count + 1;
+  unsigned int tree_size = _tree->inner_count + _tree->tip_count + 1;
   pll_unode_t *new_root_left = _tree->nodes[tree_size - 1];
   pll_unode_t *new_root_right = new_root_left->next;
 
@@ -215,7 +218,7 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
   right_child->length = new_root_right->length =
       root_location.brlen_compliment();
 
-  size_t total_unodes = _tree->inner_count * 3 + _tree->tip_count;
+  unsigned int total_unodes = _tree->inner_count * 3 + _tree->tip_count;
 
   _tree->inner_count += 1;
   _tree->edge_count += 1;
@@ -223,7 +226,7 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
 
   new_root_left->clv_index = new_root_right->clv_index = tree_size - 1;
   new_root_left->scaler_index = new_root_right->scaler_index =
-      _tree->inner_count - 1;
+      static_cast<int>(_tree->inner_count - 1);
 
   new_root_left->pmatrix_index = left_child->pmatrix_index;
 
@@ -299,7 +302,8 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   unsigned int op_count = 0;
   unsigned int matrix_count = 0;
 
-  pll_utree_create_operations(trav_buf.data(), trav_buf.size() - 1,
+  pll_utree_create_operations(trav_buf.data(),
+                              static_cast<unsigned int>(trav_buf.size() - 1),
                               branch_lengths.data(), pmatrix_indices.data(),
                               ops.data(), &matrix_count, &op_count);
 
@@ -431,7 +435,7 @@ bool rooted_tree_t::sanity_check() const {
   return branch_length_sanity_check();
 }
 
-void tag_nodes(pll_unode_t *n) {
+static void tag_nodes(pll_unode_t *n) {
   pll_unode_t *start = n;
   do {
     n->data = (void *)0xdeadbeef;
@@ -439,10 +443,10 @@ void tag_nodes(pll_unode_t *n) {
   } while (n != nullptr && n != start);
 }
 
-void untag_nodes(pll_unode_t *n) {
+static void untag_nodes(pll_unode_t *n) {
   pll_unode_t *start = n;
   do {
-    n->data = (void *)0x0;
+    n->data = (void *)nullptr;
     n = n->next;
   } while (n != nullptr && n != start);
 }
@@ -508,7 +512,7 @@ rooted_tree_t::generate_root_update_operations(
 
   auto update_root_callback = [](pll_unode_t *n) -> int {
     if (n->data == (void *)0xdeadbeef) {
-      n->data = 0x0;
+      n->data = nullptr;
       return PLL_SUCCESS;
     }
     return PLL_FAILURE;
@@ -528,7 +532,8 @@ rooted_tree_t::generate_root_update_operations(
   unsigned int op_count = 0;
   unsigned int matrix_count = 0;
 
-  pll_utree_create_operations(trav_buf.data(), trav_buf.size() - 1,
+  pll_utree_create_operations(trav_buf.data(),
+                              static_cast<unsigned int>(trav_buf.size() - 1),
                               branch_lengths.data(), pmatrix_indices.data(),
                               ops.data(), &matrix_count, &op_count);
 
@@ -565,21 +570,21 @@ rooted_tree_t::generate_root_update_operations(
 
 void rooted_tree_t::clear_traversal_data() {
   for (unsigned int i = 0; i < _tree->tip_count; ++i) {
-    _tree->nodes[i]->data = (void*)0x0;
+    _tree->nodes[i]->data = nullptr;
   }
   for (unsigned int i = _tree->tip_count;
        i < _tree->tip_count + _tree->inner_count; ++i) {
     pll_unode_t *start = _tree->nodes[i];
     pll_unode_t *node = start;
     do {
-      node->data = (void*)0x0;
+      node->data = nullptr;
       node = node->next;
     } while (node && node != start);
   }
   pll_unode_t *start = _tree->vroot;
   pll_unode_t *node = start;
   do {
-    node->data = (void*)0x0;
+    node->data = nullptr;
     node = node->next;
   } while (node && node != start);
 }

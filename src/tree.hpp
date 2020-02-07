@@ -1,5 +1,5 @@
-#ifndef __RD_TREE_HPP_
-#define __RD_TREE_HPP_
+#ifndef RD_TREE_HPP_
+#define RD_TREE_HPP_
 
 extern "C" {
 #include <libpll/pll.h>
@@ -70,7 +70,7 @@ public:
   unsigned int branch_count() const;
 
   unsigned int root_clv_index() const;
-  unsigned int root_scaler_index() const;
+  int root_scaler_index() const;
 
   root_location_t current_root() const;
   const std::vector<root_location_t> &roots() const;
