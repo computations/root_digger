@@ -1,5 +1,5 @@
-#ifndef __RD_MODEL_HPP_
-#define __RD_MODEL_HPP_
+#ifndef RD_MODEL_HPP_
+#define RD_MODEL_HPP_
 
 extern "C" {
 #include <libpll/pll.h>

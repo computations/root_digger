@@ -1,5 +1,5 @@
-#ifndef __RD_MSA_HPP_
-#define __RD_MSA_HPP_
+#ifndef RD_MSA_HPP_
+#define RD_MSA_HPP_
 
 extern "C" {
 #include <libpll/pll.h>
@@ -26,13 +26,14 @@ class msa_t {
 public:
   msa_t(const std::string &msa_filename, const pll_state_t *map = pll_map_nt,
         unsigned int states = 4, bool compress = true)
-      : _msa{0}, _map(map), _weights{0}, _states(states) {
+      : _msa{nullptr}, _map(map), _weights{nullptr}, _states(states) {
     _msa = parse_msa_file(msa_filename);
     if (compress) {
       _weights = pll_compress_site_patterns(_msa->sequence, map, _msa->count,
                                             &(_msa->length));
     } else {
-      _weights = (unsigned int *)malloc(sizeof(unsigned int) * _msa->length);
+      _weights = (unsigned int *)malloc(
+          sizeof(unsigned int) * static_cast<unsigned long>(_msa->length));
       for (int i = 0; i < _msa->length; ++i) {
         _weights[i] = 1;
       }
@@ -51,7 +52,7 @@ public:
   const pll_state_t *map() const;
   unsigned int states() const;
   int count() const;
-  int length() const;
+  unsigned int length() const;
   void compress();
   std::vector<msa_t> partition(const msa_partitions_t &) const;
 

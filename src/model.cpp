@@ -16,9 +16,9 @@ extern "C" {
 std::string read_file_contents(std::ifstream &infile) {
   std::string str;
   infile.seekg(0, std::ios::end);
-  str.resize(infile.tellg());
+  str.resize(static_cast<unsigned long>(infile.tellg()));
   infile.seekg(0, std::ios::beg);
-  infile.read(&str[0], str.size());
+  infile.read(&str[0], static_cast<long>(str.size()));
   return str;
 }
 
@@ -78,6 +78,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   if (_early_stop) {
     debug_string(EMIT_LEVEL_IMPORTANT, "INFO: Early stop is enabled");
   }
+
   _random_engine = std::minstd_rand(_seed);
   _tree = std::move(tree);
   for (auto rc : rate_cats) {
@@ -108,9 +109,22 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   for (size_t partition_index = 0; partition_index < msas.size();
        ++partition_index) {
     auto &msa = msas[partition_index];
+
+    if (_rate_weights[partition_index].size() >
+        static_cast<size_t>(std::numeric_limits<int>::max())) {
+      throw std::runtime_error("The size of the rate weights for the partition "
+                               "is too large to safely cast");
+    }
+
+    if (msa.length() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+      throw std::runtime_error(
+          "The length of the MSA is too large to safely cast");
+    }
+
     _partitions.push_back(pll_partition_create(
         _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
-        _submodels, _tree.branch_count(), _rate_weights[partition_index].size(),
+        _submodels, _tree.branch_count(),
+        static_cast<unsigned int>(_rate_weights[partition_index].size()),
         _tree.branch_count(), attributes));
     _partition_weights.push_back(msa.total_weight());
     set_gamma_rates(partition_index);
@@ -145,14 +159,16 @@ void model_t::set_subst_rates_random(size_t p_index, size_t states) {
 }
 
 void model_t::set_gamma_rates(size_t p_index) {
-  pll_compute_gamma_cats(1.0, _rate_weights[p_index].size(),
-                         _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
+  pll_compute_gamma_cats(
+      1.0, static_cast<unsigned int>(_rate_weights[p_index].size()),
+      _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partitions[p_index], _rate_weights[p_index].data());
 }
 
 void model_t::set_gamma_rates(size_t p_index, double alpha) {
-  pll_compute_gamma_cats(alpha, _rate_weights[p_index].size(),
-                         _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
+  pll_compute_gamma_cats(
+      alpha, static_cast<unsigned int>(_rate_weights[p_index].size()),
+      _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partitions[p_index], _rate_weights[p_index].data());
 }
 
@@ -160,7 +176,7 @@ void model_t::update_invariant_sites(size_t p_index) {
   if (_invariant_sites) {
     pll_update_invariant_sites(_partitions[p_index]);
   } else {
-    for (size_t i = 0; i < _submodels; ++i) {
+    for (unsigned int i = 0; i < _submodels; ++i) {
       pll_update_invariant_sites_proportion(_partitions[p_index], i, 0.0);
     }
   }
@@ -238,13 +254,15 @@ double model_t::compute_lh(const root_location_t &root_location) {
     auto &partition = _partitions[i];
     int result = pll_update_prob_matrices(
         partition, _param_indicies[i].data(), pmatrix_indices.data(),
-        branch_lengths.data(), pmatrix_indices.size());
+        branch_lengths.data(),
+        static_cast<unsigned int>(pmatrix_indices.size()));
 
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
     }
 
-    pll_update_partials(partition, ops.data(), ops.size());
+    pll_update_partials(partition, ops.data(),
+                        static_cast<unsigned int>(ops.size()));
 
     lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
                                          _tree.root_scaler_index(),
@@ -271,9 +289,9 @@ double model_t::compute_lh_root(const root_location_t &root) {
 
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    int result =
-        pll_update_prob_matrices(partition, params, pmatrix_indices.data(),
-                                 branch_lengths.data(), pmatrix_indices.size());
+    int result = pll_update_prob_matrices(
+        partition, params, pmatrix_indices.data(), branch_lengths.data(),
+        static_cast<unsigned int>(pmatrix_indices.size()));
 
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
@@ -450,12 +468,12 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
         2.0 * abs(end.brlen_ratio) * std::numeric_limits<double>::epsilon() +
         0.5 * atol;
     double e_tol = 0.5 * (midpoint.brlen_ratio - end.brlen_ratio);
-    if (abs(e_tol) <= tol || d_end.dlh == 0)
+    if (abs(e_tol) <= tol || abs(d_end.dlh) <= 1e-12)
       return {end, d_end.lh};
     if (abs(e) >= tol && abs(d_beg.dlh) > abs(d_end.dlh)) {
       double s = d_end.dlh / d_beg.dlh;
       double p, q;
-      if (beg.brlen_ratio == midpoint.brlen_ratio) {
+      if (abs(beg.brlen_ratio - midpoint.brlen_ratio) < 1e-12) {
         p = 2.0 * e_tol * s;
         q = 1.0 - s;
       } else {
@@ -547,7 +565,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
    */
 
   bool beg_end_pos = d_beg.dlh > 0.0 && d_end.dlh > 0.0;
-  dlh_t best_midpoint_lh = {-INFINITY, 0};
+  dlh_t best_midpoint_lh = {-std::numeric_limits<double>::infinity(), 0};
   root_location_t best_midpoint;
   bool found_midpoint = false;
 
@@ -615,7 +633,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
 std::pair<root_location_t, double>
 model_t::optimize_root_location(size_t min_roots, double root_ratio) {
   std::pair<root_location_t, double> best;
-  best.second = -INFINITY;
+  best.second = -std::numeric_limits<double>::infinity();
 
   /* start by making a list of "good" roots, with the current model*/
 
@@ -656,39 +674,17 @@ void model_t::move_root(const root_location_t &new_root) {
     auto &partition = _partitions[i];
     int result = pll_update_prob_matrices(
         partition, _param_indicies[i].data(), pmatrix_indices.data(),
-        branch_lengths.data(), pmatrix_indices.size());
+        branch_lengths.data(),
+        static_cast<unsigned int>(pmatrix_indices.size()));
 
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
     }
 
-    pll_update_partials(partition, ops.data(), ops.size());
+    pll_update_partials(partition, ops.data(),
+                        static_cast<unsigned int>(ops.size()));
   }
 }
-
-/*
-void model_t::move_root(const root_location_t &root_location) {
-  std::vector<pll_operation_t> ops;
-  std::vector<unsigned int> pmatrix_indices;
-  std::vector<double> branch_lengths;
-
-  GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
-                          branch_lengths);
-
-  for (size_t i = 0; i < _partitions.size(); ++i) {
-    auto &partition = _partitions[i];
-    int result = pll_update_prob_matrices(
-        partition, _param_indicies[i].data(), pmatrix_indices.data(),
-        branch_lengths.data(), pmatrix_indices.size());
-
-    if (result == PLL_FAILURE) {
-      throw std::runtime_error(pll_errmsg);
-    }
-
-    pll_update_partials(partition, ops.data(), ops.size());
-  }
-}
-*/
 
 std::vector<std::pair<root_location_t, double>> model_t::suggest_roots() {
   return suggest_roots(1, 0.0);
@@ -697,14 +693,18 @@ std::vector<std::pair<root_location_t, double>> model_t::suggest_roots() {
 std::vector<std::pair<root_location_t, double>>
 model_t::suggest_roots(size_t min, double ratio) {
   std::vector<std::pair<root_location_t, double>> rl_lhs;
+  using fucking_difference_type =
+      std::vector<std::pair<root_location_t, double>>::difference_type;
   rl_lhs.reserve(_tree.root_count());
   for (auto rl : _tree.roots()) {
     move_root(rl);
     rl_lhs.push_back(std::make_pair(rl, compute_lh_root(rl)));
   }
-  size_t final_size = std::max(static_cast<size_t>(rl_lhs.size() * ratio), min);
+  auto final_size = std::max(static_cast<size_t>(rl_lhs.size() * ratio), min);
   std::partial_sort(
-      rl_lhs.begin(), rl_lhs.begin() + final_size, rl_lhs.end(),
+      rl_lhs.begin(),
+      rl_lhs.begin() + static_cast<fucking_difference_type>(final_size),
+      rl_lhs.end(),
       [](std::pair<root_location_t, double> a,
          std::pair<root_location_t, double> b) { return a.second > b.second; });
   rl_lhs.resize(final_size);
@@ -729,7 +729,8 @@ std::vector<root_location_t> model_t::suggest_roots_random(size_t min,
 std::pair<root_location_t, double>
 model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
                       double pgtol, double brtol, double factor) {
-  double best_lh = -INFINITY;
+
+  double best_lh = -std::numeric_limits<double>::infinity();
   root_location_t best_rl;
   std::vector<model_params_t> best_subst;
   std::vector<model_params_t> best_freqs;
@@ -771,7 +772,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
     }
 
     auto cur_best_rl = rl;
-    double cur_best_lh = -INFINITY;
+    double cur_best_lh = -std::numeric_limits<double>::infinity();
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
 
@@ -867,7 +868,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
                                                               double factor) {
   size_t root_index = 0;
   root_location_t best_rl;
-  double best_lh = -INFINITY;
+  double best_lh = -std::numeric_limits<double>::infinity();
   size_t root_count = _tree.root_count();
   std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
   debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
@@ -894,7 +895,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
     }
 
     root_location_t cur_best_rl;
-    double cur_best_lh = -INFINITY;
+    double cur_best_lh = -std::numeric_limits<double>::infinity();
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
       for (size_t i = 0; i < _partitions.size(); ++i) {
@@ -957,7 +958,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
     }
   }
 
-  double max_lh = -INFINITY;
+  double max_lh = -std::numeric_limits<double>::infinity();
 
   for (auto kv : mapped_likelihoods) {
     max_lh = std::max(kv.second, max_lh);
@@ -1043,7 +1044,7 @@ std::string model_t::subst_string() const {
   return oss.str();
 }
 
-double gd_params(model_params_t &initial_params, size_t partition_index,
+static double gd_params(model_params_t &initial_params, size_t partition_index,
                  double p_min, double p_max, double epsilon,
                  std::function<double()> compute_lh,
                  std::function<void(size_t, const model_params_t &)> set_func) {
@@ -1055,7 +1056,7 @@ double gd_params(model_params_t &initial_params, size_t partition_index,
   std::vector<double> gradient(n_params, 0.0);
   set_func(partition_index, initial_params);
   double initial_score = compute_lh();
-  double last_score = INFINITY;
+  double last_score = std::numeric_limits<double>::infinity();
   while (true) {
     set_func(partition_index, parameters);
     double score = compute_lh();
@@ -1123,7 +1124,7 @@ double gd_params(model_params_t &initial_params, size_t partition_index,
   return -final_score;
 }
 
-double
+static double
 bfgs_params(model_params_t &initial_params, size_t partition_index,
             double p_min, double p_max, double epsilon, double pgtol,
             double factor, std::function<double()> compute_lh,
@@ -1134,20 +1135,21 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   double score = compute_lh();
   double initial_score = score;
   int csave;
-  std::vector<double> gradient(n_params, 0.0);
+  std::vector<double> gradient(static_cast<size_t>(n_params), 0.0);
   size_t max_corrections = 20;
-  std::vector<double> wa((2 * max_corrections + 5) * n_params +
+  std::vector<double> wa((2 * max_corrections + 5) *
+                                 static_cast<size_t>(n_params) +
                              12 * max_corrections * (max_corrections + 1),
                          0.0);
-  std::vector<int> iwa(3 * n_params, 0);
+  std::vector<int> iwa(3 * static_cast<size_t>(n_params), 0);
 
   std::vector<double> parameters(initial_params);
-  std::vector<double> param_min(n_params, p_min);
-  std::vector<double> param_max(n_params, p_max);
+  std::vector<double> param_min(static_cast<size_t>(n_params), p_min);
+  std::vector<double> param_max(static_cast<size_t>(n_params), p_max);
   logical lsave[4];
   int isave[44];
   double dsave[29];
-  std::vector<int> bound_type(n_params, 2);
+  std::vector<int> bound_type(static_cast<size_t>(n_params), 2);
   int iprint = -1;
   size_t iters = 0;
 
@@ -1164,7 +1166,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
     set_func(partition_index, parameters);
     score = compute_lh();
     if (IS_FG(task)) {
-      for (int i = 0; i < n_params; ++i) {
+      for (size_t i = 0; i < static_cast<size_t>(n_params); ++i) {
         double h = epsilon * fabs(parameters[i]);
         if (h < epsilon) {
           h = epsilon;

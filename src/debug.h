@@ -1,5 +1,5 @@
-#ifndef __RD_DEBUG__
-#define __RD_DEBUG__
+#ifndef RD_DEBUG
+#define RD_DEBUG
 
 #include <cassert>
 #include <cstdio>
