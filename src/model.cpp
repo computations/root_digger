@@ -455,7 +455,7 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
       d_midpoint = d_beg;
       d = e = end.brlen_ratio - beg.brlen_ratio;
     }
-    if (abs(d_end.dlh) < abs(d_midpoint.dlh)) {
+    if (fabs(d_end.dlh) < fabs(d_midpoint.dlh)) {
       beg = end;
       end = midpoint;
       midpoint = beg;
@@ -465,15 +465,15 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
     }
 
     double tol =
-        2.0 * abs(end.brlen_ratio) * std::numeric_limits<double>::epsilon() +
+        2.0 * fabs(end.brlen_ratio) * std::numeric_limits<double>::epsilon() +
         0.5 * atol;
     double e_tol = 0.5 * (midpoint.brlen_ratio - end.brlen_ratio);
-    if (abs(e_tol) <= tol || abs(d_end.dlh) <= 1e-12)
+    if (fabs(e_tol) <= tol || fabs(d_end.dlh) <= 1e-12)
       return {end, d_end.lh};
-    if (abs(e) >= tol && abs(d_beg.dlh) > abs(d_end.dlh)) {
+    if (fabs(e) >= tol && fabs(d_beg.dlh) > fabs(d_end.dlh)) {
       double s = d_end.dlh / d_beg.dlh;
       double p, q;
-      if (abs(beg.brlen_ratio - midpoint.brlen_ratio) < 1e-12) {
+      if (fabs(beg.brlen_ratio - midpoint.brlen_ratio) < 1e-12) {
         p = 2.0 * e_tol * s;
         q = 1.0 - s;
       } else {
@@ -485,9 +485,9 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
       }
       if (p > 0.0)
         q = -q;
-      p = abs(p);
-      double min1 = 3.0 * e_tol * q - abs(e_tol * q);
-      double min2 = abs(e * q);
+      p = fabs(p);
+      double min1 = 3.0 * e_tol * q - fabs(e_tol * q);
+      double min2 = fabs(e * q);
       if (2.0 * p < (min1 < min2 ? min1 : min2)) {
         e = d;
         d = p / q;
@@ -501,7 +501,7 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
     }
     beg = end;
     d_beg = d_end;
-    if (abs(d) > tol)
+    if (fabs(d) > tol)
       end.brlen_ratio += d;
     else {
       end.brlen_ratio += e_tol >= 0.0 ? tol : -tol;

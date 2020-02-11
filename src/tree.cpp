@@ -495,7 +495,7 @@ rooted_tree_t::generate_root_update_operations(
 
   if (new_root.edge == _current_rl.edge ||
       new_root.edge == _current_rl.edge->back) {
-    return {{}, {}, {}};
+    return {};
   }
 
   auto old_root = _current_rl;
