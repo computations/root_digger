@@ -44,13 +44,15 @@ CONTROL_FILE = """
 [EVOLVE] p1 1 seqs
 """
 
+PERF = r"perf record -m 8 -g -o {program_name}.perf.data {program}"
+
 RD_ES = os.path.abspath(
     "../bin/rd"
 ) + " --msa {msa} --tree {tree} --seed {seed} --verbose --early-stop --rate-cats 4"
 RD_NES = os.path.abspath(
     "../bin/rd"
 ) + " --msa {msa} --tree {tree} --seed {seed} --verbose --no-early-stop --rate-cats 4"
-IQTREE = "iqtree -m 12.12+G4 -s {msa} -g {tree}"
+IQTREE = "iqtree -m 12.12+G4 -s {msa} -g {tree} -pre {prefix} -seed {seed} -nt 1"
 model_file = "subst.model"
 freqs_file = "freqs.model"
 
@@ -124,10 +126,12 @@ class exp:
                  aligns,
                  run_rd=True,
                  run_iq=True,
+                 profile=False,
                  seed=None):
         self._run_rd = run_rd
         self._run_iq = run_iq
         self._run_iter = run_iter
+        self._profile = profile
         leading_zeroes = math.ceil(math.log10(TOTAL_ITERS))
         self._run_path = os.path.abspath(
             os.path.join(
@@ -266,7 +270,18 @@ class exp:
             logfile.write(rd_output.stdout.decode('utf-8'))
         with open('rd_output_es_err', 'w') as logfile:
             logfile.write(rd_output.stderr.decode('utf-8'))
+        if self._profile:
+            self.run_rd_es_profile(tree_filename, msa)
         self.set_rd_done('.')
+
+    def run_rd_es_profile(self, tree_filename, msa):
+        subprocess.run(PERF.format(program_name="rd_es",
+                                   program=RD_ES.format(
+                                       msa=msa,
+                                       tree=os.path.join("../", tree_filename),
+                                       seed=self._seed)).split(' '),
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE)
 
     def run_rd_no_es(self, tree_filename, msa):
         rd_output = subprocess.run(RD_NES.format(msa=msa,
@@ -279,12 +294,35 @@ class exp:
             logfile.write(rd_output.stdout.decode('utf-8'))
         with open('rd_output_nes_err', 'w') as logfile:
             logfile.write(rd_output.stderr.decode('utf-8'))
+        if self._profile:
+            self.run_rd_no_es_profile(tree_filename, msa)
         self.set_rd_done('.')
 
+    def run_rd_no_es_profile(self, tree_filename, msa):
+        subprocess.run(PERF.format(program_name="rd_nes",
+                                   program=RD_NES.format(
+                                       msa=msa,
+                                       tree=os.path.join("../", tree_filename),
+                                       seed=self._seed)).split(' '),
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE)
+
     def run_iqtree(self, tree_filename, msa):
-        subprocess.run(IQTREE.format(msa=msa, tree=tree_filename).split(),
+        subprocess.run(IQTREE.format(msa=msa, tree=tree_filename,
+                                     prefix=msa, seed=self._seed).split(),
                        stdout=subprocess.DEVNULL)
+        if self._profile:
+            self.run_iqtree_profile(tree_filename, msa)
         self.set_iqtree_done('.')
+
+    def run_iqtree_profile(self, tree_filename, msa):
+        subprocess.run(PERF.format(program_name='iqtree',
+                                   program=IQTREE.format(
+                                       msa=msa,
+                                       tree=tree_filename,
+                                       prefix='perf',
+                                       seed=self._seed)).split(),
+                       stdout=subprocess.DEVNULL)
 
     def run_exp(self, tree_filename, msa):
         if not self.check_done_rd('.') and self._run_rd:
@@ -595,8 +633,8 @@ class iqtree_result(result):
 
 class summary:
     def __init__(self, experiments):
-        self._results = [e.rd_results_es() for e in experiments] + \
-            [e.rd_results_nes() for e in experiments] + \
+        self._results = [e.rd_results_es() for e in experiments] +\
+            [e.rd_results_nes() for e in experiments] +\
             [e.iqtree_results() for e in experiments]
         self._results = [
             i for sl in self._results if not sl is None for i in sl
@@ -715,8 +753,8 @@ def extract_node_with_clade_pair(tree, clade_pair):
         return (tree & clade_pair[0][0])
     if len(clade_pair[1]) == 1:
         return (tree & clade_pair[1][0])
-    clade = clade_pair[0] if len(clade_pair[0]) <= len(clade_pair[1]) else\
-        clade_pair[1]
+    clade = (clade_pair[0]
+             if len(clade_pair[0]) <= len(clade_pair[1]) else clade_pair[1])
     ca0 = tree.get_common_ancestor(clade_pair[0])
     ca1 = tree.get_common_ancestor(clade_pair[1])
     if ca0 in tree.children and ca1 in tree.children:
@@ -831,9 +869,14 @@ if __name__ == "__main__":
     parser.add_argument('--run-iq-tree', dest='runiq', action='store_true')
     parser.add_argument('--no-run-rd', dest='runrd', action='store_false')
     parser.add_argument('--no-run-iq-tree', dest='runiq', action='store_false')
+    parser.add_argument('--profile', dest='profile', action='store_true',
+            default=False)
     parser.set_defaults(runrd=True)
     parser.set_defaults(runiq=True)
     args = parser.parse_args()
+
+#    if args.profile and args.procs > 1:
+#        print("Please only use one proc when using profiling")
 
     RD_ES += " --atol {atol} --factor {factor} --bfgstol {bfgstol}".format(
         atol=args.atol, factor=args.factor, bfgstol=args.bfgstol)
@@ -876,7 +919,8 @@ if __name__ == "__main__":
         experiments = []
         for i in range(TOTAL_ITERS):
             experiments.append(
-                exp('.', i, trees, aligns, args.runrd, args.runiq))
+                exp('.', i, trees, aligns, args.runrd, args.runiq,
+                    args.profile))
 
         PROGRESS_BAR.update(PROGRESS_BAR_ITER.value)
         PROGRESS_BAR_ITER.value += 1
