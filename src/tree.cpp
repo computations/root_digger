@@ -507,7 +507,7 @@ rooted_tree_t::generate_root_update_operations(
 
   tag_nodes(_tree->vroot->back);
   tag_nodes(_tree->vroot->next->back);
-  std::vector<pll_unode_t *> trav_buf(inner_count());
+  std::vector<pll_unode_t *> trav_buf(inner_count() + tip_count());
   unsigned int trav_size = 0;
 
   auto update_root_callback = [](pll_unode_t *n) -> int {

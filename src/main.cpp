@@ -54,10 +54,10 @@ public:
   };
   initialized_flag_t() : value(value_t::uninitalized){};
   constexpr initialized_flag_t(const value_t &v) : value(v) {}
-  constexpr bool operator==(const initialized_flag_t &rhs) {
+  constexpr bool operator==(const initialized_flag_t &rhs) const {
     return rhs.value == value;
   }
-  constexpr bool operator!=(const initialized_flag_t &rhs) {
+  constexpr bool operator!=(const initialized_flag_t &rhs) const {
     return rhs.value != value;
   }
   constexpr bool initalized() const { return value != value_t::uninitalized; }
@@ -355,15 +355,14 @@ int main(int argv, char **argc) {
                              cli_options.br_tolerance, cli_options.factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
-      final_tree_string = std::move(model.rooted_tree(final_rl).newick());
+      final_tree_string = model.rooted_tree(final_rl).newick();
     } else {
       auto tmp = model.exhaustive_search(
           cli_options.abs_tolerance, cli_options.bfgs_tol,
           cli_options.br_tolerance, cli_options.factor);
       final_rl = tmp.first;
       final_lh = tmp.second;
-      final_tree_string =
-          std::move(model.virtual_rooted_tree(final_rl).newick());
+      final_tree_string = model.virtual_rooted_tree(final_rl).newick();
     }
     if (!cli_options.silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
