@@ -80,7 +80,7 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
 }
 
 static std::string::const_iterator expect_next(std::string::const_iterator itr,
-                                        char c) {
+                                               char c) {
   while (std::isspace(*itr)) {
     itr++;
   }
@@ -231,12 +231,14 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
                                    static_cast<size_t>(other.count()));
 
   for (int i = 0; i < other.count(); ++i) {
-    if (_msa->length < 0) {
+    if (_msa->length <= 0) {
       throw std::runtime_error(
           "The size of the MSA is less than 0 (overflow?)");
     }
+
+    // We need to make space for the terminating zero
     _msa->sequence[i] = (char *)malloc(static_cast<size_t>(sizeof(char)) *
-                                       static_cast<size_t>(_msa->length));
+                                       static_cast<size_t>(_msa->length + 1));
     size_t cur_idx = 0;
     char *other_sequence = other.sequence(i);
     for (auto range : partition.parts) {
@@ -303,8 +305,10 @@ void msa_t::compress() {
   if (_weights != nullptr) {
     free(_weights);
   }
+  int new_length = _msa->length;
   _weights = pll_compress_site_patterns(_msa->sequence, _map, _msa->count,
-                                        &(_msa->length));
+                                        &new_length);
+  _msa->length = new_length;
 }
 
 std::vector<msa_t> msa_t::partition(const msa_partitions_t &ps) const {
