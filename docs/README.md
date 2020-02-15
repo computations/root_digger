@@ -15,8 +15,8 @@ available, so installing it should be done through your package manager. In the
 case that GSL is not found though, the build process will automatically download
 GSL and build it.
 
-Compilation requires the dependencies Flex and Bison, both of which can also be
-obtained through a package manager.
+Compilation of `libpll` requires the dependencies Flex and Bison, both of which
+can also be obtained through a package manager.
 
 Root digger requires `cmake` to build. There is a `makefile` provided which will
 set up the build directory and build the software automatically. Once the
