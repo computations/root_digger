@@ -5,11 +5,13 @@ root on the given tree.
 
 # Building
 
-Root digger depends on `pll-modules`, which can be satisfied by
+Currently, the best way to get the most recent version of RootDigger is by
+cloning the repository
 
-    git submodule update --init --recursive
+    git clone --recursive https://github.com/computations/root_digger
 
-Furthermore, the particular variant of `libpll` that is used by Root digger
+This will obtain all the required dependencies including a modified `libpll`.
+Furthermore, the particular variant of `libpll` that is used by RootDigger
 requires the GNU Scientific Library (GSL). Most distributions have packages
 available, so installing it should be done through your package manager. In the
 case that GSL is not found though, the build process will automatically download
