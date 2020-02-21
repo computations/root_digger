@@ -8,14 +8,16 @@ set(CMAKE_C_FLAGS_RELEASE "-O3 -fno-omit-frame-pointer" CACHE INTERNAL "")
 
 find_package(Git)
 if(GIT_FOUND)
-    if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+    if(EXISTS ${CMAKE_SOURCE_DIR})
         execute_process(
             COMMAND ${GIT_EXECUTABLE} describe --tags
             WORKING_DIRECTORY "${local_dir}"
             OUTPUT_VARIABLE RD_BUILD_VERSION
             ERROR_QUIET
             OUTPUT_STRIP_TRAILING_WHITESPACE)
-        string(REGEX REPLACE "-g.+" "" RD_BUILD_VERSION ${RD_BUILD_VERSION})
+        if (${RD_BUILD_VERSION})
+            string(REGEX REPLACE "-g.+" "" RD_BUILD_VERSION ${RD_BUILD_VERSION})
+        endif()
         execute_process(
             COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
             WORKING_DIRECTORY "${local_dir}"
@@ -37,7 +39,7 @@ set(LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
 add_subdirectory(lib)
 include_directories(${LOCALDEPS_DIR}/include)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 add_subdirectory(src)
 
 find_library(ASAN_FOUND asan)
