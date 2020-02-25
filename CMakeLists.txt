@@ -17,6 +17,9 @@ if(GIT_FOUND)
             OUTPUT_STRIP_TRAILING_WHITESPACE)
         if (${RD_BUILD_VERSION})
             string(REGEX REPLACE "-g.+" "" RD_BUILD_VERSION ${RD_BUILD_VERSION})
+            if(STATIC_BUILD)
+                set(RD_BUILD_VERSION "${RD_BUILD_VERSION}-static")
+            endif()
         endif()
         execute_process(
             COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
