@@ -1,7 +1,7 @@
 
 
 find_package(GSL)
-if(GSL_FOUND AND NOT STATIC_GSL)
+if(GSL_FOUND AND NOT ${STATIC_GSL})
     set(GSL_LIBS gsl gslcblas PARENT_SCOPE)
 else()
     set(GSL_PREFIX "${CMAKE_BINARY_DIR}/localdeps/")

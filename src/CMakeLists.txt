@@ -14,13 +14,12 @@ set_target_properties(rd PROPERTIES
 )
 
 # We duplicate the libararies here to solve a dumb link time error
+set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
+    ${GSL_LIBS} lbfgs_lib )
 
-if(STATIC_GSL)
-set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
-    ${GSL_LIBS} lbfgs_lib -static)
-else()
-set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
-    ${GSL_LIBS} lbfgs_lib)
+if(STATIC_BUILD)
+    target_link_options(rd PRIVATE -static -pie)
+    target_compile_options(rd PRIVATE -fPIE)
 endif()
 
 target_link_libraries(rd ${LINK_LIBS})

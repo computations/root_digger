@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.00)
 project(root_digger)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fno-omit-frame-pointer" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -fno-omit-frame-pointer" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 
 find_package(Git)
 if(GIT_FOUND)
@@ -25,6 +25,10 @@ if(GIT_FOUND)
             ERROR_QUIET
             OUTPUT_STRIP_TRAILING_WHITESPACE)
     endif()
+endif()
+
+if( ${STATIC_BUILD})
+    set(STATIC_GSL ON)
 endif()
 
 if( NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
