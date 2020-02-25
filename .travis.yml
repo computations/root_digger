@@ -1,15 +1,30 @@
 language: cpp
 
-compiler:
-  - clang
-  - gcc-9
+env:
+  - MATRIX_EVAL="CC=clang && CXX=clang++"
+  - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9"
+  - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+  - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+
+before_install:
+  - eval "${MATRIX_EVAL}"
 
 os:
   - linux
 
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-9
+      - g++-8
+      - g++-7
+
 branches:
   only:
   - master
+  - "/^v\\d+\\./"
 
 script: VERBOSE=1 make
 
@@ -20,7 +35,7 @@ stages:
 jobs:
   include:
     - os: linux
-      compiler: gcc-9
+      env: MATRIX_EVAL="CC=gcc-9 && CXX=g++-9"
       stage: deploy
       script: VERBOSE=1 make static
       after_script: file bin/rd
