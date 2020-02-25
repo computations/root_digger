@@ -1,18 +1,25 @@
 language: cpp
+
 compiler:
   - clang
-  - gcc
+  - gcc-9
+
 os:
   - osx
   - linux
+
+branches:
+  only:
+  - master
+
 script: VERBOSE=1 make static-gsl
-before_install:
-- if [ -n "${C_COMPILER}" ]; then export CC="${C_COMPILER}"; fi
-- if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
+
 deploy:
   provider: releases
   api_key:
     secure: OVQRNLwhNDngaKdsUqYED2wWkP9U6sVeWXdxU8x2uC7gZGkec/1hunvSY/oKpMd369yqxbm5xDiYvfU/m98TD9kP5bAre0+MHr+FkIRlYqyNI3owfjMZi6XhDBcRzplEziKiE9+QOf3o+0+0Rzd3tx68ncRR0cifbVMM1XYYryY4FEaPn4a8j9ZW+5M3jljGCFNuYgEL/7utsN/dtcW8+ooD0Em/dw65kYVAOjMZc6xzWfaKWz9FxXK8Hw/s7EkVUHWcNGAaPPsVVBWQDmba57ITzPz71zrDDK0dLuhmaqmL1xXEHMe8BMPLWd7Xv3lvcCYQ03W6QOQ+NNHwvVhE7Q5RjjM5ekJVvjv5rcJ4gFvArB9uLIMcLj3bBVd0FtRriGVLGcRnjsgc1ixQqaZ+KIkCZrPM8830hhFxSEaw/XTjAiH5nm9NmrTqdelaz6lksrO4sBpBYKbhyYz6e2lipKCllCO/eERkWnHKOJdPFKDCLvk9o3Sz0bAxrsSJbp5AtMeJktOpHu0ZE/cgcWha6GmGlo7ObCpVlg8DiZWTL47BiUIQGMhDcz0bK0uDNVwbH8GiKXLJmd6673o0nzXH/LZOpQ1cjyhVA1yx28KahTaFoIbCMqrezjDBoflsapIUNKaFqwpeIlYXtkf5pIJ+gb4uiz9L2KFGZ3S9KJO8RhY=
   file: bin/rd
+  skip_cleanup: true
   on:
     repo: computations/root_digger
+    tags: true
