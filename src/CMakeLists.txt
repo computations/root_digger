@@ -20,8 +20,8 @@ set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
 if(STATIC_BUILD)
     #target_link_options(rd PRIVATE -static -pie)
     #target_compile_options(rd PRIVATE -fPIE -static)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EX_LINKER_FLAGS} -static")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static -fPIE")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EX_LINKER_FLAGS} -static -pie")
 endif()
 
 target_link_libraries(rd ${LINK_LIBS})

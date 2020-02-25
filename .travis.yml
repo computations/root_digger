@@ -13,7 +13,9 @@ branches:
 
 script: VERBOSE=1 make static
 
-job:
+after_script: file bin/rd
+
+jobs:
   include:
     - os: osx
       script: VERBOSE=1 make
