@@ -11,15 +11,16 @@ branches:
   only:
   - master
 
+script: VERBOSE=1 make static
+
 job:
   include:
-    os: osx
-    script: VERBOSE=1 make
-    compiler:
-      - gcc
-      - clang
-
-script: VERBOSE=1 make static
+    - os: osx
+      script: VERBOSE=1 make
+      compiler: gcc
+    - os: osx
+      script: VERBOSE=1 make
+      compiler: clang
 
 deploy:
   provider: releases
