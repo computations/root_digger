@@ -27,8 +27,11 @@ if(GIT_FOUND)
     endif()
 endif()
 
-if( ${STATIC_BUILD})
+if( STATIC_BUILD )
     set(STATIC_GSL ON)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static -fPIE")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static -fPIE")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EX_LINKER_FLAGS} -static -pie")
 endif()
 
 if( NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
