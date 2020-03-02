@@ -39,6 +39,15 @@ jobs:
       stage: deploy
       script: VERBOSE=1 make static
       after_script: file bin/rd
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-9
+            - g++-8
+            - g++-7
+            - libasan
       deploy:
         provider: releases
         api_key:
