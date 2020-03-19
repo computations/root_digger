@@ -57,6 +57,7 @@ public:
   std::vector<msa_t> partition(const msa_partitions_t &) const;
 
   bool constiency_check(std::unordered_set<std::string>) const;
+  void valid_data() const;
 
   ~msa_t();
 

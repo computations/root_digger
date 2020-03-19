@@ -3,6 +3,7 @@
 #include <fstream>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 extern "C" {
@@ -346,6 +347,25 @@ bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
     }
   }
   return ret;
+}
+
+void msa_t::valid_data() const {
+  for (int i = 0; i < _msa->count; ++i) {
+    for (int j = 0; j < _msa->length; ++j) {
+      char c = _msa->sequence[i][j];
+      if (c < 0) {
+        throw std::runtime_error(
+            std::string("Encountered an invalid character in sequence ") +
+            std::to_string(i) + " at position " + std::to_string(j) + ".");
+      }
+      size_t idx = static_cast<size_t>(c);
+      if (_map[idx] == 0) {
+        throw std::runtime_error(
+            std::string("Found unrecognized character sequence ") +
+            std::to_string(i) + " position " + std::to_string(j)+ ".");
+      }
+    }
+  }
 }
 
 msa_t::~msa_t() {
