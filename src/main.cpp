@@ -329,7 +329,7 @@ int main(int argv, char **argc) {
       for (auto &p : part_infos) {
 
         size_t rate_cats = p.model.ratehet_opts.rate_cats;
-        if (rate_cats == 0){
+        if (rate_cats == 0) {
           rate_cats = 1;
         }
         cli_options.rate_cats.push_back(rate_cats);

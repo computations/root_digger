@@ -520,7 +520,7 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
      * Since the range specification is [first, second], we have to add one to
      * include the endpoint
      */
-    size_t cur_partition_length = (range.second - range.first) + 1;
+    size_t cur_partition_length = (range.second - range.first);
     if (cur_partition_length >
         static_cast<size_t>(std::numeric_limits<int>::max())) {
       throw std::runtime_error("Partition range is too large to cast safely");
