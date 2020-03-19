@@ -41,6 +41,160 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
     CHECK(5122 == pi.parts[1].first);
     CHECK(12411 == pi.parts[1].second);
   }
+  SECTION("Model strings") {
+    SECTION("Frequency only") {
+      SECTION("emperical") {
+        std::string line{"DNA+F,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+F" == pi.model_name);
+        CHECK("DNA" == pi.model.subst_str);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.freq_opts.type == param_type::emperical);
+      }
+      SECTION("estimate") {
+        std::string line{"DNA+FO,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+FO" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.freq_opts.type == param_type::estimate);
+      }
+      SECTION("equal") {
+        std::string line{"DNA+FE,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+FE" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.freq_opts.type == param_type::equal);
+      }
+      SECTION("user") {
+        SECTION("cli") {
+          std::string line{
+              "DNA+FU{0.25/0.25/0.25/0.25},PART_0=123-4123, 5122-12411"};
+          auto pi = parse_partition_info(line);
+          CHECK("DNA+FU{0.25/0.25/0.25/0.25}" == pi.model_name);
+          CHECK("PART_0" == pi.partition_name);
+          CHECK(123 == pi.parts[0].first);
+          CHECK(4123 == pi.parts[0].second);
+          CHECK(5122 == pi.parts[1].first);
+          CHECK(12411 == pi.parts[1].second);
+          CHECK(pi.model.freq_opts.type == param_type::user);
+        }
+      }
+    }
+    SECTION("Invar Only"){
+      SECTION("estimate"){
+        std::string line{"DNA+I,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+I" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.invar_opts.type == param_type::estimate);
+      }
+      SECTION("emperical"){
+        std::string line{"DNA+IC,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+IC" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.invar_opts.type == param_type::emperical);
+      }
+      SECTION("user"){
+        std::string line{"DNA+IU{0.25},PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+IU{0.25}" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.invar_opts.type == param_type::user);
+        CHECK(pi.model.invar_opts.user_prop == 0.25);
+      }
+    }
+    SECTION("RateHet Only"){
+      SECTION("emperical"){
+        std::string line{"DNA+G,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+G" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.ratehet_opts.type == param_type::estimate);
+        CHECK(pi.model.ratehet_opts.rate_cats == 4);
+      }
+      SECTION("emperical, with n"){
+        std::string line{"DNA+G2,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+G2" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.ratehet_opts.type == param_type::estimate);
+        CHECK(pi.model.ratehet_opts.rate_cats == 2);
+      }
+      SECTION("user"){
+        std::string line{"DNA+G2{0.25},PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+G2{0.25}" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.ratehet_opts.type == param_type::user);
+        CHECK(pi.model.ratehet_opts.rate_cats == 2);
+        CHECK(pi.model.ratehet_opts.alpha == 0.25);
+      }
+      SECTION("median"){
+        std::string line{"DNA+GA,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+GA" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.ratehet_opts.type == param_type::estimate);
+        CHECK(pi.model.ratehet_opts.rate_cats == 4);
+      }
+    }
+    SECTION("All together"){
+        std::string line{"DNA+G2{0.25}+F+I,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+G2{0.25}+F+I" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.ratehet_opts.type == param_type::user);
+        CHECK(pi.model.ratehet_opts.rate_cats == 2);
+        CHECK(pi.model.ratehet_opts.alpha == 0.25);
+        CHECK(pi.model.invar_opts.type == param_type::estimate);
+        CHECK(pi.model.freq_opts.type == param_type::emperical);
+    }
+  }
   SECTION("error: missing comma") {
     std::string line{"DNA PART_0 = 123-4123"};
     CHECK_THROWS(parse_partition_info(line));

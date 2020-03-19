@@ -41,6 +41,12 @@ extern int __VERBOSE__;
       if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                   \
         fprintf(stdout, "[%s:%d]: ", __func__, __LINE__);                      \
       }                                                                        \
+      if (level == EMIT_LEVEL_WARNING) {                                       \
+        fprintf(stdout, "[Warning] ");                                         \
+      }                                                                        \
+      if (level == EMIT_LEVEL_ERROR) {                                         \
+        fprintf(stdout, "[ERROR] ");                                           \
+      }                                                                        \
       fprintf(stdout, fmt "\n", __VA_ARGS__);                                  \
     }                                                                          \
   } while (0)

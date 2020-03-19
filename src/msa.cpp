@@ -1,13 +1,18 @@
+#include "debug.h"
 #include "msa.hpp"
 #include <cctype>
 #include <fstream>
+#include <functional>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
 extern "C" {
 #include <libpll/pll_msa.h>
 }
+
+typedef std::string::const_iterator string_iter_t;
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename) {
 
@@ -79,12 +84,16 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
   throw std::invalid_argument("Could not parse msa file");
 }
 
-static std::string::const_iterator expect_next(std::string::const_iterator itr,
-                                               char c) {
+/* Given a character, looks for the next instance of that character. If the
+ * another character is encountered that isn't the specified one, the function
+ * throws an exception. Ignores spaces The the returned iterator is one past the
+ * character that was expected.
+ */
+static string_iter_t expect_next(string_iter_t itr, char c) {
   while (std::isspace(*itr)) {
     itr++;
   }
-  if (c != *itr) {
+  if (std::tolower(c) != std::tolower(*itr)) {
     throw std::runtime_error(
         std::string("Failed to parse partition file, expected '") + c +
         "' got '" + *itr + "' instead");
@@ -94,6 +103,301 @@ static std::string::const_iterator expect_next(std::string::const_iterator itr,
     itr++;
   }
   return itr;
+}
+
+static inline string_iter_t scan_word(string_iter_t iter) {
+  auto start = iter;
+  while (std::isalnum(*iter) || (*iter == '_') || (*iter == ':')) {
+    ++iter;
+  }
+  if (iter == start) {
+    throw std::runtime_error("Failed to find a word when scanning");
+  }
+  return iter;
+}
+
+static inline string_iter_t scan_float(string_iter_t iter) {
+  auto start = iter;
+  while (std::isdigit(*iter)) {
+    debug_print(EMIT_LEVEL_DEBUG, "eating digit %c", *iter);
+    iter++;
+  }
+  if (start == iter) {
+    throw std::runtime_error("Expected float, but found something else");
+  }
+
+  /* now we expect either a '.', '+', or an 'e'. */
+  while (true) {
+    bool dot = false;
+    switch (*iter) {
+    case '.':
+    case '+':
+    case '-':
+    case 'e':
+      if (*iter == '.') {
+        dot = true;
+      }
+      iter++;
+      break;
+    default:
+      return iter;
+    }
+    auto cont_start = iter;
+    while (*iter && std::isdigit(*++iter)) {
+    }
+    if (!dot && cont_start == iter) {
+      throw std::runtime_error("Encountered a malformed floating point number");
+    }
+  }
+
+  return iter;
+}
+
+static inline string_iter_t scan_integer(string_iter_t iter) {
+  auto start = iter;
+  while (*iter && std::isdigit(*++iter)) {
+  }
+  if (start == iter) {
+    throw std::runtime_error("Expected a number, but found something else");
+  }
+  return iter;
+}
+
+static inline std::string parse_subst_str(string_iter_t &iter) {
+  /* the matrix spec is anything before the first plus */
+  auto end = scan_word(iter);
+  std::string subst_string{iter, end};
+  iter = end;
+  return subst_string;
+}
+
+static inline string_iter_t
+skip_to(string_iter_t iter, const std::function<bool(char)> &test_func) {
+  while (!test_func(*++iter) && *iter) {
+    debug_print(EMIT_LEVEL_DEBUG, "Skipping '%c'/%x", *iter, *iter);
+    debug_print(EMIT_LEVEL_DEBUG, "test_func '%x", test_func(*iter));
+  }
+  debug_print(EMIT_LEVEL_DEBUG, "Finished skipping on '%c'/%x", *iter, *iter);
+  if (!*iter) {
+    throw std::runtime_error(
+        std::string("Could not skip, found end of string intead"));
+  }
+  return iter;
+}
+
+static inline string_iter_t skip_space(string_iter_t iter) {
+  while (std::isspace(*iter)) {
+    ++iter;
+  }
+  return iter;
+}
+
+static inline freq_opts_t parse_freq_options(string_iter_t &iter) {
+  freq_opts_t fi;
+  iter++;
+  switch (*iter) {
+  default:
+    fi.type = param_type::emperical;
+    break;
+  case 'c':
+  case 'C':
+    iter++;
+    fi.type = param_type::emperical;
+    break;
+  case 'O':
+  case 'o':
+    fi.type = param_type::estimate;
+    iter++;
+    break;
+  case 'E':
+  case 'e':
+    fi.type = param_type::equal;
+    iter++;
+    break;
+  case 'U':
+  case 'u':
+    fi.type = param_type::user;
+    /* Eat the input until we find the next '}' */
+    iter = skip_to(iter, [](char d) -> bool { return d == '}'; });
+    ++iter;
+    break;
+  }
+
+  iter = skip_space(iter);
+  return fi;
+}
+
+static inline invar_opts_t parse_invar_options(string_iter_t &iter) {
+  invar_opts_t ii;
+  iter++;
+  switch (*iter) {
+  default:
+    ii.type = param_type::estimate;
+    break;
+  case 'O':
+  case 'o':
+    ii.type = param_type::estimate;
+    iter++;
+    break;
+  case 'C':
+  case 'c':
+    ii.type = param_type::emperical;
+    iter++;
+    break;
+  case 'U':
+  case 'u':
+    iter++;
+    ii.type = param_type::user;
+    iter = expect_next(iter, '{');
+    auto end = scan_float(iter);
+    debug_print(EMIT_LEVEL_DEBUG, "ending on %c/%x", *end, *end);
+    ii.user_prop = std::stod(std::string{iter, end});
+    iter = expect_next(end, '}');
+    break;
+  }
+
+  iter = skip_space(iter);
+  return ii;
+}
+
+static inline ratehet_opts_t parse_ratehet_options(string_iter_t &iter) {
+  ratehet_opts_t ri;
+  iter++;
+  switch (*iter) {
+  default:
+    ri.type = param_type::estimate;
+    if (std::isdigit(*iter)) {
+      auto end = scan_integer(iter);
+      int res = std::stoi(std::string(iter, end));
+      debug_print(EMIT_LEVEL_DEBUG, "res.c_str(): %s",
+                  std::string(iter, end).c_str());
+      if (res < 0) {
+        throw std::runtime_error(
+            "Number of rate categories can not be less than zero");
+      }
+      ri.rate_cats = static_cast<size_t>(res);
+      iter = end;
+      debug_print(EMIT_LEVEL_DEBUG, "*iter: %c/%x", *iter, *iter);
+      if (*iter == '{') {
+        iter++;
+        end = scan_float(iter);
+        ri.alpha = stod(std::string(iter, end));
+        ri.alpha_init = true;
+        iter = expect_next(end, '}');
+        ri.type = param_type::user;
+        debug_print(EMIT_LEVEL_DEBUG, "*iter: %c/%x", *iter, *iter);
+      }
+    } else {
+      ri.rate_cats = 4;
+    }
+    break;
+  case 'A':
+  case 'a':
+    ri.median = true;
+    ri.type = param_type::estimate;
+    ri.rate_cats = 4;
+    iter++;
+  }
+  debug_print(EMIT_LEVEL_DEBUG, "*iter: %c/%x", *iter, *iter);
+  iter = skip_space(iter);
+  return ri;
+}
+
+static inline asc_bias_opts_t parse_ascbias_options(string_iter_t &iter) {
+  asc_bias_opts_t abo;
+  iter = expect_next(iter, 'S');
+  iter = expect_next(iter, 'C');
+  iter = expect_next(iter, '_');
+  switch (*iter) {
+  case 'L':
+  case 'l':
+    abo.type = asc_bias_type::lewis;
+    iter++;
+    break;
+  case 'F':
+  case 'f': {
+    abo.type = asc_bias_type::fels;
+    iter = expect_next(iter, '{');
+    auto end = scan_float(iter);
+    abo.fels_weight = std::stod(std::string(iter, end));
+    iter = expect_next(end, '}');
+  } break;
+  case 'S':
+  case 's': {
+    abo.type = asc_bias_type::stam;
+    iter = expect_next(iter, '{');
+    while (true) {
+      auto end = scan_float(iter);
+      abo.stam_weights.push_back(std::stod(std::string(iter, end)));
+      if (*end == '}') {
+        iter = end;
+        iter++;
+        break;
+      }
+      iter = expect_next(end, '/');
+    }
+  } break;
+  }
+  iter = skip_space(iter);
+  return abo;
+}
+
+// static inline void parse_char_to_state_option(string_iter_t &iter) {}
+
+model_info_t parse_model_info(const std::string &model_string) {
+  model_info_t model_info;
+  /* parse the subst matrix
+   * This is just a list of strings. We currently only support the GTR model and
+   * binary data, so we need to mark that the model is not GTR or BIN, and then
+   * warn that we are just going to ignore that information.
+   */
+  debug_print(EMIT_LEVEL_DEBUG, "model string: %s", model_string.c_str());
+  auto iter = model_string.begin();
+  auto end = scan_word(iter);
+  model_info.subst_str = std::string(iter, end);
+  debug_print(EMIT_LEVEL_DEBUG, "subst string: %s",
+              model_info.subst_str.c_str());
+  debug_print(EMIT_LEVEL_DEBUG, "end - iter: %lu", end - iter);
+  iter = end;
+
+  while (model_string.end() != iter && *iter) {
+    debug_print(EMIT_LEVEL_DEBUG, "working on charcter: %c, %x", *iter, *iter);
+    iter = expect_next(iter, '+');
+    iter = skip_space(iter);
+    switch (*iter) {
+    case 'F':
+    case 'f':
+      model_info.freq_opts = parse_freq_options(iter);
+      break;
+    case 'I':
+    case 'i':
+      model_info.invar_opts = parse_invar_options(iter);
+      break;
+    case 'G':
+    case 'g':
+      model_info.ratehet_opts = parse_ratehet_options(iter);
+      break;
+    case 'A':
+    case 'a':
+      model_info.asc_opts = parse_ascbias_options(iter);
+      break;
+    case 'R':
+    case 'r':
+      debug_string(EMIT_LEVEL_WARNING,
+                   "The 'R' option in the model string is not supported by "
+                   "root digger, and will be ignored.");
+      iter++;
+      break;
+    case 'M':
+    case 'm':
+      debug_string(EMIT_LEVEL_WARNING,
+                   "The 'M' option in the model string is not supported by "
+                   "root digger, and will be ignored.");
+      iter++;
+      break;
+    }
+  }
+  return model_info;
 }
 
 partition_info_t parse_partition_info(const std::string &line) {
@@ -107,11 +411,13 @@ partition_info_t parse_partition_info(const std::string &line) {
 
   /* parse model name */
   auto start = itr;
-  while (std::isalnum(*itr)) {
+  while (std::isalnum(*itr) || *itr == '+' || *itr == '{' || *itr == '}' ||
+         *itr == '/' || *itr == '.') {
     itr++;
   }
   pi.model_name = std::string(start, itr);
 
+  pi.model = parse_model_info(pi.model_name);
   /* check for comma */
   itr = expect_next(itr, ',');
 
@@ -213,7 +519,7 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
      * Since the range specification is [first, second], we have to add one to
      * include the endpoint
      */
-    size_t cur_partition_length = (range.second - range.first) + 1;
+    size_t cur_partition_length = (range.second - range.first);
     if (cur_partition_length >
         static_cast<size_t>(std::numeric_limits<int>::max())) {
       throw std::runtime_error("Partition range is too large to cast safely");
@@ -284,6 +590,9 @@ unsigned int *msa_t::weights() const {
 }
 
 unsigned int msa_t::total_weight() const {
+  if (!_weights) {
+    return static_cast<unsigned int>(_msa->length);
+  }
   unsigned int total = 0;
   for (int i = 0; i < _msa->length; ++i) {
     total += _weights[i];
@@ -308,6 +617,10 @@ void msa_t::compress() {
   int new_length = _msa->length;
   _weights = pll_compress_site_patterns(_msa->sequence, _map, _msa->count,
                                         &new_length);
+  if (!_weights) {
+    throw std::runtime_error(std::string("PLL ERR: ") +
+                             std::to_string(pll_errno) + " " + pll_errmsg);
+  }
   _msa->length = new_length;
 }
 

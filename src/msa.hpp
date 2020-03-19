@@ -10,11 +10,67 @@ extern "C" {
 #include <unordered_set>
 #include <vector>
 
+namespace param_type {
+enum param_type_e { emperical, estimate, equal, user };
+}
+
+struct freq_opts_t {
+  param_type::param_type_e type;
+};
+
+struct invar_opts_t {
+  param_type::param_type_e type;
+  float user_prop;
+};
+
+struct ratehet_opts_t {
+  param_type::param_type_e type;
+  bool median = false;
+  size_t rate_cats = 0;
+  bool alpha_init = false;
+  double alpha;
+};
+
+namespace asc_bias_type {
+enum asc_bias_type_e { lewis, fels, stam };
+}
+
+struct asc_bias_opts_t {
+  asc_bias_type::asc_bias_type_e type;
+  double fels_weight;
+  std::vector<double> stam_weights;
+};
+
+struct model_info_t {
+  size_t states;
+  std::string subst_str;
+  freq_opts_t freq_opts;
+  invar_opts_t invar_opts;
+  ratehet_opts_t ratehet_opts;
+  asc_bias_opts_t asc_opts;
+};
+
 struct partition_info_t {
   std::vector<std::pair<size_t, size_t>> parts;
   std::string model_name;
   std::string partition_name;
+  model_info_t model;
 };
+
+/*
+static const char *dna_models[] = {
+    "JC",   "K80",    "F81",   "HKY",    "TN93ef", "TN93",   "K81",  "K81uf",
+    "TPM2", "TPM2uf", "TPM3",  "TPM3uf", "TIM1",   "TIM1uf", "TIM2", "TIM2uf",
+    "TIM3", "TIM3uf", "TVMef", "TVM",    "SYM",    "GTR"};
+
+static const char *protein_models[] = {
+    "Blosum62", "cpREV", "Dayhoff", "DCMut",       "DEN",    "FLU",
+    "HIVb",     "HIVw",  "JTT",     "JTT - DCMut", "LG",     "mtART",
+    "mtMAM",    "mtREV", "mtZOA",   "PMB",         "rtREV",  "stmtREV",
+    "VT",       "WAG",   "LG4M ",   "LG4X ",       "PROTGTR"};
+
+static const char *bin_models[] = {"BIN"};
+*/
 
 typedef std::vector<partition_info_t> msa_partitions_t;
 
