@@ -520,7 +520,7 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
      * Since the range specification is [first, second], we have to add one to
      * include the endpoint
      */
-    size_t cur_partition_length = (range.second - range.first);
+    size_t cur_partition_length = (range.second - range.first) + 1;
     if (cur_partition_length >
         static_cast<size_t>(std::numeric_limits<int>::max())) {
       throw std::runtime_error("Partition range is too large to cast safely");
@@ -549,7 +549,11 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
     size_t cur_idx = 0;
     char *other_sequence = other.sequence(i);
     for (auto range : partition.parts) {
-      for (size_t j = range.first; j <= range.second; ++j) {
+      if (range.first == 0) {
+        throw std::runtime_error(
+            "Partition ranges start at 1, but we encountered a 0");
+      }
+      for (size_t j = range.first - 1; j < range.second; ++j) {
         _msa->sequence[i][cur_idx++] = other_sequence[j];
       }
     }
@@ -675,7 +679,7 @@ void msa_t::valid_data() const {
       if (_map[idx] == 0) {
         throw std::runtime_error(
             std::string("Found unrecognized character sequence ") +
-            std::to_string(i) + " position " + std::to_string(j)+ ".");
+            std::to_string(i) + " position " + std::to_string(j) + ".");
       }
     }
   }

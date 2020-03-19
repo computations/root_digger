@@ -221,36 +221,36 @@ TEST_CASE("msa_t partition datafile", "[msa_t]") {
   auto ds = data_files_dna["101.phy"];
   SECTION("single partition, one range") {
     msa_t msa{ds.first};
-    msa_partitions_t parts{parse_partition_info("DNA, PART_0 = 0-100")};
+    msa_partitions_t parts{parse_partition_info("DNA, PART_0 = 1-100")};
     auto parted_msa = msa.partition(parts);
     CHECK(parted_msa.size() == parts.size());
-    CHECK(parted_msa[0].length() == 101);
+    CHECK(parted_msa[0].length() == 100);
   }
   SECTION("single partition, two ranges") {
     msa_t msa{ds.first};
     msa_partitions_t parts{
-        parse_partition_info("DNA, PART_0 = 0-100, 200-300")};
+        parse_partition_info("DNA, PART_0 = 1-100, 200-300")};
     auto parted_msa = msa.partition(parts);
     CHECK(parted_msa.size() == parts.size());
-    CHECK(parted_msa[0].length() == 202);
+    CHECK(parted_msa[0].length() == 201);
   }
   SECTION("multiple partitions, one range") {
     msa_t msa{ds.first};
-    msa_partitions_t parts{parse_partition_info("DNA, PART_0 = 0-100"),
+    msa_partitions_t parts{parse_partition_info("DNA, PART_0 = 1-100"),
                            parse_partition_info("DNA, PART_1 = 200-300")};
     auto parted_msa = msa.partition(parts);
     CHECK(parted_msa.size() == parts.size());
-    CHECK(parted_msa[0].length() == 101);
+    CHECK(parted_msa[0].length() == 100);
     CHECK(parted_msa[1].length() == 101);
   }
   SECTION("multiple partitions, multiple ranges") {
     msa_t msa{ds.first};
     msa_partitions_t parts{
-        parse_partition_info("DNA, PART_0 = 0-100, 500-520"),
+        parse_partition_info("DNA, PART_0 = 1-100, 500-520"),
         parse_partition_info("DNA, PART_1 = 200-300, 400-500")};
     auto parted_msa = msa.partition(parts);
     CHECK(parted_msa.size() == parts.size());
-    CHECK(parted_msa[0].length() == 122);
+    CHECK(parted_msa[0].length() == 121);
     CHECK(parted_msa[1].length() == 202);
   }
 }
