@@ -2,6 +2,7 @@ extern "C" {
 #include <libpll/pll.h>
 }
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -308,12 +309,49 @@ int main(int argv, char **argc) {
     }
 
     std::vector<msa_t> msa;
+    msa_partitions_t part_infos;
     if (cli_options.partition_filename.empty()) {
       msa.emplace_back(cli_options.msa_filename, map, cli_options.states);
     } else {
-      msa_t unparted_msa{cli_options.msa_filename, map, cli_options.states};
-      msa = unparted_msa.partition(
-          parse_partition_file(cli_options.partition_filename));
+      msa_t unparted_msa{cli_options.msa_filename, map, cli_options.states,
+                         false};
+      part_infos = parse_partition_file(cli_options.partition_filename);
+      msa = unparted_msa.partition(part_infos);
+    }
+
+    if (part_infos.size() > 0) {
+      if (cli_options.rate_cats.size() > 0) {
+        debug_string(EMIT_LEVEL_WARNING,
+                     "Using rate categories from the partition file "
+                     "over the option passed on the command line");
+      }
+      cli_options.rate_cats.clear();
+      for (auto &p : part_infos) {
+
+        size_t rate_cats = p.model.ratehet_opts.rate_cats;
+        if (rate_cats == 0){
+          rate_cats = 1;
+        }
+        cli_options.rate_cats.push_back(rate_cats);
+        if (p.model.ratehet_opts.alpha_init) {
+          debug_print(EMIT_LEVEL_WARNING,
+                      "Ignoring alpha in partition %s as it currently "
+                      "is not suported",
+                      p.partition_name.c_str());
+        }
+        auto subst_str{p.model.subst_str};
+
+        for (auto &ch : subst_str) {
+          ch = std::tolower(ch);
+        }
+
+        if (subst_str != "unrest") {
+          debug_print(EMIT_LEVEL_WARNING,
+                      "Ignoring subst matrix %s for partition "
+                      "%s. Currently only UNREST is supported",
+                      p.model.subst_str.c_str(), p.partition_name.c_str());
+        }
+      }
     }
 
     rooted_tree_t tree{cli_options.tree_filename};

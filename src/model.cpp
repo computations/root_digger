@@ -13,6 +13,7 @@ extern "C" {
 #include <libpll/pll_msa.h>
 }
 
+
 std::string read_file_contents(std::ifstream &infile) {
   std::string str;
   infile.seekg(0, std::ios::end);
@@ -1044,10 +1045,10 @@ std::string model_t::subst_string() const {
   return oss.str();
 }
 
-static double gd_params(model_params_t &initial_params, size_t partition_index,
-                 double p_min, double p_max, double epsilon,
-                 std::function<double()> compute_lh,
-                 std::function<void(size_t, const model_params_t &)> set_func) {
+static double
+gd_params(model_params_t &initial_params, size_t partition_index, double p_min,
+          double p_max, double epsilon, std::function<double()> compute_lh,
+          std::function<void(size_t, const model_params_t &)> set_func) {
 
   size_t iters = 0;
   double atol = 1e-4;
