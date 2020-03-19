@@ -354,6 +354,14 @@ int main(int argv, char **argc) {
       }
     }
 
+    for (auto &m : msa) {
+      m.valid_data();
+    }
+
+    for (auto &m : msa) {
+      m.valid_data();
+    }
+
     rooted_tree_t tree{cli_options.tree_filename};
 
     if (cli_options.min_roots > tree.root_count()) {
