@@ -2,6 +2,7 @@
 #define RD_DEBUG
 
 #include <cassert>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <execinfo.h>
@@ -9,7 +10,7 @@
 #include <time.h>
 #include <unistd.h>
 
-const clock_t CLOCK_START = clock();
+const auto CLOCK_START = std::chrono::high_resolution_clock::now();
 extern bool __PROGRESS_BAR_FLAG__;
 extern int __VERBOSE__;
 
@@ -30,8 +31,9 @@ extern int __VERBOSE__;
 
 #define print_clock                                                            \
   do {                                                                         \
-    fprintf(stdout, "[%.2f] ",                                                 \
-            ((double)clock() - CLOCK_START) / CLOCKS_PER_SEC);                 \
+    std::chrono::duration<double> diff =                                       \
+        std::chrono::high_resolution_clock::now() - CLOCK_START;               \
+    fprintf(stdout, "[%.2f] ", diff.count());                                  \
   } while (0)
 
 #define debug_print(level, fmt, ...)                                           \
