@@ -13,7 +13,6 @@ extern "C" {
 #include <libpll/pll_msa.h>
 }
 
-
 std::string read_file_contents(std::ifstream &infile) {
   std::string str;
   infile.seekg(0, std::ios::end);
@@ -241,6 +240,32 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
   set_freqs(p_index, freqs);
 }
 
+void model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
+                               const std::vector<double> &branch_lengths) {
+  /* Update the eigen decompositions first */
+  for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
+    auto part = _partitions[part_index];
+    for (size_t i = 0; i < part->rate_cats; ++i) {
+      if (!part->eigen_decomp_valid[i]) {
+        pll_update_eigen(part, _param_indicies[part_index][i]);
+      }
+    }
+  }
+  for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
+    auto part = _partitions[part_index];
+#pragma omp parallel for num_threads(4) collapse(2) schedule(static)
+    for (size_t i = 0; i < part->rate_cats; ++i) {
+      for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
+        auto param_index = _param_indicies[part_index];
+        auto matrix_index = pmatrix_indices[branch];
+        auto branch_length = branch_lengths[branch];
+        pll_update_prob_matrices(part, param_index.data(), &matrix_index,
+                                 &branch_length, 1);
+      }
+    }
+  }
+}
+
 double model_t::compute_lh(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
   std::vector<unsigned int> pmatrix_indices;
@@ -249,10 +274,13 @@ double model_t::compute_lh(const root_location_t &root_location) {
   GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
                           branch_lengths);
 
+  update_pmatrices(pmatrix_indices, branch_lengths);
+
   double lh = 0.0;
 
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
+    /*
     int result = pll_update_prob_matrices(
         partition, _param_indicies[i].data(), pmatrix_indices.data(),
         branch_lengths.data(),
@@ -261,6 +289,8 @@ double model_t::compute_lh(const root_location_t &root_location) {
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
     }
+    */
+    update_pmatrices(pmatrix_indices, branch_lengths);
 
     pll_update_partials(partition, ops.data(),
                         static_cast<unsigned int>(ops.size()));

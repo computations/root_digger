@@ -91,6 +91,8 @@ private:
   void set_empirical_freqs();
   void set_freqs_all_free(size_t, model_params_t);
   void move_root(const root_location_t &new_root);
+  void update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
+                        const std::vector<double> &branch_lengths);
   double bfgs_rates(model_params_t &initial_rates, const root_location_t &rl,
                     size_t partition_index, double pgtol, double factor);
   double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,
