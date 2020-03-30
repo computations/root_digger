@@ -253,7 +253,7 @@ void model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
   }
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
     auto part = _partitions[part_index];
-#pragma omp parallel for collapse(2) schedule(static)
+#pragma omp parallel for collapse(2) schedule(static) default(shared)
     for (size_t i = 0; i < part->rate_cats; ++i) {
       for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
         auto param_index = _param_indicies[part_index];
@@ -278,18 +278,9 @@ double model_t::compute_lh(const root_location_t &root_location) {
 
   double lh = 0.0;
 
+#pragma omp parallel for reduction(+:lh)
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    /*
-    int result = pll_update_prob_matrices(
-        partition, _param_indicies[i].data(), pmatrix_indices.data(),
-        branch_lengths.data(),
-        static_cast<unsigned int>(pmatrix_indices.size()));
-
-    if (result == PLL_FAILURE) {
-      throw std::runtime_error(pll_errmsg);
-    }
-    */
     update_pmatrices(pmatrix_indices, branch_lengths);
 
     pll_update_partials(partition, ops.data(),

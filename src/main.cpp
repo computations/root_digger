@@ -83,8 +83,8 @@ private:
   value_t value;
 };
 
-/* The following functions are taken from RAxML-NG. Some of the initial work was
- * done by me, but the final implementation is from Alexey Kozlov
+/* The following functions are taken from RAxML-NG. I did some of the initial
+ * work, but the final implementation is from Alexey Kozlov
  */
 
 bool sysutil_dir_exists(const std::string &dname) {
