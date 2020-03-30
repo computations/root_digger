@@ -1,6 +1,9 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#ifndef _WIN32
+#include <cpuid.h>
+#endif
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -11,9 +14,12 @@ extern "C" {
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <omp.h>
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <sys/stat.h>
+#include <thread>
 #include <vector>
 
 #include "debug.h"
@@ -36,7 +42,7 @@ static void print_version() {
 
 static void print_run_header(
     const std::chrono::time_point<std::chrono::system_clock> &start_time,
-    uint64_t seed) {
+    uint64_t seed, size_t threads) {
   time_t st = std::chrono::system_clock::to_time_t(start_time);
   char time_string[256];
   std::strftime(time_string, sizeof(time_string), "%F %T", std::localtime(&st));
@@ -44,6 +50,7 @@ static void print_run_header(
   print_version();
   debug_print(EMIT_LEVEL_IMPORTANT, "Started: %s", time_string);
   debug_print(EMIT_LEVEL_IMPORTANT, "Seed: %lu", seed);
+  debug_print(EMIT_LEVEL_IMPORTANT, "Number of threads: %lu", threads);
 }
 
 class initialized_flag_t {
@@ -76,6 +83,97 @@ private:
   value_t value;
 };
 
+/* The following functions are taken from RAxML-NG. Some of the initial work was
+ * done by me, but the final implementation is from Alexey Kozlov
+ */
+
+bool sysutil_dir_exists(const std::string &dname) {
+  struct stat info;
+
+  if (stat(dname.c_str(), &info) != 0)
+    return false;
+  else if (info.st_mode & S_IFDIR)
+    return true;
+  else
+    return false;
+}
+
+static std::string build_path(size_t cpu_number) {
+  return "/sys/devices/system/cpu/cpu" + std::to_string(cpu_number) +
+         "/topology/";
+}
+
+static void get_cpuid(int32_t out[4], int32_t x) {
+#ifdef _WIN32
+  __cpuid(out, x);
+#else
+  __cpuid_count(x, 0, out[0], out[1], out[2], out[3]);
+#endif
+}
+
+size_t read_id_from_file(const std::string &filename) {
+  std::ifstream f(filename);
+  if (f.good()) {
+    size_t id;
+    f >> id;
+    return id;
+  } else
+    throw std::runtime_error("couldn't open sys files");
+}
+
+size_t get_numa_node_id(const std::string &cpu_path) {
+  // this is ugly, but should be reliable -> please blame Linux kernel
+  // developers & Intel!
+  std::string node_path = cpu_path + "../node";
+  for (size_t i = 0; i < 1000; ++i) {
+    if (sysutil_dir_exists(node_path + std::to_string(i)))
+      return i;
+  }
+
+  // fallback solution: return socket_id which is often identical to numa id
+  return read_id_from_file(cpu_path + "physical_package_id");
+}
+
+size_t get_core_id(const std::string &cpu_path) {
+  return read_id_from_file(cpu_path + "core_id");
+}
+
+size_t get_physical_core_count(size_t n_cpu) {
+#if defined(__linux__)
+  std::unordered_set<size_t> cores;
+  for (size_t i = 0; i < n_cpu; ++i) {
+    std::string cpu_path = build_path(i);
+    size_t core_id = get_core_id(cpu_path);
+    size_t node_id = get_numa_node_id(cpu_path);
+    size_t uniq_core_id = (node_id << 16) + core_id;
+    cores.insert(uniq_core_id);
+  }
+  return cores.size();
+#else
+  RAXML_UNUSED(n_cpu);
+  throw std::runtime_error("This function only supports linux");
+#endif
+}
+
+static bool ht_enabled() {
+  int32_t info[4];
+
+  get_cpuid(info, 1);
+
+  return (bool)(info[3] & (0x1 << 28));
+}
+
+size_t sysutil_get_cpu_cores() {
+  auto lcores = std::thread::hardware_concurrency();
+  try {
+    return get_physical_core_count(lcores);
+  } catch (const std::runtime_error &) {
+    auto threads_per_core = ht_enabled() ? 2u : 1u;
+
+    return lcores / threads_per_core;
+  }
+}
+
 struct cli_options_t {
   std::string msa_filename;
   std::string tree_filename;
@@ -87,6 +185,7 @@ struct cli_options_t {
   std::vector<size_t> rate_cats{1};
   uint64_t seed = std::random_device()();
   size_t min_roots = 1;
+  size_t threads = 0;
   double root_ratio = 0.01;
   double abs_tolerance = 1e-7;
   double factor = 1e4;
@@ -146,6 +245,8 @@ static void print_usage() {
       << "           Tolerance for the BFGS steps. Default is 1e-7\n"
       << "    --factor [NUMBER]\n"
       << "           Factor for the BFGS steps. Default is 1e4\n"
+      << "    --threads [NUMBER]\n"
+      << "           Number of threads to use\n"
       << "    --silent\n"
       << "           Suppress output except for the final tree\n"
       << "    --verbose\n"
@@ -160,22 +261,23 @@ int main(int argv, char **argc) {
       {"msa", required_argument, 0, 0},             /* 0 */
       {"tree", required_argument, 0, 0},            /* 1 */
       {"model", required_argument, 0, 0},           /* 2 */
-      {"seed", required_argument, 0, 0},            /* 4 */
-      {"verbose", no_argument, 0, 0},               /* 5 */
-      {"silent", no_argument, 0, 0},                /* 6 */
-      {"min-roots", required_argument, 0, 0},       /* 7 */
-      {"root-ratio", required_argument, 0, 0},      /* 8 */
-      {"atol", required_argument, 0, 0},            /* 9 */
-      {"brtol", required_argument, 0, 0},           /* 10 */
-      {"bfgstol", required_argument, 0, 0},         /* 11 */
-      {"factor", required_argument, 0, 0},          /* 12 */
-      {"partition", required_argument, 0, 0},       /* 13 */
-      {"treefile", required_argument, 0, 0},        /* 14 */
-      {"exhaustive", no_argument, 0, 0},            /* 15 */
-      {"early-stop", no_argument, 0, 0},            /* 16 */
-      {"no-early-stop", no_argument, 0, 0},         /* 17 */
-      {"rate-cats", required_argument, 0, 0},       /* 18 */
-      {"invariant-sites", required_argument, 0, 0}, /* 19 */
+      {"seed", required_argument, 0, 0},            /* 3 */
+      {"verbose", no_argument, 0, 0},               /* 4 */
+      {"silent", no_argument, 0, 0},                /* 5 */
+      {"min-roots", required_argument, 0, 0},       /* 6 */
+      {"root-ratio", required_argument, 0, 0},      /* 7 */
+      {"atol", required_argument, 0, 0},            /* 8 */
+      {"brtol", required_argument, 0, 0},           /* 9 */
+      {"bfgstol", required_argument, 0, 0},         /* 10 */
+      {"factor", required_argument, 0, 0},          /* 11 */
+      {"partition", required_argument, 0, 0},       /* 12 */
+      {"treefile", required_argument, 0, 0},        /* 13 */
+      {"exhaustive", no_argument, 0, 0},            /* 14 */
+      {"early-stop", no_argument, 0, 0},            /* 15 */
+      {"no-early-stop", no_argument, 0, 0},         /* 16 */
+      {"rate-cats", required_argument, 0, 0},       /* 17 */
+      {"invariant-sites", required_argument, 0, 0}, /* 18 */
+      {"threads", required_argument, 0, 0},         /* 19 */
       {"version", no_argument, 0, 0},               /* 20 */
       {"debug", no_argument, 0, 0},                 /* 21 */
       {"echo", no_argument, 0, 0},                  /* 22 */
@@ -248,16 +350,19 @@ int main(int argv, char **argc) {
       case 17: // rate-cats
         cli_options.rate_cats = {(size_t)atol(optarg)};
         break;
-      case 18:
+      case 18: // invariant-sites
         cli_options.invariant_sites = true;
         break;
-      case 19: // version
+      case 19: // threads
+        cli_options.threads = {(size_t)atol(optarg)};
+        break;
+      case 20: // version
         print_version();
         return 0;
-      case 20: // debug
+      case 21: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
-      case 21: // echo
+      case 22: // echo
         cli_options.echo = true;
         break;
       default:
@@ -285,9 +390,13 @@ int main(int argv, char **argc) {
       print_usage();
       return 1;
     }
+    if (cli_options.threads == 0) {
+      cli_options.threads = sysutil_get_cpu_cores();
+    }
+    omp_set_num_threads(cli_options.threads);
 
     if (!cli_options.silent)
-      print_run_header(start_time, cli_options.seed);
+      print_run_header(start_time, cli_options.seed, cli_options.threads);
 
     debug_print(EMIT_LEVEL_INFO, "abs_tolerance: %.08f",
                 cli_options.abs_tolerance);
@@ -329,7 +438,7 @@ int main(int argv, char **argc) {
       for (auto &p : part_infos) {
 
         size_t rate_cats = p.model.ratehet_opts.rate_cats;
-        if (rate_cats == 0){
+        if (rate_cats == 0) {
           rate_cats = 1;
         }
         cli_options.rate_cats.push_back(rate_cats);

@@ -253,7 +253,7 @@ void model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
   }
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
     auto part = _partitions[part_index];
-#pragma omp parallel for num_threads(4) collapse(2) schedule(static)
+#pragma omp parallel for collapse(2) schedule(static)
     for (size_t i = 0; i < part->rate_cats; ++i) {
       for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
         auto param_index = _param_indicies[part_index];

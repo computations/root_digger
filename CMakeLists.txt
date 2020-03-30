@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.00)
 project(root_digger)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer -fopenmp" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fopenmp" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer -fopenmp" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -fopenmp" CACHE INTERNAL "")
 
 find_package(Git)
 if(GIT_FOUND)
