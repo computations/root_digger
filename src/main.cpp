@@ -87,6 +87,7 @@ private:
  * work, but the final implementation is from Alexey Kozlov
  */
 
+#ifdef _OPENMP
 bool sysutil_dir_exists(const std::string &dname) {
   struct stat info;
 
@@ -173,6 +174,9 @@ size_t sysutil_get_cpu_cores() {
     return lcores / threads_per_core;
   }
 }
+#else
+size_t sysutil_get_cpu_cores() { return 1; }
+#endif
 
 struct cli_options_t {
   std::string msa_filename;
@@ -393,7 +397,10 @@ int main(int argv, char **argc) {
     if (cli_options.threads == 0) {
       cli_options.threads = sysutil_get_cpu_cores();
     }
+
+#ifdef _OPENMP
     omp_set_num_threads(cli_options.threads);
+#endif
 
     if (!cli_options.silent)
       print_run_header(start_time, cli_options.seed, cli_options.threads);
