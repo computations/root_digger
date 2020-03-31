@@ -23,9 +23,13 @@ struct invar_opts_t {
   float user_prop;
 };
 
+namespace rate_category {
+enum rate_category_e { MEDIAN, MEAN, FREE };
+}
+
 struct ratehet_opts_t {
   param_type::param_type_e type;
-  bool median = false;
+  rate_category::rate_category_e rate_category_type;
   size_t rate_cats = 0;
   bool alpha_init = false;
   double alpha;

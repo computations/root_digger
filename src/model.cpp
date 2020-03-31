@@ -1,4 +1,6 @@
+#include "debug.h"
 #include "model.hpp"
+#include "msa.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -70,10 +72,13 @@ model_params_t random_params(size_t size, uint64_t seed) {
   return mp;
 }
 
-model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
-                 const std::vector<size_t> &rate_cats, bool invariant_sites,
-                 uint64_t seed, bool early_stop)
-    : _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
+model_t::model_t(
+    rooted_tree_t tree, const std::vector<msa_t> &msas,
+    const std::vector<size_t> &rate_cats,
+    const std::vector<rate_category::rate_category_e> &rate_category_types,
+    bool invariant_sites, uint64_t seed, bool early_stop)
+    : _rate_category_types{rate_category_types},
+      _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
 
   if (_early_stop) {
     debug_string(EMIT_LEVEL_IMPORTANT, "INFO: Early stop is enabled");
@@ -82,7 +87,8 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
   _random_engine = std::minstd_rand(_seed);
   _tree = std::move(tree);
   for (auto rc : rate_cats) {
-    _rate_weights.emplace_back(rc, 0.0);
+    _rate_rates.emplace_back(rc, 1.0);
+    _rate_weights.emplace_back(rc, 1.0 / rc);
     _param_indicies.emplace_back(rc, 0);
   }
 
@@ -110,7 +116,7 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
        ++partition_index) {
     auto &msa = msas[partition_index];
 
-    if (_rate_weights[partition_index].size() >
+    if (_rate_rates[partition_index].size() >
         static_cast<size_t>(std::numeric_limits<int>::max())) {
       throw std::runtime_error("The size of the rate weights for the partition "
                                "is too large to safely cast");
@@ -124,9 +130,10 @@ model_t::model_t(rooted_tree_t tree, const std::vector<msa_t> &msas,
     _partitions.push_back(pll_partition_create(
         _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
         _submodels, _tree.branch_count(),
-        static_cast<unsigned int>(_rate_weights[partition_index].size()),
+        static_cast<unsigned int>(_rate_rates[partition_index].size()),
         _tree.branch_count(), attributes));
     _partition_weights.push_back(msa.total_weight());
+
     set_gamma_rates(partition_index);
     total_weight += msa.total_weight();
   }
@@ -158,18 +165,93 @@ void model_t::set_subst_rates_random(size_t p_index, size_t states) {
                   random_params(states * states - states, _random_engine()));
 }
 
-void model_t::set_gamma_rates(size_t p_index) {
-  pll_compute_gamma_cats(
-      1.0, static_cast<unsigned int>(_rate_weights[p_index].size()),
-      _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
-  pll_set_category_rates(_partitions[p_index], _rate_weights[p_index].data());
+void model_t::set_gamma_weights(size_t p_index, model_params_t w) {
+  double sum = 0.0;
+  for (auto &f : w) {
+    sum += f;
+  }
+  for (auto &f : w) {
+    f /= sum;
+  }
+  pll_set_category_weights(_partitions[p_index], w.data());
 }
 
-void model_t::set_gamma_rates(size_t p_index, double alpha) {
-  pll_compute_gamma_cats(
-      alpha, static_cast<unsigned int>(_rate_weights[p_index].size()),
-      _rate_weights[p_index].data(), PLL_GAMMA_RATES_MEAN);
-  pll_set_category_rates(_partitions[p_index], _rate_weights[p_index].data());
+void model_t::set_gamma_rates(size_t p_index) {
+  pll_set_category_weights(_partitions[p_index], _rate_weights[p_index].data());
+  switch (_rate_category_types[p_index]) {
+  case rate_category::MEAN:
+    set_gamma_rates_mean(p_index);
+    break;
+  case rate_category::MEDIAN:
+    set_gamma_rates_median(p_index);
+    break;
+  default:
+    set_gamma_rates_free(p_index);
+    break;
+  }
+}
+
+void model_t::set_gamma_rates(size_t p_index, const model_params_t &alpha) {
+  switch (_rate_category_types[p_index]) {
+  case rate_category::MEAN:
+    set_gamma_rates_mean(p_index, alpha[0]);
+    break;
+  case rate_category::MEDIAN:
+    set_gamma_rates_median(p_index, alpha[0]);
+    break;
+  default:
+    set_gamma_rates_free(p_index, alpha);
+    break;
+  }
+}
+
+void model_t::set_gamma_rates_mean(size_t p_index) {
+  pll_compute_gamma_cats(1.0,
+                         static_cast<unsigned int>(_rate_rates[p_index].size()),
+                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEAN);
+  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+}
+
+void model_t::set_gamma_rates_mean(size_t p_index, double alpha) {
+  pll_compute_gamma_cats(alpha,
+                         static_cast<unsigned int>(_rate_rates[p_index].size()),
+                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEDIAN);
+  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+}
+
+void model_t::set_gamma_rates_median(size_t p_index) {
+  pll_compute_gamma_cats(1.0,
+                         static_cast<unsigned int>(_rate_rates[p_index].size()),
+                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEAN);
+  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+}
+
+void model_t::set_gamma_rates_median(size_t p_index, double alpha) {
+  pll_compute_gamma_cats(alpha,
+                         static_cast<unsigned int>(_rate_rates[p_index].size()),
+                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEDIAN);
+  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+}
+
+void model_t::set_gamma_rates_free(size_t p_index) {
+
+  for (auto &r : _rate_rates[p_index]) {
+    r = 1.0;
+  }
+  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+}
+
+void model_t::set_gamma_rates_free(size_t p_index, model_params_t free_rates) {
+
+  double sum = 0.0;
+  for (size_t i = 0; i < free_rates.size(); ++i) {
+    sum += free_rates[i] * _rate_weights[p_index][i];
+  }
+  for (auto &f : free_rates) {
+    f /= sum;
+  }
+  _rate_rates[p_index] = free_rates;
+  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::update_invariant_sites(size_t p_index) {
@@ -278,7 +360,7 @@ double model_t::compute_lh(const root_location_t &root_location) {
 
   double lh = 0.0;
 
-#pragma omp parallel for reduction(+:lh)
+#pragma omp parallel for reduction(+ : lh)
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
     update_pmatrices(pmatrix_indices, branch_lengths);
@@ -756,7 +838,8 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
   root_location_t best_rl;
   std::vector<model_params_t> best_subst;
   std::vector<model_params_t> best_freqs;
-  std::vector<double> best_gamma_alpha;
+  std::vector<model_params_t> best_gamma_alpha;
+  std::vector<model_params_t> best_gamma_weights;
 
   set_subst_rates_uniform();
   set_empirical_freqs();
@@ -774,15 +857,18 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
     subst_rates.reserve(_partitions.size());
     std::vector<model_params_t> freqs;
     freqs.reserve(_partitions.size());
-    std::vector<double> gamma_alpha;
+    std::vector<model_params_t> gamma_alpha;
     gamma_alpha.reserve(_partitions.size());
+    std::vector<model_params_t> gamma_weights(_partitions.size());
 
     std::vector<model_params_t> saved_subst_rates;
     saved_subst_rates.resize(_partitions.size());
     std::vector<model_params_t> saved_freqs;
     saved_freqs.resize(_partitions.size());
-    std::vector<double> saved_gamma_alpha;
+    std::vector<model_params_t> saved_gamma_alpha;
     saved_gamma_alpha.resize(_partitions.size());
+    std::vector<model_params_t> saved_gamma_weights;
+    saved_gamma_weights.resize(_partitions.size());
 
     for (size_t p = 0; p < _partitions.size(); ++p) {
       size_t subst_size = _partitions[p]->states;
@@ -790,7 +876,18 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       freqs.push_back(
           model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
       subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
-      gamma_alpha.push_back(1);
+
+      switch (_rate_category_types[p]) {
+      case rate_category::MEAN:
+      case rate_category::MEDIAN:
+        gamma_alpha.emplace_back(1, 1.0);
+        break;
+      case rate_category::FREE:
+        gamma_alpha.emplace_back(_partitions[p]->rate_cats, 1.0);
+        gamma_weights[p] = model_params_t(_partitions[p]->rate_cats,
+                                          1.0 / _partitions[p]->rate_cats);
+        break;
+      }
     }
 
     auto cur_best_rl = rl;
@@ -810,16 +907,25 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       for (size_t i = 0; i < _partitions.size(); ++i) {
         saved_gamma_alpha[i] = gamma_alpha[i];
       }
+      for (size_t i = 0; i < _partitions.size(); ++i) {
+        if (_rate_category_types[i] == rate_category::FREE) {
+          saved_gamma_weights[i] = gamma_weights[i];
+        }
+      }
 
       for (size_t i = 0; i < _partitions.size(); ++i) {
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
         set_gamma_rates(i, gamma_alpha[i]);
-        debug_string(EMIT_LEVEL_INFO, "Optimizing Gamma");
-        bfgs_gamma(gamma_alpha[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_INFO, "Optmizing Rates");
+        if (_rate_category_types[i] == rate_category::FREE) {
+          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Gamma Weights");
+          bfgs_gamma_weights(gamma_alpha[i], rl, i, pgtol, factor);
+        }
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Gamma Rates");
+        bfgs_gamma_rates(gamma_alpha[i], rl, i, pgtol, factor);
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optmizing Rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_INFO, "Optimizing Freqs");
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Freqs");
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
       }
 
@@ -835,6 +941,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
         std::swap(saved_subst_rates, subst_rates);
         std::swap(saved_freqs, freqs);
         std::swap(saved_gamma_alpha, gamma_alpha);
+        std::swap(saved_gamma_weights, gamma_weights);
         break;
       }
 
@@ -872,12 +979,16 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       best_freqs = freqs;
       best_subst = subst_rates;
       best_gamma_alpha = gamma_alpha;
+      best_gamma_weights = gamma_weights;
     }
   }
   for (size_t i = 0; i < _partitions.size(); ++i) {
     set_subst_rates(i, best_subst[i]);
     set_freqs_all_free(i, best_freqs[i]);
     set_gamma_rates(i, best_gamma_alpha[i]);
+    if (_rate_category_types[i] == rate_category::FREE) {
+      set_gamma_weights(i, best_gamma_weights[i]);
+    }
   }
 
   move_root(best_rl);
@@ -905,7 +1016,8 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
     compute_lh(rl);
     std::vector<model_params_t> subst_rates;
     std::vector<model_params_t> freqs;
-    std::vector<double> gamma_alphas;
+    std::vector<model_params_t> gamma_alphas;
+    std::vector<model_params_t> gamma_weights;
 
     for (size_t p = 0; p < _partitions.size(); ++p) {
       size_t subst_size = _partitions[p]->states;
@@ -913,7 +1025,17 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       freqs.push_back(
           model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
       subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
-      gamma_alphas.push_back(1.0);
+      switch (_rate_category_types[p]) {
+      case rate_category::MEAN:
+      case rate_category::MEDIAN:
+        gamma_alphas.emplace_back(1, 1.0);
+        break;
+      case rate_category::FREE:
+        gamma_alphas.emplace_back(_partitions[p]->rate_cats, 1.0);
+        gamma_weights.emplace_back(_partitions[p]->rate_cats,
+                                   1.0 / _partitions[p]->rate_cats);
+        break;
+      }
     }
 
     root_location_t cur_best_rl;
@@ -924,11 +1046,18 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
         set_gamma_rates(i, gamma_alphas[i]);
-        debug_string(EMIT_LEVEL_DEBUG, "Optimizing gamma rates");
-        bfgs_gamma(gamma_alphas[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_DEBUG, "Optmizing rates");
+        if (_rate_category_types[i] == rate_category::FREE) {
+          set_gamma_weights(i, gamma_weights[i]);
+        }
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
+        bfgs_gamma_rates(gamma_alphas[i], rl, i, pgtol, factor);
+        if (_rate_category_types[i] == rate_category::FREE) {
+          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
+          bfgs_gamma_weights(gamma_alphas[i], rl, i, pgtol, factor);
+        }
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optmizing rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_DEBUG, "Optimizing freqs");
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing freqs");
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
       }
 
@@ -1183,7 +1312,8 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
            gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
            &iprint, &csave, lsave, isave, dsave);
 
-    debug_print(EMIT_LEVEL_DEBUG, "BFGS Iter: %lu Score: %.5f", iters, -score);
+    debug_print(EMIT_LEVEL_MPROGRESS, "BFGS Iter: %lu Score: %.5f", iters,
+                -score);
 
     set_func(partition_index, parameters);
     score = compute_lh();
@@ -1286,43 +1416,75 @@ double model_t::gd_freqs(model_params_t &initial_freqs,
   return lh;
 }
 
-double model_t::bfgs_gamma(double &initial_alpha, const root_location_t &rl,
-                           size_t partition_index, double pgtol,
-                           double factor) {
+double model_t::bfgs_gamma_rates(model_params_t &alpha,
+                                 const root_location_t &rl,
+                                 size_t partition_index, double pgtol,
+                                 double factor) {
   constexpr double p_min = 0.2;
   constexpr double p_max = 10000.0;
   constexpr double epsilon = 1e-4;
-  model_params_t alpha(1);
-  alpha[0] = initial_alpha;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = bfgs_params(
       alpha, partition_index, p_min, p_max, epsilon, pgtol, factor,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
-        this->set_gamma_rates(pi, mp[0]);
+        this->set_gamma_rates(pi, mp);
       });
-  initial_alpha = alpha[0];
 
   return lh;
 }
 
-double model_t::gd_gamma(double &initial_alpha, const root_location_t &rl,
-                         size_t partition_index) {
+double model_t::gd_gamma_rates(model_params_t &alpha, const root_location_t &rl,
+                               size_t partition_index) {
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
-  model_params_t alpha(1);
-  alpha[0] = initial_alpha;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = gd_params(
       alpha, partition_index, p_min, p_max, epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
-        this->set_gamma_rates(pi, mp[0]);
+        this->set_gamma_rates(pi, mp);
       });
-  initial_alpha = alpha[0];
+
+  return lh;
+}
+
+double model_t::bfgs_gamma_weights(model_params_t &alpha,
+                                   const root_location_t &rl,
+                                   size_t partition_index, double pgtol,
+                                   double factor) {
+  constexpr double p_min = 0.2;
+  constexpr double p_max = 10000.0;
+  constexpr double epsilon = 1e-4;
+
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
+  double lh = bfgs_params(
+      alpha, partition_index, p_min, p_max, epsilon, pgtol, factor,
+      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this](size_t pi, const model_params_t &mp) -> void {
+        this->set_gamma_weights(pi, mp);
+      });
+
+  return lh;
+}
+
+double model_t::gd_gamma_weights(model_params_t &alpha,
+                                 const root_location_t &rl,
+                                 size_t partition_index) {
+  constexpr double p_min = 1e-4;
+  constexpr double p_max = 1.0 - 1e-4 * 3;
+  constexpr double epsilon = 1e-4;
+
+  debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
+  double lh = gd_params(
+      alpha, partition_index, p_min, p_max, epsilon,
+      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this](size_t pi, const model_params_t &mp) -> void {
+        this->set_gamma_weights(pi, mp);
+      });
 
   return lh;
 }

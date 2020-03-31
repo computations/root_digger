@@ -151,7 +151,7 @@ size_t get_physical_core_count(size_t n_cpu) {
   }
   return cores.size();
 #else
-  RAXML_UNUSED(n_cpu);
+  (void)(n_cpu);
   throw std::runtime_error("This function only supports linux");
 #endif
 }
@@ -187,6 +187,7 @@ struct cli_options_t {
   std::string partition_filename;
   std::string data_type;
   std::vector<size_t> rate_cats{1};
+  std::vector<rate_category::rate_category_e> rate_category_types;
   uint64_t seed = std::random_device()();
   size_t min_roots = 1;
   size_t threads = 0;
@@ -280,11 +281,12 @@ int main(int argv, char **argc) {
       {"early-stop", no_argument, 0, 0},            /* 15 */
       {"no-early-stop", no_argument, 0, 0},         /* 16 */
       {"rate-cats", required_argument, 0, 0},       /* 17 */
-      {"invariant-sites", required_argument, 0, 0}, /* 18 */
-      {"threads", required_argument, 0, 0},         /* 19 */
-      {"version", no_argument, 0, 0},               /* 20 */
-      {"debug", no_argument, 0, 0},                 /* 21 */
-      {"echo", no_argument, 0, 0},                  /* 22 */
+      {"rate-cats-type", required_argument, 0, 0},  /* 18 */
+      {"invariant-sites", required_argument, 0, 0}, /* 19 */
+      {"threads", required_argument, 0, 0},         /* 20 */
+      {"version", no_argument, 0, 0},               /* 21 */
+      {"debug", no_argument, 0, 0},                 /* 22 */
+      {"echo", no_argument, 0, 0},                  /* 23 */
       {0, 0, 0, 0},
   };
 
@@ -354,19 +356,28 @@ int main(int argv, char **argc) {
       case 17: // rate-cats
         cli_options.rate_cats = {(size_t)atol(optarg)};
         break;
-      case 18: // invariant-sites
+      case 18: // rate-cats-type
+        if (strcmp(optarg, "mean") == 0) {
+          cli_options.rate_category_types.push_back(rate_category::MEAN);
+        } else if (strcmp(optarg, "median") == 0) {
+          cli_options.rate_category_types.push_back(rate_category::MEDIAN);
+        } else if (strcmp(optarg, "free") == 0) {
+          cli_options.rate_category_types.push_back(rate_category::FREE);
+        }
+        break;
+      case 19: // invariant-sites
         cli_options.invariant_sites = true;
         break;
-      case 19: // threads
+      case 20: // threads
         cli_options.threads = {(size_t)atol(optarg)};
         break;
-      case 20: // version
+      case 21: // version
         print_version();
         return 0;
-      case 21: // debug
+      case 22: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
-      case 22: // echo
+      case 23: // echo
         cli_options.echo = true;
         break;
       default:
@@ -470,6 +481,14 @@ int main(int argv, char **argc) {
       }
     }
 
+    if (cli_options.rate_category_types.size() == 0) {
+      cli_options.rate_category_types.push_back(rate_category::MEAN);
+    }
+
+    if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0){
+      throw std::runtime_error("Rate categories cannot be zero");
+    }
+
     for (auto &m : msa) {
       m.valid_data();
     }
@@ -489,6 +508,7 @@ int main(int argv, char **argc) {
         tree,
         msa,
         cli_options.rate_cats,
+        cli_options.rate_category_types,
         cli_options.invariant_sites,
         cli_options.seed,
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)};
