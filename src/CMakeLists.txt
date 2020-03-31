@@ -17,7 +17,7 @@ set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fs
 
 # We duplicate the libararies here to solve a dumb link time error
 set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
-    ${GSL_LIBS} lbfgs_lib)
+    ${GSL_LIBS} lbfgs_lib )
 
 if(STATIC_BUILD)
     #target_link_options(rd PRIVATE -static -pie)
@@ -28,7 +28,7 @@ target_link_libraries(rd ${LINK_LIBS})
 #target_link_options(rd PRIVATE -fno-omit-frame-pointer -fsanitize=address)
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
-    -pedantic -Wsign-conversion -Wnarrowing )
+    -pedantic -Wsign-conversion -Wnarrowing)
     #-fsanitize=address -fno-omit-frame-pointer)
 target_compile_definitions(rd PRIVATE
     GIT_REV=${RD_BUILD_VERSION}
