@@ -26,8 +26,9 @@ extern int __VERBOSE__;
 #define EMIT_LEVEL_ERROR 1
 #define EMIT_LEVEL_WARNING 2
 #define EMIT_LEVEL_PROGRESS 3
-#define EMIT_LEVEL_INFO 4
-#define EMIT_LEVEL_DEBUG 5
+#define EMIT_LEVEL_MPROGRESS 4
+#define EMIT_LEVEL_INFO 5
+#define EMIT_LEVEL_DEBUG 6
 
 #define print_clock                                                            \
   do {                                                                         \
