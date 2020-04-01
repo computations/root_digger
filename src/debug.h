@@ -30,6 +30,11 @@ extern int __VERBOSE__;
 #define EMIT_LEVEL_INFO 5
 #define EMIT_LEVEL_DEBUG 6
 
+#define progress_macro(i, k)                                                   \
+  (((std::chrono::high_resolution_clock::now() - CLOCK_START).count() /        \
+    static_cast<double>(i)) *                                                  \
+   (static_cast<double>(k - i)) / 1e9 / 3600.0)
+
 #define print_clock                                                            \
   do {                                                                         \
     std::chrono::duration<double> diff =                                       \

@@ -188,8 +188,7 @@ void model_t::set_gamma_weights(size_t p_index, model_params_t w) {
   for (auto &f : w) {
     f /= sum;
   }
-  debug_print(EMIT_LEVEL_DEBUG, "setting weights to %s",
-              to_string(w).c_str());
+  debug_print(EMIT_LEVEL_DEBUG, "setting weights to %s", to_string(w).c_str());
   pll_set_category_weights(_partitions[p_index], w.data());
 }
 
@@ -872,7 +871,8 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
     set_subst_rates_uniform();
     set_empirical_freqs();
     ++root_index;
-    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu/%lu", root_index, root_count);
+    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu/%lu, ETC: %fh", root_index,
+                root_count, progress_macro(root_index, root_count));
 
     std::vector<model_params_t> subst_rates;
     subst_rates.reserve(_partitions.size());
@@ -1130,7 +1130,8 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       rl = cur_rl;
     }
 
-    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu / %lu", root_index, root_count);
+    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu / %lu, ETC: %0.2fh", root_index,
+                root_count, progress_macro(root_index, root_count));
 
     mapped_likelihoods.emplace_back(cur_best_rl, cur_best_lh);
     if (cur_best_lh > best_lh) {
