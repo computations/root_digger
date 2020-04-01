@@ -34,7 +34,7 @@ extern int __VERBOSE__;
   do {                                                                         \
     std::chrono::duration<double> diff =                                       \
         std::chrono::high_resolution_clock::now() - CLOCK_START;               \
-    fprintf(stdout, "[%.2f] ", diff.count());                                  \
+    printf("[%.2f] ", diff.count());                                           \
   } while (0)
 
 #define debug_print(level, fmt, ...)                                           \
@@ -42,15 +42,15 @@ extern int __VERBOSE__;
     if (DEBUG_IF_FLAG && __VERBOSE__ >= level) {                               \
       print_clock;                                                             \
       if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                   \
-        fprintf(stdout, "[%s:%d]: ", __func__, __LINE__);                      \
+        printf("[%s:%d]: ", __func__, __LINE__);                               \
       }                                                                        \
       if (level == EMIT_LEVEL_WARNING) {                                       \
-        fprintf(stdout, "[Warning] ");                                         \
+        printf("[Warning] ");                                                  \
       }                                                                        \
       if (level == EMIT_LEVEL_ERROR) {                                         \
-        fprintf(stdout, "[ERROR] ");                                           \
+        printf("[ERROR] ");                                                    \
       }                                                                        \
-      fprintf(stdout, fmt "\n", __VA_ARGS__);                                  \
+      printf(fmt "\n", __VA_ARGS__);                                           \
     }                                                                          \
   } while (0)
 
