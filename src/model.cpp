@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <functional>
+#include <iomanip>
 #include <limits>
 #include <random>
 #include <sstream>
@@ -22,6 +23,19 @@ std::string read_file_contents(std::ifstream &infile) {
   infile.seekg(0, std::ios::beg);
   infile.read(&str[0], static_cast<long>(str.size()));
   return str;
+}
+
+static std::string to_string(const std::vector<double> &v) {
+  std::stringstream out;
+  out << std::setprecision(3);
+  out << "[";
+  for (auto &i : v) {
+    out << std::setw(3);
+    out << std::fixed << i << " ";
+  }
+  out.seekp(-1, out.cur);
+  out << "]";
+  return out.str();
 }
 
 double parse_param(std::string::const_iterator begin,
@@ -167,12 +181,15 @@ void model_t::set_subst_rates_random(size_t p_index, size_t states) {
 
 void model_t::set_gamma_weights(size_t p_index, model_params_t w) {
   double sum = 0.0;
+  debug_print(EMIT_LEVEL_DEBUG, "input weights %s", to_string(w).c_str());
   for (auto &f : w) {
     sum += f;
   }
   for (auto &f : w) {
     f /= sum;
   }
+  debug_print(EMIT_LEVEL_DEBUG, "setting weights to %s",
+              to_string(w).c_str());
   pll_set_category_weights(_partitions[p_index], w.data());
 }
 
@@ -244,6 +261,8 @@ void model_t::set_gamma_rates_free(size_t p_index) {
 void model_t::set_gamma_rates_free(size_t p_index, model_params_t free_rates) {
 
   double sum = 0.0;
+  debug_print(EMIT_LEVEL_DEBUG, "input rates %s",
+              to_string(free_rates).c_str());
   for (size_t i = 0; i < free_rates.size(); ++i) {
     sum += free_rates[i] * _rate_weights[p_index][i];
   }
@@ -251,6 +270,8 @@ void model_t::set_gamma_rates_free(size_t p_index, model_params_t free_rates) {
     f /= sum;
   }
   _rate_rates[p_index] = free_rates;
+  debug_print(EMIT_LEVEL_DEBUG, "setting rates to %s",
+              to_string(free_rates).c_str());
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
@@ -1030,11 +1051,15 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       case rate_category::MEDIAN:
         gamma_alphas.emplace_back(1, 1.0);
         break;
-      case rate_category::FREE:
+      case rate_category::FREE: {
         gamma_alphas.emplace_back(_partitions[p]->rate_cats, 1.0);
-        gamma_weights.emplace_back(_partitions[p]->rate_cats,
-                                   1.0 / _partitions[p]->rate_cats);
-        break;
+        model_params_t wv(_partitions[p]->rate_cats, 0.0);
+        std::uniform_real_distribution<> dis(0.0, 1.0);
+        for (auto &f : wv) {
+          f = dis(_random_engine);
+        }
+        gamma_weights.push_back(wv);
+      } break;
       }
     }
 
@@ -1046,19 +1071,24 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
         set_subst_rates(i, subst_rates[i]);
         set_freqs_all_free(i, freqs[i]);
         set_gamma_rates(i, gamma_alphas[i]);
+
         if (_rate_category_types[i] == rate_category::FREE) {
           set_gamma_weights(i, gamma_weights[i]);
         }
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
-        bfgs_gamma_rates(gamma_alphas[i], rl, i, pgtol, factor);
-        if (_rate_category_types[i] == rate_category::FREE) {
-          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
-          bfgs_gamma_weights(gamma_alphas[i], rl, i, pgtol, factor);
-        }
+
         debug_string(EMIT_LEVEL_MPROGRESS, "Optmizing rates");
         bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
+
         debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing freqs");
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
+
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
+        bfgs_gamma_rates(gamma_alphas[i], rl, i, pgtol, factor);
+
+        if (_rate_category_types[i] == rate_category::FREE) {
+          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
+          bfgs_gamma_weights(gamma_weights[i], rl, i, pgtol, factor);
+        }
       }
 
       if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
@@ -1456,8 +1486,8 @@ double model_t::bfgs_gamma_weights(model_params_t &alpha,
                                    const root_location_t &rl,
                                    size_t partition_index, double pgtol,
                                    double factor) {
-  constexpr double p_min = 0.2;
-  constexpr double p_max = 10000.0;
+  constexpr double p_min = 1e-4;
+  constexpr double p_max = 1.0;
   constexpr double epsilon = 1e-4;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
