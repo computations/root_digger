@@ -22,6 +22,52 @@ TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
     CHECK(tree.root_count() > 0);
     for (size_t i = 0; i < tree.root_count(); ++i) {
       CHECK(tree.root_location(i).edge->length > 0.0);
+      CHECK(tree.root_location(i).id == i);
+    }
+  }
+  SECTION("testing two different constructions are consistent") {
+    SECTION("dataset single") {
+      auto &ds = data_files_dna["single"];
+      rooted_tree_t t1{ds.second};
+      rooted_tree_t t2{ds.second};
+      CHECK(t1.root_count() == t2.root_count());
+      CHECK(t1.newick() == t2.newick());
+      for (size_t i = 0; i < t1.root_count(); ++i) {
+        CHECK(t1.root_location(i).id ==
+              t2.root_location(i).id);
+        CHECK(t1.root_location(i).saved_brlen ==
+              t2.root_location(i).saved_brlen);
+        CHECK(t1.root_location(i).label() ==
+              t2.root_location(i).label());
+      }
+    }
+    SECTION("dataset 10.fasta") {
+      auto &ds = data_files_dna["10.fasta"];
+      rooted_tree_t t1{ds.second};
+      rooted_tree_t t2{ds.second};
+      CHECK(t1.root_count() == t2.root_count());
+      for (size_t i = 0; i < t1.root_count(); ++i) {
+        CHECK(t1.root_location(i).id ==
+              t2.root_location(i).id);
+        CHECK(t1.root_location(i).saved_brlen ==
+              t2.root_location(i).saved_brlen);
+        CHECK(t1.root_location(i).label() ==
+              t2.root_location(i).label());
+      }
+    }
+    SECTION("dataset 101.phy") {
+      auto &ds = data_files_dna["101.phy"];
+      rooted_tree_t t1{ds.second};
+      rooted_tree_t t2{ds.second};
+      CHECK(t1.root_count() == t2.root_count());
+      for (size_t i = 0; i < t1.root_count(); ++i) {
+        CHECK(t1.root_location(i).id ==
+              t2.root_location(i).id);
+        CHECK(t1.root_location(i).saved_brlen ==
+              t2.root_location(i).saved_brlen);
+        CHECK(t1.root_location(i).label() ==
+              t2.root_location(i).label());
+      }
     }
   }
 }
@@ -38,6 +84,13 @@ TEST_CASE("rooted_tree copy constructor", "[rooted_tree_t]") {
     CHECK(tree1.branch_count() == tree2.branch_count());
     CHECK(tree1.inner_count() == tree2.inner_count());
     CHECK(tree1.tip_count() == tree2.tip_count());
+    CHECK(tree1.root_count() == tree2.root_count());
+  }
+  SECTION("testing root ids") {
+    SECTION("dataset single") {
+      auto &ds = data_files_dna["single"];
+      rooted_tree_t t1{ds.second};
+    }
   }
 }
 

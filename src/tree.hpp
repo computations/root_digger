@@ -22,6 +22,7 @@ extern "C" {
 
 struct root_location_t {
   pll_unode_t *edge;
+  size_t id;
   double saved_brlen;
   double brlen_ratio;
   constexpr inline double brlen() const { return saved_brlen * brlen_ratio; }
@@ -46,6 +47,7 @@ public:
     }
     generate_root_locations();
     add_root_space();
+    sort_root_locations();
   }
 
   rooted_tree_t(rooted_tree_t &&other)
@@ -116,7 +118,9 @@ public:
   void annotate_ratio(const root_location_t &node_index, double ratio);
 
 private:
+  void sort_root_locations();
   void generate_root_locations();
+  void copy_root_locations(const rooted_tree_t&);
   void add_root_space();
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;

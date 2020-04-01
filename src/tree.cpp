@@ -25,8 +25,12 @@ static void clean_root_unode(pll_unode_t *node) {
 rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
   _tree = pll_utree_clone(other._tree);
   _rooted = other._rooted;
-  generate_root_locations();
-  add_root_space();
+
+  copy_root_locations(other);
+
+  if (!_rooted) {
+    add_root_space();
+  }
 }
 
 rooted_tree_t::~rooted_tree_t() {
@@ -55,8 +59,12 @@ rooted_tree_t &rooted_tree_t::operator=(rooted_tree_t &&other) {
 rooted_tree_t &rooted_tree_t::operator=(const rooted_tree_t &other) {
   _tree = pll_utree_clone(other._tree);
   _rooted = other._rooted;
-  generate_root_locations();
-  add_root_space();
+
+  copy_root_locations(other);
+
+  if (!_rooted) {
+    add_root_space();
+  }
   return *this;
 }
 
@@ -119,21 +127,58 @@ std::unordered_set<std::string> rooted_tree_t::label_set() const {
   return label_set;
 }
 
+void rooted_tree_t::copy_root_locations(const rooted_tree_t &other) {
+  _roots.clear();
+  std::unordered_map<pll_unode_t *, size_t> id_map;
+  id_map.reserve(other.root_count());
+  for (const auto &r : other.roots()) {
+    debug_print(EMIT_LEVEL_DEBUG, "mapping %p to %lu", (void *)r.edge, r.id);
+    id_map[r.edge] = r.id;
+  }
+
+  auto other_trav = other.full_traverse();
+  auto our_trav = full_traverse();
+
+  if (other_trav.size() != our_trav.size()) {
+    throw std::runtime_error("Traversal sizes didn't match during copy "
+                             "constructor, something is seriously wrong");
+  }
+
+  for (size_t i = 0; i < other_trav.size(); ++i) {
+    auto res = id_map.find(other_trav[i]);
+    if (res != id_map.end()) {
+      auto edge = our_trav[i];
+      _roots.push_back({edge, res->second, edge->length, 0.5});
+    }
+  }
+  sort_root_locations();
+}
+
+void rooted_tree_t::sort_root_locations() {
+  std::sort(_roots.begin(), _roots.end(),
+            [](const root_location_t &a, const root_location_t &b) {
+              return a.id < b.id;
+            });
+}
+
 void rooted_tree_t::generate_root_locations() {
   debug_string(EMIT_LEVEL_DEBUG, "generating root locations");
   auto edges = full_traverse();
 
-  std::unordered_set<pll_unode_t *> node_set;
+  std::vector<pll_unode_t *> node_set;
+  node_set.reserve(_tree->tip_count + _tree->inner_count);
   for (auto edge : edges) {
-    if (node_set.find(edge) == node_set.end() &&
-        node_set.find(edge->back) == node_set.end()) {
-      node_set.insert(edge);
+    if (std::find(node_set.begin(), node_set.end(), edge) == node_set.end() &&
+        std::find(node_set.begin(), node_set.end(), edge->back) ==
+            node_set.end()) {
+      node_set.push_back(edge);
     }
   }
 
   _roots.reserve(node_set.size());
+  size_t id = 0;
   for (auto edge : node_set) {
-    _roots.push_back({edge, edge->length, 0.5});
+    _roots.push_back({edge, id++, edge->length, 0.5});
   }
 }
 
