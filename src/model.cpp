@@ -155,6 +155,7 @@ model_t::model_t(
   for (auto &&pw : _partition_weights) {
     pw /= (double)total_weight;
   }
+  assign_indicies();
 }
 
 model_t::~model_t() {
@@ -1023,11 +1024,12 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
   size_t root_index = 0;
   root_location_t best_rl;
   double best_lh = -std::numeric_limits<double>::infinity();
-  size_t root_count = _tree.root_count();
+  size_t root_count = _assigned_idx.size();
   std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
   debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
 
-  for (auto rl : _tree.roots()) {
+  for(auto rl_index : _assigned_idx){
+    auto rl = _tree.root_location(rl_index);
     set_subst_rates_uniform();
     set_empirical_freqs();
     ++root_index;
@@ -1543,5 +1545,28 @@ void model_t::set_subst_rates_uniform() {
 void model_t::set_empirical_freqs() {
   for (size_t i = 0; i < _partitions.size(); ++i) {
     set_empirical_freqs(i);
+  }
+}
+
+void model_t::assign_indicies(const std::vector<size_t>& idx){
+  _assigned_idx = idx;
+}
+
+void model_t::assign_indicies(size_t begin, size_t end){
+  _assigned_idx.resize(end - begin);
+  std::iota(_assigned_idx.begin(), _assigned_idx.end(), begin);
+}
+
+void model_t::assign_indicies(){
+  _assigned_idx.resize(_tree.root_count());
+  std::iota(_assigned_idx.begin(), _assigned_idx.end(), 0);
+}
+
+void model_t::assign_indicies_by_rank(size_t rank, size_t num_tasks){
+  size_t total_roots = _tree.root_count();
+  size_t chunk_size = total_roots / num_tasks;
+  size_t mod = total_roots % num_tasks;
+  if(rank <= mod){
+    chunk_size += 1;
   }
 }

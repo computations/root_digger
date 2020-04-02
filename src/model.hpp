@@ -81,6 +81,10 @@ public:
   std::vector<double> compute_all_root_lh();
   void set_subst_rates(size_t, const model_params_t &);
   void set_freqs(size_t, const model_params_t &);
+  void assign_indicies(const std::vector<size_t>&);
+  void assign_indicies(size_t, size_t);
+  void assign_indicies();
+  void assign_indicies_by_rank(size_t, size_t);
 
 private:
   std::pair<root_location_t, double>
@@ -135,6 +139,7 @@ private:
   std::vector<model_params_t> _rate_rates;
   std::vector<model_params_t> _rate_weights;
   std::vector<std::vector<unsigned int>> _param_indicies;
+  std::vector<size_t> _assigned_idx;
   std::minstd_rand _random_engine;
   bool _invariant_sites;
   uint64_t _seed;

@@ -24,7 +24,7 @@ if(STATIC_BUILD)
     #target_compile_options(rd PRIVATE -fPIE -static)
 endif()
 
-target_link_libraries(rd ${LINK_LIBS})
+target_link_libraries(rd ${LINK_LIBS} MPI::MPI_CXX)
 #target_link_options(rd PRIVATE -fno-omit-frame-pointer -fsanitize=address)
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines

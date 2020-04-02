@@ -14,6 +14,7 @@ extern "C" {
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <mpi.h>
 #include <omp.h>
 #include <random>
 #include <stdexcept>
@@ -261,6 +262,10 @@ static void print_usage() {
 }
 
 int main(int argv, char **argc) {
+  int numtasks, rank;
+  MPI_Init(&argv, &argc);
+  MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
       {"msa", required_argument, 0, 0},             /* 0 */
@@ -291,7 +296,10 @@ int main(int argv, char **argc) {
   };
 
   if (argv == 1) {
-    print_usage();
+    if (rank == 0) {
+      print_usage();
+    }
+    MPI_Finalize();
     return 0;
   }
   try {
@@ -485,7 +493,7 @@ int main(int argv, char **argc) {
       cli_options.rate_category_types.push_back(rate_category::MEAN);
     }
 
-    if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0){
+    if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0) {
       throw std::runtime_error("Rate categories cannot be zero");
     }
 
@@ -563,6 +571,7 @@ int main(int argv, char **argc) {
               << e.what() << std::endl;
     return 1;
   }
+  MPI_Finalize();
 
   return 0;
 }
