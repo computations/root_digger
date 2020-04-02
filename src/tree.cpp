@@ -165,20 +165,15 @@ void rooted_tree_t::generate_root_locations() {
   debug_string(EMIT_LEVEL_DEBUG, "generating root locations");
   auto edges = full_traverse();
 
-  std::vector<pll_unode_t *> node_set;
-  node_set.reserve(_tree->tip_count + _tree->inner_count);
-  for (auto edge : edges) {
-    if (std::find(node_set.begin(), node_set.end(), edge) == node_set.end() &&
-        std::find(node_set.begin(), node_set.end(), edge->back) ==
-            node_set.end()) {
-      node_set.push_back(edge);
-    }
-  }
-
-  _roots.reserve(node_set.size());
+  std::unordered_set<pll_unode_t*> node_set;
+  _roots.reserve(_tree->inner_count + _tree->tip_count);
+  node_set.reserve(_tree->inner_count + _tree->tip_count);
   size_t id = 0;
-  for (auto edge : node_set) {
-    _roots.push_back({edge, id++, edge->length, 0.5});
+  for(auto& edge : edges){
+    if(node_set.find(edge) == node_set.end() && node_set.find(edge->back) == node_set.end()){
+      node_set.insert(edge);
+      _roots.push_back({edge, id++, edge->length, 0.5});
+    }
   }
 }
 
