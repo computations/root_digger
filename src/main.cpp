@@ -186,6 +186,7 @@ struct cli_options_t {
   std::string freqs_filename;
   std::string partition_filename;
   std::string data_type;
+  std::string model_string;
   std::vector<size_t> rate_cats{1};
   std::vector<rate_category::rate_category_e> rate_category_types;
   uint64_t seed = std::random_device()();
@@ -283,10 +284,10 @@ int main(int argv, char **argc) {
       {"rate-cats", required_argument, 0, 0},       /* 17 */
       {"rate-cats-type", required_argument, 0, 0},  /* 18 */
       {"invariant-sites", required_argument, 0, 0}, /* 19 */
-      {"threads", required_argument, 0, 0},         /* 20 */
-      {"version", no_argument, 0, 0},               /* 21 */
-      {"debug", no_argument, 0, 0},                 /* 22 */
-      {"echo", no_argument, 0, 0},                  /* 23 */
+      {"threads", required_argument, 0, 0},         /* 21 */
+      {"version", no_argument, 0, 0},               /* 22 */
+      {"debug", no_argument, 0, 0},                 /* 23 */
+      {"echo", no_argument, 0, 0},                  /* 24 */
       {0, 0, 0, 0},
   };
 
@@ -308,7 +309,7 @@ int main(int argv, char **argc) {
         cli_options.tree_filename = optarg;
         break;
       case 2: // model
-        cli_options.model_filename = optarg;
+        cli_options.model_string = optarg;
         break;
       case 3: // seed
         cli_options.seed = static_cast<uint64_t>(atol(optarg));
@@ -371,13 +372,13 @@ int main(int argv, char **argc) {
       case 20: // threads
         cli_options.threads = {(size_t)atol(optarg)};
         break;
-      case 21: // version
+      case 22: // version
         print_version();
         return 0;
-      case 22: // debug
+      case 23: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
-      case 23: // echo
+      case 24: // echo
         cli_options.echo = true;
         break;
       default:
@@ -386,25 +387,16 @@ int main(int argv, char **argc) {
     }
 
     if (cli_options.msa_filename.empty()) {
+      std::cout << "No MSA was given, please supply an MSA" << std::endl;
       print_usage();
       return 1;
     }
     if (cli_options.tree_filename.empty()) {
+      std::cout << "No tree was given, please supply an tree" << std::endl;
       print_usage();
       return 1;
     }
 
-    model_params_t model_params;
-
-    if (!cli_options.model_filename.empty()) {
-      model_params = parse_model_file(cli_options.model_filename);
-    } else if (cli_options.states == 0) {
-      std::cout << "Please give either a model file, or a number of states to "
-                   "the model"
-                << std::endl;
-      print_usage();
-      return 1;
-    }
     if (cli_options.threads == 0) {
       cli_options.threads = sysutil_get_cpu_cores();
     }
@@ -433,6 +425,31 @@ int main(int argv, char **argc) {
     if (map == nullptr) {
       throw std::invalid_argument(
           "Root digger only supports protein and nucleotide data");
+    }
+
+    if (!cli_options.model_string.empty()) {
+      auto mi = parse_model_info(cli_options.model_string);
+      cli_options.rate_cats.clear();
+      cli_options.rate_category_types.clear();
+      cli_options.rate_cats.push_back(mi.ratehet_opts.rate_cats);
+      cli_options.rate_category_types.push_back(
+          mi.ratehet_opts.rate_category_type);
+      if (mi.ratehet_opts.alpha_init) {
+        debug_string(EMIT_LEVEL_WARNING,
+                     "Ignoring alpha in model string as it currently "
+                     "is not suported");
+      }
+      auto subst_str{mi.subst_str};
+
+      for (auto &ch : subst_str) {
+        ch = std::tolower(ch);
+      }
+      if (subst_str != "unrest") {
+        debug_print(EMIT_LEVEL_WARNING,
+                    "Ignoring subst matrix %s for model from command line"
+                    ". Currently only UNREST is supported",
+                    mi.subst_str.c_str());
+      }
     }
 
     std::vector<msa_t> msa;
@@ -485,7 +502,7 @@ int main(int argv, char **argc) {
       cli_options.rate_category_types.push_back(rate_category::MEAN);
     }
 
-    if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0){
+    if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0) {
       throw std::runtime_error("Rate categories cannot be zero");
     }
 
