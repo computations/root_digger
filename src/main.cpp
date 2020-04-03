@@ -55,7 +55,7 @@ static void print_run_header(
   print_version();
   debug_print(EMIT_LEVEL_IMPORTANT, "Started: %s", time_string);
   debug_print(EMIT_LEVEL_IMPORTANT, "Seed: %lu", seed);
-  debug_print(EMIT_LEVEL_IMPORTANT, "Number of threads: %lu", threads);
+  debug_print(EMIT_LEVEL_IMPORTANT, "Number of threads per proc: %lu", threads);
 #ifdef MPI_VERSION
   debug_print(EMIT_LEVEL_IMPORTANT, "Number of procs %d", __MPI_NUM_TASKS__);
 #endif
