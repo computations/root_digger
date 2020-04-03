@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.00)
 project(root_digger)
 
+option(MPI_BUILD "Build with MPI" OFF)
+
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer " CACHE INTERNAL "")
@@ -42,7 +44,7 @@ if(STATIC_BUILD)
     set(STATIC_GSL ON)
 endif()
 
-if( NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
+if(NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
     set(RD_BUILD_VERSION "1.3.0")
     set(RD_BUILD_COMMIT "From Release")
 endif()
@@ -58,7 +60,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 add_subdirectory(src)
 
 find_library(ASAN_FOUND asan)
-if(ASAN_FOUND)
+if(ASAN_FOUND AND NOT MPI_BUILD)
     add_subdirectory(test)
     add_subdirectory(benchmark)
 endif()
