@@ -1021,23 +1021,6 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
                                                               double pgtol,
                                                               double brtol,
                                                               double factor) {
-
-#ifdef MPI_VERSION
-  int blocklenths[exhaustive_mode_results_t_nitems] = {1, 1, 1};
-  MPI_Datatype types[exhaustive_mode_results_t_nitems] = {MPI_INT, MPI_DOUBLE,
-                                                          MPI_DOUBLE};
-  MPI_Datatype mpi_exhaustive_mode_result_t;
-  MPI_Aint offsets[exhaustive_mode_results_t_nitems] = {
-      offsetof(exhaustive_mode_results_t, root_id),
-      offsetof(exhaustive_mode_results_t, lh),
-      offsetof(exhaustive_mode_results_t, alpha)};
-  MPI_Type_create_struct(exhaustive_mode_results_t_nitems, blocklenths, offsets,
-                         types, &mpi_exhaustive_mode_result_t);
-  MPI_Type_commit(&mpi_exhaustive_mode_result_t);
-  size_t lockstep_roots =
-      _tree.root_count() / static_cast<size_t>(__MPI_NUM_TASKS__);
-#endif
-
   size_t root_index = 0;
   root_location_t best_rl;
   double best_lh = -std::numeric_limits<double>::infinity();
@@ -1148,55 +1131,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       rl = cur_rl;
     }
 
-#ifdef MPI_VERSION
-    debug_print(EMIT_LEVEL_DEBUG,
-                "Starting to gather results from %d other processes",
-                __MPI_NUM_TASKS__);
-    std::vector<exhaustive_mode_results_t> res_buffer;
-    exhaustive_mode_results_t res{static_cast<int>(cur_best_rl.id), cur_best_lh,
-                                  cur_best_rl.brlen_ratio};
-    if (root_index < lockstep_roots) {
-
-      if (__MPI_RANK__ == 0) {
-        res_buffer.resize(static_cast<size_t>(__MPI_NUM_TASKS__));
-      }
-      MPI_Gather(&res, 1, mpi_exhaustive_mode_result_t,
-                 static_cast<void *>(res_buffer.data()), 1,
-                 mpi_exhaustive_mode_result_t, 0, MPI_COMM_WORLD);
-      debug_print(EMIT_LEVEL_DEBUG, "our id: %d, gather index 0 id: %d",
-                  res.root_id, res_buffer[0].root_id);
-    } else {
-      size_t mod;
-      {
-        auto compute_results =
-            compute_chunk_size_mod(static_cast<size_t>(__MPI_NUM_TASKS__));
-        mod = compute_results.second;
-      }
-      debug_print(EMIT_LEVEL_DEBUG,
-                  "performing point to point gather on %lu ranks", mod);
-      if (__MPI_RANK__ == 0) {
-        res_buffer.push_back(res);
-        for (size_t r = 1; r < mod; ++r) {
-          debug_print(EMIT_LEVEL_DEBUG, "recv from %lu", r);
-          exhaustive_mode_results_t recv_buf;
-          MPI_Recv(&recv_buf, 1, mpi_exhaustive_mode_result_t, r, 0,
-                   MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-          res_buffer.push_back(recv_buf);
-        }
-      } else {
-        if (static_cast<size_t>(__MPI_RANK__) < mod) {
-          MPI_Send(&res, 1, mpi_exhaustive_mode_result_t, 0, 0, MPI_COMM_WORLD);
-        }
-      }
-    }
-    for (auto recv_res : res_buffer) {
-      auto our_rl = _tree.root_location(static_cast<size_t>(recv_res.root_id));
-      our_rl.brlen_ratio = recv_res.alpha;
-      mapped_likelihoods.emplace_back(our_rl, recv_res.lh);
-    }
-#else
     mapped_likelihoods.emplace_back(cur_best_rl, cur_best_lh);
-#endif
     root_index++;
 
     debug_print(EMIT_LEVEL_PROGRESS, "Step %lu / %lu, ETC: %0.2fh", root_index,
@@ -1207,6 +1142,10 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
       best_lh = cur_best_lh;
     }
   }
+
+#ifdef MPI_VERSION
+  gather_exhaustive_results(mapped_likelihoods);
+#endif
 
   if (__MPI_RANK__ == 0) {
     double max_lh = -std::numeric_limits<double>::infinity();
@@ -1649,3 +1588,81 @@ void model_t::assign_indicies_by_rank(size_t rank, size_t num_tasks) {
   size_t end = chunk_size * (rank + 1) + std::min(mod, (rank + 1));
   assign_indicies(beg, end);
 }
+
+#ifdef MPI_VERSION
+void model_t::gather_exhaustive_results(
+    std::vector<std::pair<root_location_t, double>> &mapped_likelihoods) {
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  int blocklenths[exhaustive_mode_results_t_nitems] = {1, 1, 1};
+  MPI_Datatype types[exhaustive_mode_results_t_nitems] = {MPI_INT, MPI_DOUBLE,
+                                                          MPI_DOUBLE};
+  MPI_Datatype mpi_exhaustive_mode_result_t;
+  MPI_Aint offsets[exhaustive_mode_results_t_nitems] = {
+      offsetof(exhaustive_mode_results_t, root_id),
+      offsetof(exhaustive_mode_results_t, lh),
+      offsetof(exhaustive_mode_results_t, alpha)};
+  MPI_Type_create_struct(exhaustive_mode_results_t_nitems, blocklenths, offsets,
+                         types, &mpi_exhaustive_mode_result_t);
+  MPI_Type_commit(&mpi_exhaustive_mode_result_t);
+  size_t lockstep_roots =
+      _tree.root_count() / static_cast<size_t>(__MPI_NUM_TASKS__);
+
+  debug_print(EMIT_LEVEL_DEBUG,
+              "Starting to gather results from %d other processes",
+              __MPI_NUM_TASKS__);
+  std::vector<exhaustive_mode_results_t> res_buffer;
+  std::vector<std::pair<root_location_t, double>> new_mapped_lh;
+
+  for (size_t root_index = 0; root_index < lockstep_roots; ++root_index) {
+    MPI_Barrier(MPI_COMM_WORLD);
+    auto cur_best_rl = mapped_likelihoods[root_index].first;
+    auto cur_best_lh = mapped_likelihoods[root_index].second;
+
+    exhaustive_mode_results_t res{static_cast<int>(cur_best_rl.id), cur_best_lh,
+                                  cur_best_rl.brlen_ratio};
+
+    if (root_index < lockstep_roots) {
+      if (__MPI_RANK__ == 0) {
+        res_buffer.resize(static_cast<size_t>(__MPI_NUM_TASKS__));
+      }
+      MPI_Gather(&res, 1, mpi_exhaustive_mode_result_t,
+                 static_cast<void *>(res_buffer.data()), 1,
+                 mpi_exhaustive_mode_result_t, 0, MPI_COMM_WORLD);
+      debug_print(EMIT_LEVEL_DEBUG, "our id: %d, gather index 0 id: %d",
+                  res.root_id, res_buffer[0].root_id);
+    } else {
+      size_t mod;
+      {
+        auto compute_results =
+            compute_chunk_size_mod(static_cast<size_t>(__MPI_NUM_TASKS__));
+        mod = compute_results.second;
+      }
+      debug_print(EMIT_LEVEL_DEBUG,
+                  "performing point to point gather on %lu ranks", mod);
+      if (__MPI_RANK__ == 0) {
+        res_buffer.push_back(res);
+        for (size_t r = 1; r < mod; ++r) {
+          debug_print(EMIT_LEVEL_DEBUG, "recv from %lu", r);
+          exhaustive_mode_results_t recv_buf;
+          MPI_Recv(&recv_buf, 1, mpi_exhaustive_mode_result_t, r, 0,
+                   MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+          res_buffer.push_back(recv_buf);
+        }
+      } else {
+        if (static_cast<size_t>(__MPI_RANK__) < mod) {
+          MPI_Send(&res, 1, mpi_exhaustive_mode_result_t, 0, 0, MPI_COMM_WORLD);
+        }
+      }
+    }
+    for (auto recv_res : res_buffer) {
+      auto our_rl = _tree.root_location(static_cast<size_t>(recv_res.root_id));
+      our_rl.brlen_ratio = recv_res.alpha;
+      new_mapped_lh.emplace_back(our_rl, recv_res.lh);
+    }
+  }
+  if(__MPI_RANK__ == 0){
+    std::swap(new_mapped_lh, mapped_likelihoods);
+  }
+}
+#endif

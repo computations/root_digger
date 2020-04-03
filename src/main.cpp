@@ -14,7 +14,9 @@ extern "C" {
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#ifdef MPI_BUILD
 #include <mpi.h>
+#endif
 #include <omp.h>
 #include <random>
 #include <stdexcept>
@@ -56,7 +58,7 @@ static void print_run_header(
   debug_print(EMIT_LEVEL_IMPORTANT, "Number of threads: %lu", threads);
 #ifdef MPI_VERSION
   debug_print(EMIT_LEVEL_IMPORTANT, "Number of procs %d", __MPI_NUM_TASKS__);
-#endif 
+#endif
 }
 
 class initialized_flag_t {

@@ -8,7 +8,9 @@ extern "C" {
 #include "msa.hpp"
 #include "tree.hpp"
 #include <functional>
+#ifdef MPI_BUILD
 #include <mpi.h>
+#endif
 #include <random>
 #include <string>
 #include <utility>
@@ -144,6 +146,10 @@ private:
 
   std::pair<size_t, size_t> compute_chunk_size_mod(size_t num_tasks) const;
 
+#ifdef MPI_VERSION
+  void gather_exhaustive_results(
+      std::vector<std::pair<root_location_t, double>> &);
+#endif
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;
