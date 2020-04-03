@@ -14,6 +14,9 @@ extern "C" {
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#ifdef MPI_BUILD
+#include <mpi.h>
+#endif
 #include <omp.h>
 #include <random>
 #include <stdexcept>
@@ -24,6 +27,8 @@ extern "C" {
 
 #include "debug.h"
 int __VERBOSE__ = EMIT_LEVEL_PROGRESS;
+int __MPI_RANK__ = 0;
+int __MPI_NUM_TASKS__ = 1;
 #include "model.hpp"
 #include "msa.hpp"
 #include "tree.hpp"
@@ -51,6 +56,9 @@ static void print_run_header(
   debug_print(EMIT_LEVEL_IMPORTANT, "Started: %s", time_string);
   debug_print(EMIT_LEVEL_IMPORTANT, "Seed: %lu", seed);
   debug_print(EMIT_LEVEL_IMPORTANT, "Number of threads: %lu", threads);
+#ifdef MPI_VERSION
+  debug_print(EMIT_LEVEL_IMPORTANT, "Number of procs %d", __MPI_NUM_TASKS__);
+#endif
 }
 
 class initialized_flag_t {
@@ -206,6 +214,9 @@ struct cli_options_t {
 };
 
 static void print_usage() {
+  if (__MPI_RANK__ != 0) {
+    return;
+  }
   std::cout
       << "Usage: rd [options]\n"
       << "Version: " << GIT_REV_STRING << "\n"
@@ -261,7 +272,12 @@ static void print_usage() {
       << std::endl;
 }
 
-int main(int argv, char **argc) {
+int wrapped_main(int argv, char **argc) {
+#ifdef MPI_VERSION
+  MPI_Comm_size(MPI_COMM_WORLD, &__MPI_NUM_TASKS__);
+  MPI_Comm_rank(MPI_COMM_WORLD, &__MPI_RANK__);
+#endif
+
   auto start_time = std::chrono::system_clock::now();
   static struct option long_opts[] = {
       {"msa", required_argument, 0, 0},             /* 0 */
@@ -398,7 +414,11 @@ int main(int argv, char **argc) {
     }
 
     if (cli_options.threads == 0) {
+#ifdef MPI_VERSION
+      cli_options.threads = 1;
+#else
       cli_options.threads = sysutil_get_cpu_cores();
+#endif
     }
 
 #ifdef _OPENMP
@@ -535,6 +555,9 @@ int main(int argv, char **argc) {
       model.initialize_partitions_uniform_freqs(msa);
     }
 
+    model.assign_indicies_by_rank(static_cast<size_t>(__MPI_RANK__),
+                                  static_cast<size_t>(__MPI_NUM_TASKS__));
+
     if (cli_options.echo) {
       std::cout << tree.newick() << std::endl;
     }
@@ -562,24 +585,38 @@ int main(int argv, char **argc) {
     if (!cli_options.silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }
-    std::cout << final_tree_string << std::endl;
+    if (__MPI_RANK__ == 0) {
+      std::cout << final_tree_string << std::endl;
+    }
     auto end_time = std::chrono::system_clock::now();
 
     std::chrono::duration<double> duration = end_time - start_time;
 
-    if (!cli_options.silent)
+    if (!cli_options.silent && __MPI_RANK__ == 0)
       std::cout << "Inference took: " << duration.count() << "s" << std::endl;
 
-    if (!cli_options.output_tree_filename.empty()) {
+    if (!cli_options.output_tree_filename.empty() && __MPI_RANK__ == 0) {
       std::ofstream outfile{cli_options.output_tree_filename};
       outfile << final_tree_string;
     }
 
   } catch (const std::exception &e) {
-    std::cout << "There was an error during processing:\n"
-              << e.what() << std::endl;
+    if (__MPI_RANK__ == 0) {
+      std::cout << "There was an error during processing:\n"
+                << e.what() << std::endl;
+    }
     return 1;
   }
 
   return 0;
+}
+
+int main(int argv, char **argc) {
+#ifdef MPI_VERSION
+  MPI_Init(&argv, &argc);
+#endif
+  wrapped_main(argv, argc);
+#ifdef MPI_VERSION
+  MPI_Finalize();
+#endif
 }
