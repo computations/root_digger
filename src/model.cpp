@@ -1083,12 +1083,14 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
         debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing freqs");
         bfgs_freqs(freqs[i], rl, i, pgtol, factor);
 
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
-        bfgs_gamma_rates(gamma_alphas[i], rl, i, pgtol, factor);
+        if (iter % 10 == 0) {
+          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
+          bfgs_gamma_rates(gamma_alphas[i], rl, i, pgtol, factor);
 
-        if (_rate_category_types[i] == rate_category::FREE) {
-          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
-          bfgs_gamma_weights(gamma_weights[i], rl, i, pgtol, factor);
+          if (_rate_category_types[i] == rate_category::FREE) {
+            debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
+            bfgs_gamma_weights(gamma_weights[i], rl, i, pgtol, factor);
+          }
         }
       }
 
@@ -1379,7 +1381,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   }
   set_func(partition_index, parameters);
   score = compute_lh();
-  assert_string(initial_score >= score, "Failed to improve the likelihood");
+  //assert_string(initial_score >= score, "Failed to improve the likelihood");
   if (initial_score >= score) {
     std::swap(parameters, initial_params);
   }
@@ -1661,7 +1663,7 @@ void model_t::gather_exhaustive_results(
       new_mapped_lh.emplace_back(our_rl, recv_res.lh);
     }
   }
-  if(__MPI_RANK__ == 0){
+  if (__MPI_RANK__ == 0) {
     std::swap(new_mapped_lh, mapped_likelihoods);
   }
 }
