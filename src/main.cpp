@@ -315,10 +315,10 @@ int wrapped_main(int argv, char **argc) {
       {"rate-cats", required_argument, 0, 0},       /* 17 */
       {"rate-cats-type", required_argument, 0, 0},  /* 18 */
       {"invariant-sites", required_argument, 0, 0}, /* 19 */
-      {"threads", required_argument, 0, 0},         /* 21 */
-      {"version", no_argument, 0, 0},               /* 22 */
-      {"debug", no_argument, 0, 0},                 /* 23 */
-      {"echo", no_argument, 0, 0},                  /* 24 */
+      {"threads", required_argument, 0, 0},         /* 20 */
+      {"version", no_argument, 0, 0},               /* 21 */
+      {"debug", no_argument, 0, 0},                 /* 22 */
+      {"echo", no_argument, 0, 0},                  /* 23 */
       {0, 0, 0, 0},
   };
 
@@ -403,13 +403,13 @@ int wrapped_main(int argv, char **argc) {
       case 20: // threads
         cli_options.threads = {(size_t)atol(optarg)};
         break;
-      case 22: // version
+      case 21: // version
         print_version();
         return 0;
-      case 23: // debug
+      case 22: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
-      case 24: // echo
+      case 23: // echo
         cli_options.echo = true;
         break;
       default:
