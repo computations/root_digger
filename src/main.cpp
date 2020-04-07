@@ -557,6 +557,17 @@ int wrapped_main(int argv, char **argc) {
       throw std::runtime_error("Root ratio is negative");
     }
 
+#ifdef MPI_VERSION
+    if (__MPI_NUM_TASKS__ == 1) {
+      debug_string(EMIT_LEVEL_WARNING, "Running MPI version with only 1 process, "
+                                       "is this really what you meant?");
+    }
+    if (!cli_options.exhaustive) {
+      throw std::runtime_error("Sorry, MPI root digger only supports "
+                               "exhaustive mode for MPI builds right now :(");
+    }
+#endif
+
     model_t model{
         tree,
         msa,
