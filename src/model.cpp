@@ -1312,8 +1312,16 @@ gd_params(model_params_t &initial_params, size_t partition_index, double p_min,
   set_func(partition_index, parameters);
   double final_score = compute_lh();
   // check that we have successfully _minimized_ the function
-  assert_string(initial_score >= final_score, "Failed to make the lh better");
-  std::swap(parameters, initial_params);
+  // assert_string(initial_score >= final_score, "Failed to make the lh
+  // better");
+  if (initial_score >= final_score) {
+    std::swap(parameters, initial_params);
+  } else {
+    debug_print(
+        EMIT_LEVEL_WARNING,
+        "Failed to improve the likelihood after GD. Start: %f, End: %f",
+        initial_score, final_score);
+  }
   return -final_score;
 }
 
@@ -1381,9 +1389,14 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   }
   set_func(partition_index, parameters);
   score = compute_lh();
-  //assert_string(initial_score >= score, "Failed to improve the likelihood");
+  // assert_string(initial_score >= score, "Failed to improve the likelihood");
   if (initial_score >= score) {
     std::swap(parameters, initial_params);
+  } else {
+    debug_print(
+        EMIT_LEVEL_WARNING,
+        "Failed to improve the likelihood after BFGS. Start: %f, End: %f",
+        initial_score, score);
   }
   return score;
 }
