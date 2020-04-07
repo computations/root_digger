@@ -14,6 +14,7 @@ extern "C" {
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #ifdef MPI_BUILD
 #include <mpi.h>
 #endif
@@ -45,9 +46,21 @@ static void print_version() {
   debug_print(EMIT_LEVEL_IMPORTANT, "Build Date: %s", BUILD_DATE_STRING);
 }
 
+static std::string combine_argv_argc(int argv, char **argc) {
+
+  std::ostringstream oss;
+  for (int i = 0; i < argv; ++i) {
+    oss << argc[i];
+    if (i != argv - 1) {
+      oss << " ";
+    }
+  }
+  return oss.str();
+}
+
 static void print_run_header(
     const std::chrono::time_point<std::chrono::system_clock> &start_time,
-    uint64_t seed, size_t threads) {
+    uint64_t seed, size_t threads, int argv, char **argc) {
   time_t st = std::chrono::system_clock::to_time_t(start_time);
   char time_string[256];
   std::strftime(time_string, sizeof(time_string), "%F %T", std::localtime(&st));
@@ -59,6 +72,8 @@ static void print_run_header(
 #ifdef MPI_VERSION
   debug_print(EMIT_LEVEL_IMPORTANT, "Number of procs %d", __MPI_NUM_TASKS__);
 #endif
+  debug_print(EMIT_LEVEL_IMPORTANT, "Command: %s",
+              combine_argv_argc(argv, argc).c_str());
 }
 
 class initialized_flag_t {
@@ -426,7 +441,8 @@ int wrapped_main(int argv, char **argc) {
 #endif
 
     if (!cli_options.silent)
-      print_run_header(start_time, cli_options.seed, cli_options.threads);
+      print_run_header(start_time, cli_options.seed, cli_options.threads, argv,
+                       argc);
 
     debug_print(EMIT_LEVEL_INFO, "abs_tolerance: %.08f",
                 cli_options.abs_tolerance);
