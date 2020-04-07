@@ -15,7 +15,11 @@ extern int __VERBOSE__;
 extern int __MPI_RANK__;
 extern int __MPI_NUM_TASKS__;
 
+#ifdef RD_DEBUG_FLAG
 #define DEBUG_IF_FLAG 1
+#else
+#define DEBUG_IF_FLAG 0
+#endif
 
 #ifdef RD_DEBUG
 #define RD_DEBUG_ASSERT_FLAG 1
@@ -45,18 +49,20 @@ extern int __MPI_NUM_TASKS__;
 
 #define debug_print(level, fmt, ...)                                           \
   do {                                                                         \
-    if (DEBUG_IF_FLAG && __VERBOSE__ >= level && __MPI_RANK__ == 0) {          \
-      print_clock;                                                             \
-      if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                   \
-        printf("[%s:%d]: ", __func__, __LINE__);                               \
+    if (DEBUG_IF_FLAG || level < EMIT_LEVEL_DEBUG) {                           \
+      if (__VERBOSE__ >= level && __MPI_RANK__ == 0) {                         \
+        print_clock;                                                           \
+        if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                 \
+          printf("[%s:%d]: ", __func__, __LINE__);                             \
+        }                                                                      \
+        if (level == EMIT_LEVEL_WARNING) {                                     \
+          printf("[Warning] ");                                                \
+        }                                                                      \
+        if (level == EMIT_LEVEL_ERROR) {                                       \
+          printf("[ERROR] ");                                                  \
+        }                                                                      \
+        printf(fmt "\n", __VA_ARGS__);                                         \
       }                                                                        \
-      if (level == EMIT_LEVEL_WARNING) {                                       \
-        printf("[Warning] ");                                                  \
-      }                                                                        \
-      if (level == EMIT_LEVEL_ERROR) {                                         \
-        printf("[ERROR] ");                                                    \
-      }                                                                        \
-      printf(fmt "\n", __VA_ARGS__);                                           \
     }                                                                          \
   } while (0)
 
