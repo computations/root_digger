@@ -318,6 +318,7 @@ int wrapped_main(int argv, char **argc) {
       {"threads", required_argument, 0, 0},         /* 20 */
       {"version", no_argument, 0, 0},               /* 21 */
       {"debug", no_argument, 0, 0},                 /* 22 */
+      {"mpi-debug", no_argument, 0, 0},             /* 22 */
       {"echo", no_argument, 0, 0},                  /* 23 */
       {0, 0, 0, 0},
   };
@@ -409,13 +410,21 @@ int wrapped_main(int argv, char **argc) {
       case 22: // debug
         __VERBOSE__ = EMIT_LEVEL_DEBUG;
         break;
-      case 23: // echo
+      case 23: // mpi-debug
+        __VERBOSE__ = EMIT_LEVEL_MPI_DEBUG;
+        break;
+      case 24: // echo
         cli_options.echo = true;
         break;
       default:
         throw std::invalid_argument("An argument was not recognized");
       }
     }
+#ifdef MPI_VERSION
+    debug_string(EMIT_LEVEL_DEBUG, "Broadcasting seed");
+    MPI_Bcast(&cli_options.seed, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
+    debug_print(EMIT_LEVEL_MPI_DEBUG, "seed: %lu", cli_options.seed);
+#endif
 
     if (cli_options.msa_filename.empty()) {
       std::cout << "No MSA was given, please supply an MSA" << std::endl;
@@ -559,12 +568,9 @@ int wrapped_main(int argv, char **argc) {
 
 #ifdef MPI_VERSION
     if (__MPI_NUM_TASKS__ == 1) {
-      debug_string(EMIT_LEVEL_WARNING, "Running MPI version with only 1 process, "
-                                       "is this really what you meant?");
-    }
-    if (!cli_options.exhaustive) {
-      throw std::runtime_error("Sorry, MPI root digger only supports "
-                               "exhaustive mode for MPI builds right now :(");
+      debug_string(EMIT_LEVEL_WARNING,
+                   "Running MPI version with only 1 process, "
+                   "is this really what you meant?");
     }
 #endif
 
@@ -582,32 +588,42 @@ int wrapped_main(int argv, char **argc) {
       model.initialize_partitions_uniform_freqs(msa);
     }
 
-    model.assign_indicies_by_rank(static_cast<size_t>(__MPI_RANK__),
-                                  static_cast<size_t>(__MPI_NUM_TASKS__));
-
     if (cli_options.echo) {
       std::cout << tree.newick() << std::endl;
     }
 
     model.compute_lh(tree.root_location(0));
     root_location_t final_rl;
-    double final_lh;
+    double final_lh = -std::numeric_limits<double>::infinity();
     std::string final_tree_string;
     if (!cli_options.exhaustive) {
+      model.assign_indicies_by_rank_search(
+          cli_options.min_roots, cli_options.root_ratio,
+          static_cast<size_t>(__MPI_RANK__),
+          static_cast<size_t>(__MPI_NUM_TASKS__));
       auto tmp =
           model.optimize_all(cli_options.min_roots, cli_options.root_ratio,
                              cli_options.abs_tolerance, cli_options.bfgs_tol,
                              cli_options.br_tolerance, cli_options.factor);
-      final_rl = tmp.first;
-      final_lh = tmp.second;
-      final_tree_string = model.rooted_tree(final_rl).newick();
+      if (__MPI_RANK__ == 0) {
+        final_rl = tmp.first;
+        final_lh = tmp.second;
+        final_tree_string = model.rooted_tree(final_rl).newick();
+      }
     } else {
+
+      model.assign_indicies_by_rank_exhaustive(
+          static_cast<size_t>(__MPI_RANK__),
+          static_cast<size_t>(__MPI_NUM_TASKS__));
+
       auto tmp = model.exhaustive_search(
           cli_options.abs_tolerance, cli_options.bfgs_tol,
           cli_options.br_tolerance, cli_options.factor);
-      final_rl = tmp.first;
-      final_lh = tmp.second;
-      final_tree_string = model.virtual_rooted_tree(final_rl).newick();
+      if (__MPI_RANK__ == 0) {
+        final_rl = tmp.first;
+        final_lh = tmp.second;
+        final_tree_string = model.virtual_rooted_tree(final_rl).newick();
+      }
     }
     if (!cli_options.silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);

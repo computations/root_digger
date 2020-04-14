@@ -70,7 +70,9 @@ rooted_tree_t &rooted_tree_t::operator=(const rooted_tree_t &other) {
 
 root_location_t rooted_tree_t::root_location(size_t index) const {
   if (index > _roots.size()) {
-    throw std::invalid_argument("Invalid index for roots on this tree");
+    throw std::invalid_argument(
+        std::string("Invalid index for roots on this tree: ") +
+        std::to_string(index));
   }
   return _roots[index];
 }
@@ -165,12 +167,13 @@ void rooted_tree_t::generate_root_locations() {
   debug_string(EMIT_LEVEL_DEBUG, "generating root locations");
   auto edges = full_traverse();
 
-  std::unordered_set<pll_unode_t*> node_set;
+  std::unordered_set<pll_unode_t *> node_set;
   _roots.reserve(_tree->inner_count + _tree->tip_count);
   node_set.reserve(_tree->inner_count + _tree->tip_count);
   size_t id = 0;
-  for(auto& edge : edges){
-    if(node_set.find(edge) == node_set.end() && node_set.find(edge->back) == node_set.end()){
+  for (auto &edge : edges) {
+    if (node_set.find(edge) == node_set.end() &&
+        node_set.find(edge->back) == node_set.end()) {
       node_set.insert(edge);
       _roots.push_back({edge, id++, edge->length, 0.5});
     }

@@ -34,6 +34,7 @@ extern int __MPI_NUM_TASKS__;
 #define EMIT_LEVEL_MPROGRESS 4
 #define EMIT_LEVEL_INFO 5
 #define EMIT_LEVEL_DEBUG 6
+#define EMIT_LEVEL_MPI_DEBUG 7
 
 #define progress_macro(i, k)                                                   \
   (((std::chrono::high_resolution_clock::now() - CLOCK_START).count() /        \
@@ -50,10 +51,15 @@ extern int __MPI_NUM_TASKS__;
 #define debug_print(level, fmt, ...)                                           \
   do {                                                                         \
     if (DEBUG_IF_FLAG || level < EMIT_LEVEL_DEBUG) {                           \
-      if (__VERBOSE__ >= level && __MPI_RANK__ == 0) {                         \
+      if (__VERBOSE__ >= level &&                                              \
+          (__MPI_RANK__ == 0 || level == EMIT_LEVEL_MPI_DEBUG)) {              \
         print_clock;                                                           \
         if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                 \
-          printf("[%s:%d]: ", __func__, __LINE__);                             \
+          printf("[%s:%d]", __func__, __LINE__);                               \
+          if (level == EMIT_LEVEL_MPI_DEBUG) {                                 \
+            printf(" [Rank: %d]", __MPI_RANK__);                               \
+          }                                                                    \
+          printf(" : ");                                   \
         }                                                                      \
         if (level == EMIT_LEVEL_WARNING) {                                     \
           printf("[Warning] ");                                                \
@@ -78,11 +84,11 @@ extern int __MPI_NUM_TASKS__;
       int frames = backtrace(callstack, 128);                                  \
       char **bt_symbols = backtrace_symbols(callstack, frames);                \
       print_clock;                                                             \
-      fprintf(stderr, "BACKTRACE AT %s:%d:%s():\n", __FILE__, __LINE__,        \
+      printf("BACKTRACE AT %s:%d:%s():\n", __FILE__, __LINE__,        \
               __func__);                                                       \
       for (int i = 0; i < frames; ++i) {                                       \
         print_clock;                                                           \
-        fprintf(stderr, "%s\n", bt_symbols[i]);                                \
+        printf("%s\n", bt_symbols[i]);                                \
       }                                                                        \
     }                                                                          \
   } while (0)

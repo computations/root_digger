@@ -40,12 +40,13 @@ model_params_t parse_model_file(const std::string &model_filename);
 model_params_t random_params(size_t size, uint64_t seed);
 
 #ifdef MPI_VERSION
-struct exhaustive_mode_results_t {
+struct rd_mpi_results_t {
   int root_id;
   double lh;
   double alpha;
 };
-constexpr const int exhaustive_mode_results_t_nitems = 3;
+
+constexpr const int rd_mpi_results_t_nitems = 3;
 #endif
 
 class model_t {
@@ -96,7 +97,8 @@ public:
   void assign_indicies(const std::vector<size_t> &);
   void assign_indicies(size_t, size_t);
   void assign_indicies();
-  void assign_indicies_by_rank(size_t, size_t);
+  void assign_indicies_by_rank_search(size_t, double, size_t, size_t);
+  void assign_indicies_by_rank_exhaustive(size_t, size_t);
 
 private:
   std::pair<root_location_t, double>
@@ -144,11 +146,12 @@ private:
   double gd_gamma_weights(model_params_t &intial_alpha,
                           const root_location_t &rl, size_t partition_index);
 
+  std::pair<size_t, size_t> compute_chunk_size_mod(size_t root_count,
+                                                   size_t num_tasks) const;
   std::pair<size_t, size_t> compute_chunk_size_mod(size_t num_tasks) const;
 
 #ifdef MPI_VERSION
-  void gather_exhaustive_results(
-      std::vector<std::pair<root_location_t, double>> &);
+  void gather_results(std::vector<std::pair<root_location_t, double>> &, size_t);
 #endif
 
   rooted_tree_t _tree;

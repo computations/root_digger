@@ -857,6 +857,10 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
 
   double best_lh = -std::numeric_limits<double>::infinity();
   root_location_t best_rl;
+  if (_assigned_idx.size() == 0) {
+    return {best_rl, best_lh};
+  }
+  std::vector<std::pair<root_location_t, double>> mapped_likelihoods;
   std::vector<model_params_t> best_subst;
   std::vector<model_params_t> best_freqs;
   std::vector<model_params_t> best_gamma_alpha;
@@ -865,14 +869,15 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
   set_subst_rates_uniform();
   set_empirical_freqs();
   auto roots = suggest_roots_random(min_roots, root_ratio);
-  size_t root_count = roots.size();
+  size_t root_count = _assigned_idx.size();
   size_t root_index = 0;
 
-  for (auto rl : roots) {
+  for (auto rl_index : _assigned_idx) {
+    auto rl = roots[rl_index];
     set_subst_rates_uniform();
     set_empirical_freqs();
     ++root_index;
-    debug_print(EMIT_LEVEL_PROGRESS, "Root %lu/%lu, ETC: %fh", root_index,
+    debug_print(EMIT_LEVEL_PROGRESS, "Stage %lu/%lu, ETC: %fh", root_index,
                 root_count, progress_macro(root_index, root_count));
 
     std::vector<model_params_t> subst_rates;
@@ -989,6 +994,7 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
 
       rl = cur_best_rl;
     }
+    mapped_likelihoods.emplace_back(cur_best_rl, cur_best_lh);
 
     debug_print(EMIT_LEVEL_DEBUG, "finished optimize_all root, cur_best_lh: %f",
                 cur_best_lh);
@@ -1004,6 +1010,19 @@ model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
       best_gamma_weights = gamma_weights;
     }
   }
+
+#ifdef MPI_VERSION
+  gather_results(mapped_likelihoods, roots.size());
+
+  auto r =
+      *std::max_element(mapped_likelihoods.begin(), mapped_likelihoods.end(),
+                        [](std::pair<root_location_t, double> &a,
+                           std::pair<root_location_t, double> &b) -> bool {
+                          return a.second < b.second;
+                        });
+  debug_print(EMIT_LEVEL_IMPORTANT, "final lh: %f", r.second);
+#endif
+
   for (size_t i = 0; i < _partitions.size(); ++i) {
     set_subst_rates(i, best_subst[i]);
     set_freqs_all_free(i, best_freqs[i]);
@@ -1146,7 +1165,7 @@ std::pair<root_location_t, double> model_t::exhaustive_search(double atol,
   }
 
 #ifdef MPI_VERSION
-  gather_exhaustive_results(mapped_likelihoods);
+  gather_results(mapped_likelihoods, _tree.root_count());
 #endif
 
   if (__MPI_RANK__ == 0) {
@@ -1317,10 +1336,9 @@ gd_params(model_params_t &initial_params, size_t partition_index, double p_min,
   if (initial_score >= final_score) {
     std::swap(parameters, initial_params);
   } else {
-    debug_print(
-        EMIT_LEVEL_WARNING,
-        "Failed to improve the likelihood after GD. Start: %f, End: %f",
-        initial_score, final_score);
+    debug_print(EMIT_LEVEL_WARNING,
+                "Failed to improve the likelihood after GD. Start: %f, End: %f",
+                initial_score, final_score);
   }
   return -final_score;
 }
@@ -1575,8 +1593,11 @@ void model_t::assign_indicies(const std::vector<size_t> &idx) {
 }
 
 void model_t::assign_indicies(size_t begin, size_t end) {
+  assert_string(end >= begin, "We got a negative value for a resize");
   _assigned_idx.resize(end - begin);
-  std::iota(_assigned_idx.begin(), _assigned_idx.end(), begin);
+  if (_assigned_idx.size() != 0) {
+    std::iota(_assigned_idx.begin(), _assigned_idx.end(), begin);
+  }
 }
 
 void model_t::assign_indicies() {
@@ -1586,13 +1607,47 @@ void model_t::assign_indicies() {
 
 std::pair<size_t, size_t>
 model_t::compute_chunk_size_mod(size_t num_tasks) const {
-  size_t total_roots = _tree.root_count();
-  size_t chunk_size = total_roots / num_tasks;
-  size_t mod = total_roots % num_tasks;
+  return compute_chunk_size_mod(_tree.root_count(), num_tasks);
+}
+
+std::pair<size_t, size_t>
+model_t::compute_chunk_size_mod(size_t root_count, size_t num_tasks) const {
+  size_t chunk_size = root_count / num_tasks;
+  size_t mod = root_count % num_tasks;
   return {chunk_size, mod};
 }
 
-void model_t::assign_indicies_by_rank(size_t rank, size_t num_tasks) {
+void model_t::assign_indicies_by_rank_search(size_t min_roots,
+                                             double root_ratio, size_t rank,
+                                             size_t num_tasks) {
+  size_t root_count =
+      std::max(static_cast<size_t>(_tree.root_count() * root_ratio), min_roots);
+
+  if (root_count < num_tasks) {
+    debug_string(EMIT_LEVEL_WARNING,
+                 "The number of searches is less than the number of processes. "
+                 "Some nodes will do no work");
+  }
+
+  size_t chunk_size, mod;
+  {
+    auto res = compute_chunk_size_mod(root_count, num_tasks);
+    chunk_size = res.first;
+    mod = res.second;
+  }
+
+  size_t beg = chunk_size * rank + std::min(mod, rank);
+  size_t end = chunk_size * (rank + 1) + std::min(mod, (rank + 1));
+  assign_indicies(beg, end);
+}
+
+void model_t::assign_indicies_by_rank_exhaustive(size_t rank,
+                                                 size_t num_tasks) {
+  if (_tree.root_count() < num_tasks) {
+    debug_string(EMIT_LEVEL_WARNING,
+                 "The number of searches is less than the number of processes. "
+                 "Some nodes will do no work");
+  }
   size_t chunk_size, mod;
   {
     auto res = compute_chunk_size_mod(num_tasks);
@@ -1605,28 +1660,27 @@ void model_t::assign_indicies_by_rank(size_t rank, size_t num_tasks) {
 }
 
 #ifdef MPI_VERSION
-void model_t::gather_exhaustive_results(
-    std::vector<std::pair<root_location_t, double>> &mapped_likelihoods) {
+void model_t::gather_results(
+    std::vector<std::pair<root_location_t, double>> &mapped_likelihoods, size_t total_size) {
 
   MPI_Barrier(MPI_COMM_WORLD);
-  int blocklenths[exhaustive_mode_results_t_nitems] = {1, 1, 1};
-  MPI_Datatype types[exhaustive_mode_results_t_nitems] = {MPI_INT, MPI_DOUBLE,
-                                                          MPI_DOUBLE};
-  MPI_Datatype mpi_exhaustive_mode_result_t;
-  MPI_Aint offsets[exhaustive_mode_results_t_nitems] = {
-      offsetof(exhaustive_mode_results_t, root_id),
-      offsetof(exhaustive_mode_results_t, lh),
-      offsetof(exhaustive_mode_results_t, alpha)};
-  MPI_Type_create_struct(exhaustive_mode_results_t_nitems, blocklenths, offsets,
-                         types, &mpi_exhaustive_mode_result_t);
-  MPI_Type_commit(&mpi_exhaustive_mode_result_t);
+  int blocklenths[rd_mpi_results_t_nitems] = {1, 1, 1};
+  MPI_Datatype types[rd_mpi_results_t_nitems] = {MPI_INT, MPI_DOUBLE,
+                                                 MPI_DOUBLE};
+  MPI_Datatype mpi_rd_mpi_results_t;
+  MPI_Aint offsets[rd_mpi_results_t_nitems] = {
+      offsetof(rd_mpi_results_t, root_id), offsetof(rd_mpi_results_t, lh),
+      offsetof(rd_mpi_results_t, alpha)};
+  MPI_Type_create_struct(rd_mpi_results_t_nitems, blocklenths, offsets, types,
+                         &mpi_rd_mpi_results_t);
+  MPI_Type_commit(&mpi_rd_mpi_results_t);
   size_t lockstep_roots =
-      _tree.root_count() / static_cast<size_t>(__MPI_NUM_TASKS__);
+      total_size / static_cast<size_t>(__MPI_NUM_TASKS__);
 
   debug_print(EMIT_LEVEL_DEBUG,
               "Starting to gather results from %d other processes",
               __MPI_NUM_TASKS__);
-  std::vector<exhaustive_mode_results_t> res_buffer;
+  std::vector<rd_mpi_results_t> res_buffer;
   std::vector<std::pair<root_location_t, double>> new_mapped_lh;
 
   for (size_t root_index = 0; root_index < lockstep_roots; ++root_index) {
@@ -1634,16 +1688,16 @@ void model_t::gather_exhaustive_results(
     auto cur_best_rl = mapped_likelihoods[root_index].first;
     auto cur_best_lh = mapped_likelihoods[root_index].second;
 
-    exhaustive_mode_results_t res{static_cast<int>(cur_best_rl.id), cur_best_lh,
-                                  cur_best_rl.brlen_ratio};
+    rd_mpi_results_t res{static_cast<int>(cur_best_rl.id), cur_best_lh,
+                         cur_best_rl.brlen_ratio};
 
     if (root_index < lockstep_roots) {
       if (__MPI_RANK__ == 0) {
         res_buffer.resize(static_cast<size_t>(__MPI_NUM_TASKS__));
       }
-      MPI_Gather(&res, 1, mpi_exhaustive_mode_result_t,
+      MPI_Gather(&res, 1, mpi_rd_mpi_results_t,
                  static_cast<void *>(res_buffer.data()), 1,
-                 mpi_exhaustive_mode_result_t, 0, MPI_COMM_WORLD);
+                 mpi_rd_mpi_results_t, 0, MPI_COMM_WORLD);
       debug_print(EMIT_LEVEL_DEBUG, "our id: %d, gather index 0 id: %d",
                   res.root_id, res_buffer[0].root_id);
     } else {
@@ -1659,14 +1713,14 @@ void model_t::gather_exhaustive_results(
         res_buffer.push_back(res);
         for (size_t r = 1; r < mod; ++r) {
           debug_print(EMIT_LEVEL_DEBUG, "recv from %lu", r);
-          exhaustive_mode_results_t recv_buf;
-          MPI_Recv(&recv_buf, 1, mpi_exhaustive_mode_result_t, r, 0,
-                   MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+          rd_mpi_results_t recv_buf;
+          MPI_Recv(&recv_buf, 1, mpi_rd_mpi_results_t, r, 0, MPI_COMM_WORLD,
+                   MPI_STATUS_IGNORE);
           res_buffer.push_back(recv_buf);
         }
       } else {
         if (static_cast<size_t>(__MPI_RANK__) < mod) {
-          MPI_Send(&res, 1, mpi_exhaustive_mode_result_t, 0, 0, MPI_COMM_WORLD);
+          MPI_Send(&res, 1, mpi_rd_mpi_results_t, 0, 0, MPI_COMM_WORLD);
         }
       }
     }
