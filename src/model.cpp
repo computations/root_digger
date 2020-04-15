@@ -854,6 +854,10 @@ std::pair<root_location_t, double>
 model_t::optimize_all(size_t min_roots, double root_ratio, double atol,
                       double pgtol, double brtol, double factor) {
 
+  if (_assigned_idx.size() == 0) {
+    throw std::runtime_error(
+        "Indicies were not assigned before calling optimizations functions");
+  }
   double best_lh = -std::numeric_limits<double>::infinity();
   root_location_t best_rl;
   if (_assigned_idx.size() == 0) {
@@ -1619,8 +1623,9 @@ model_t::compute_chunk_size_mod(size_t root_count, size_t num_tasks) const {
 void model_t::assign_indicies_by_rank_search(size_t min_roots,
                                              double root_ratio, size_t rank,
                                              size_t num_tasks) {
-  size_t root_count =
-      std::max(static_cast<size_t>(_tree.root_count() * root_ratio), min_roots);
+  size_t root_count = std::min(
+      std::max(static_cast<size_t>(_tree.root_count() * root_ratio), min_roots),
+      _tree.root_count());
 
   if (root_count < num_tasks) {
     debug_string(EMIT_LEVEL_WARNING,
@@ -1660,7 +1665,8 @@ void model_t::assign_indicies_by_rank_exhaustive(size_t rank,
 
 #ifdef MPI_VERSION
 void model_t::gather_results(
-    std::vector<std::pair<root_location_t, double>> &mapped_likelihoods, size_t total_size) {
+    std::vector<std::pair<root_location_t, double>> &mapped_likelihoods,
+    size_t total_size) {
 
   MPI_Barrier(MPI_COMM_WORLD);
   int blocklenths[rd_mpi_results_t_nitems] = {1, 1, 1};
@@ -1673,8 +1679,7 @@ void model_t::gather_results(
   MPI_Type_create_struct(rd_mpi_results_t_nitems, blocklenths, offsets, types,
                          &mpi_rd_mpi_results_t);
   MPI_Type_commit(&mpi_rd_mpi_results_t);
-  size_t lockstep_roots =
-      total_size / static_cast<size_t>(__MPI_NUM_TASKS__);
+  size_t lockstep_roots = total_size / static_cast<size_t>(__MPI_NUM_TASKS__);
 
   debug_print(EMIT_LEVEL_DEBUG,
               "Starting to gather results from %d other processes",
