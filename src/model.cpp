@@ -384,7 +384,6 @@ double model_t::compute_lh(const root_location_t &root_location) {
 #pragma omp parallel for reduction(+ : lh)
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    update_pmatrices(pmatrix_indices, branch_lengths);
 
     pll_update_partials(partition, ops.data(),
                         static_cast<unsigned int>(ops.size()));
