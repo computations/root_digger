@@ -74,6 +74,9 @@ static void print_run_header(
 #endif
   debug_print(EMIT_LEVEL_IMPORTANT, "Command: %s",
               combine_argv_argc(argv, argc).c_str());
+  debug_string(EMIT_LEVEL_IMPORTANT,
+               "Please report any bugs to "
+               "https://groups.google.com/forum/#!forum/raxml");
 }
 
 class initialized_flag_t {

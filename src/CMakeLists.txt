@@ -32,9 +32,10 @@ endif()
 
 if(MPI_BUILD)
     set(RD_COMPILE_DEFS ${RD_COMPILE_DEFS} MPI_BUILD)
+    set(LINK_LIBS ${LINK_LIBS} MPI::MPI_CXX)
 endif()
 
-target_link_libraries(rd ${LINK_LIBS} MPI::MPI_CXX)
+target_link_libraries(rd ${LINK_LIBS})
 #target_link_options(rd PRIVATE -fno-omit-frame-pointer -fsanitize=address)
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
