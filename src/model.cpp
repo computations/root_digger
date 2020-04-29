@@ -356,15 +356,13 @@ void model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
   }
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
     auto part = _partitions[part_index];
-#pragma omp parallel for collapse(2) schedule(static) default(shared)
-    for (size_t i = 0; i < part->rate_cats; ++i) {
-      for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
-        auto param_index = _param_indicies[part_index];
-        auto matrix_index = pmatrix_indices[branch];
-        auto branch_length = branch_lengths[branch];
-        pll_update_prob_matrices(part, param_index.data(), &matrix_index,
-                                 &branch_length, 1);
-      }
+#pragma omp parallel for collapse(1) schedule(static)
+    for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
+      auto param_index = _param_indicies[part_index];
+      auto matrix_index = pmatrix_indices[branch];
+      auto branch_length = branch_lengths[branch];
+      pll_update_prob_matrices(part, param_index.data(), &matrix_index,
+                               &branch_length, 1);
     }
   }
 }
