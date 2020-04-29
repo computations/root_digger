@@ -1,7 +1,9 @@
 # Root Digger
 
-RootDigger is a program that will, when given a MSA and an unrooted tree place a
-root on the given tree.
+RootDigger is a program that will, when given a MSA and an unrooted tree with
+branch lengths place a root on the given tree. For the foreseeable future,
+RootDigger will only support DNA data, as the method RootDigger uses is
+ineffective when using AA data.
 
 # Building
 
