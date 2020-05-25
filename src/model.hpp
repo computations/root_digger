@@ -4,9 +4,11 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#include "checkpoint.hpp"
 #include "debug.h"
 #include "msa.hpp"
 #include "tree.hpp"
+#include "util.hpp"
 #include <functional>
 #ifdef MPI_BUILD
 #include <mpi.h>
@@ -40,12 +42,6 @@ model_params_t parse_model_file(const std::string &model_filename);
 model_params_t random_params(size_t size, uint64_t seed);
 
 #ifdef MPI_VERSION
-struct rd_mpi_results_t {
-  int root_id;
-  double lh;
-  double alpha;
-};
-
 constexpr const int rd_mpi_results_t_nitems = 3;
 #endif
 
@@ -71,13 +67,14 @@ public:
   std::pair<root_location_t, double> optimize_root_location(size_t min_roots,
                                                             double root_ratio);
 
-  std::pair<root_location_t, double> optimize_all(size_t min_roots,
-                                                  double root_ratio,
-                                                  double atol, double pgtol,
-                                                  double brtol, double factor);
+  std::pair<root_location_t, double> search(size_t min_roots, double root_ratio,
+                                            double atol, double pgtol,
+                                            double brtol, double factor,
+                                            checkpoint_t &);
 
   std::pair<root_location_t, double>
-  exhaustive_search(double atol, double pgtol, double brtol, double factor);
+  exhaustive_search(double atol, double pgtol, double brtol, double factor,
+                    checkpoint_t &);
 
   const rooted_tree_t &rooted_tree(const root_location_t &root);
   const rooted_tree_t &virtual_rooted_tree(const root_location_t &root);
@@ -90,15 +87,17 @@ public:
   std::vector<std::pair<root_location_t, double>> suggest_roots();
   std::vector<std::pair<root_location_t, double>> suggest_roots(size_t min,
                                                                 double ratio);
-  std::vector<root_location_t> suggest_roots_random(size_t min, double ratio);
+  std::vector<size_t> shuffle_root_indicies();
   std::vector<double> compute_all_root_lh();
   void set_subst_rates(size_t, const model_params_t &);
   void set_freqs(size_t, const model_params_t &);
   void assign_indicies(const std::vector<size_t> &);
   void assign_indicies(size_t, size_t);
+  void assign_indicies(size_t beg, size_t end, std::vector<size_t> idx);
   void assign_indicies();
-  void assign_indicies_by_rank_search(size_t, double, size_t, size_t);
-  void assign_indicies_by_rank_exhaustive(size_t, size_t);
+  void assign_indicies_by_rank_search(size_t, double, size_t, size_t,
+                                      checkpoint_t &);
+  void assign_indicies_by_rank_exhaustive(size_t, size_t, checkpoint_t &);
 
 private:
   std::pair<root_location_t, double>
@@ -151,7 +150,8 @@ private:
   std::pair<size_t, size_t> compute_chunk_size_mod(size_t num_tasks) const;
 
 #ifdef MPI_VERSION
-  void gather_results(std::vector<std::pair<root_location_t, double>> &, size_t);
+  void gather_results(std::vector<std::pair<root_location_t, double>> &,
+                      size_t);
 #endif
 
   rooted_tree_t _tree;

@@ -40,9 +40,9 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EX_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}"
 
 find_package(MPI)
 
-
 if(STATIC_BUILD)
     set(STATIC_GSL ON)
+    add_dependencies(rd gsl)
 endif()
 
 if(NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))

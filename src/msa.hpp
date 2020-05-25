@@ -6,60 +6,10 @@ extern "C" {
 }
 
 #include "debug.h"
+#include "util.hpp"
 #include <string>
 #include <unordered_set>
 #include <vector>
-
-namespace param_type {
-enum param_type_e { emperical, estimate, equal, user };
-}
-
-struct freq_opts_t {
-  param_type::param_type_e type;
-};
-
-struct invar_opts_t {
-  param_type::param_type_e type;
-  float user_prop;
-};
-
-namespace rate_category {
-enum rate_category_e { MEDIAN, MEAN, FREE };
-}
-
-struct ratehet_opts_t {
-  param_type::param_type_e type;
-  rate_category::rate_category_e rate_category_type;
-  size_t rate_cats = 0;
-  bool alpha_init = false;
-  double alpha;
-};
-
-namespace asc_bias_type {
-enum asc_bias_type_e { lewis, fels, stam };
-}
-
-struct asc_bias_opts_t {
-  asc_bias_type::asc_bias_type_e type;
-  double fels_weight;
-  std::vector<double> stam_weights;
-};
-
-struct model_info_t {
-  size_t states;
-  std::string subst_str;
-  freq_opts_t freq_opts;
-  invar_opts_t invar_opts;
-  ratehet_opts_t ratehet_opts;
-  asc_bias_opts_t asc_opts;
-};
-
-struct partition_info_t {
-  std::vector<std::pair<size_t, size_t>> parts;
-  std::string model_name;
-  std::string partition_name;
-  model_info_t model;
-};
 
 /*
 static const char *dna_models[] = {

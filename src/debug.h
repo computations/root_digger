@@ -59,7 +59,7 @@ extern int __MPI_NUM_TASKS__;
           if (level == EMIT_LEVEL_MPI_DEBUG) {                                 \
             printf(" [Rank: %d]", __MPI_RANK__);                               \
           }                                                                    \
-          printf(" : ");                                   \
+          printf(" : ");                                                       \
         }                                                                      \
         if (level == EMIT_LEVEL_WARNING) {                                     \
           printf("[Warning] ");                                                \
@@ -84,11 +84,10 @@ extern int __MPI_NUM_TASKS__;
       int frames = backtrace(callstack, 128);                                  \
       char **bt_symbols = backtrace_symbols(callstack, frames);                \
       print_clock;                                                             \
-      printf("BACKTRACE AT %s:%d:%s():\n", __FILE__, __LINE__,        \
-              __func__);                                                       \
+      printf("BACKTRACE AT %s:%d:%s():\n", __FILE__, __LINE__, __func__);      \
       for (int i = 0; i < frames; ++i) {                                       \
         print_clock;                                                           \
-        printf("%s\n", bt_symbols[i]);                                \
+        printf("%s\n", bt_symbols[i]);                                         \
       }                                                                        \
     }                                                                          \
   } while (0)
