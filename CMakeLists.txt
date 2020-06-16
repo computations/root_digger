@@ -42,7 +42,6 @@ find_package(MPI)
 
 if(STATIC_BUILD)
     set(STATIC_GSL ON)
-    add_dependencies(rd gsl)
 endif()
 
 if(NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
@@ -61,8 +60,12 @@ set(LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
 add_subdirectory(lib)
 include_directories(${LOCALDEPS_DIR}/include)
 
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 add_subdirectory(src)
+if(STATIC_BUILD)
+    add_dependencies(rd gsl)
+endif()
 
 find_library(ASAN_FOUND asan)
 if(ASAN_FOUND AND NOT MPI_BUILD)
