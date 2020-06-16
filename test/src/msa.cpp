@@ -178,6 +178,32 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.ratehet_opts.type == param_type::estimate);
         CHECK(pi.model.ratehet_opts.rate_cats == 4);
       }
+      SECTION("free, ml specified"){
+        std::string line{"DNA+R4,PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+R4" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.ratehet_opts.type == param_type::estimate);
+        CHECK(pi.model.ratehet_opts.rate_cats == 4);
+        CHECK(pi.model.ratehet_opts.rate_category_type == rate_category::FREE);
+      }
+      SECTION("free, rates specified"){
+        std::string line{"DNA+R2{0.2/0.2}{0.1/0.1},PART_0=123-4123, 5122-12411"};
+        auto pi = parse_partition_info(line);
+        CHECK("DNA+R2{0.2/0.2}{0.1/0.1}" == pi.model_name);
+        CHECK("PART_0" == pi.partition_name);
+        CHECK(123 == pi.parts[0].first);
+        CHECK(4123 == pi.parts[0].second);
+        CHECK(5122 == pi.parts[1].first);
+        CHECK(12411 == pi.parts[1].second);
+        CHECK(pi.model.ratehet_opts.type == param_type::estimate);
+        CHECK(pi.model.ratehet_opts.rate_cats == 2);
+        CHECK(pi.model.ratehet_opts.rate_category_type == rate_category::FREE);
+      }
     }
     SECTION("All together"){
         std::string line{"DNA+G2{0.25}+F+I,PART_0=123-4123, 5122-12411"};

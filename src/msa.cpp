@@ -267,6 +267,7 @@ static inline ratehet_opts_t parse_ratehet_options(string_iter_t &iter) {
   switch (*iter) {
   default:
     ri.type = param_type::estimate;
+    ri.rate_category_type = rate_category::MEAN;
     if (std::isdigit(*iter)) {
       auto end = scan_integer(iter);
       int res = std::stoi(std::string(iter, end));
@@ -294,7 +295,7 @@ static inline ratehet_opts_t parse_ratehet_options(string_iter_t &iter) {
     break;
   case 'A':
   case 'a':
-    ri.median = true;
+    ri.rate_category_type = rate_category::MEDIAN;
     ri.type = param_type::estimate;
     ri.rate_cats = 4;
     iter++;
@@ -302,6 +303,32 @@ static inline ratehet_opts_t parse_ratehet_options(string_iter_t &iter) {
   debug_print(EMIT_LEVEL_DEBUG, "*iter: %c/%x", *iter, *iter);
   iter = skip_space(iter);
   return ri;
+}
+
+static inline ratehet_opts_t parse_ratehet_free_options(string_iter_t &iter) {
+  ratehet_opts_t rho;
+  iter++;
+  rho.type = param_type::estimate;
+  rho.rate_category_type = rate_category::FREE;
+  auto end = scan_integer(iter);
+
+  int res = std::stoi(std::string(iter, end));
+  if (res < 0) {
+    throw std::runtime_error(
+        "Number of rate categories can not be less than zero");
+  }
+  rho.rate_cats = static_cast<size_t>(res);
+  iter = end;
+  debug_print(EMIT_LEVEL_DEBUG, "iter: %c", *iter);
+  if (*iter == '{') {
+    debug_string(EMIT_LEVEL_WARNING, "Ignoring the user provided rate category "
+                                     "weights as they are not supported");
+    iter = skip_to(iter, [](char c) -> bool { return c == '}'; });
+    iter = skip_to(iter, [](char c) -> bool { return c == '}'; });
+    ++iter;
+  }
+  iter = skip_space(iter);
+  return rho;
 }
 
 static inline asc_bias_opts_t parse_ascbias_options(string_iter_t &iter) {
@@ -343,8 +370,6 @@ static inline asc_bias_opts_t parse_ascbias_options(string_iter_t &iter) {
   return abo;
 }
 
-// static inline void parse_char_to_state_option(string_iter_t &iter) {}
-
 model_info_t parse_model_info(const std::string &model_string) {
   model_info_t model_info;
   /* parse the subst matrix
@@ -384,10 +409,7 @@ model_info_t parse_model_info(const std::string &model_string) {
       break;
     case 'R':
     case 'r':
-      debug_string(EMIT_LEVEL_WARNING,
-                   "The 'R' option in the model string is not supported by "
-                   "root digger, and will be ignored.");
-      iter++;
+      model_info.ratehet_opts = parse_ratehet_free_options(iter);
       break;
     case 'M':
     case 'm':

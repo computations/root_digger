@@ -2,6 +2,7 @@
 #define RD_DEBUG
 
 #include <cassert>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <execinfo.h>
@@ -9,11 +10,16 @@
 #include <time.h>
 #include <unistd.h>
 
-const clock_t CLOCK_START = clock();
-extern bool __PROGRESS_BAR_FLAG__;
+const auto CLOCK_START = std::chrono::high_resolution_clock::now();
 extern int __VERBOSE__;
+extern int __MPI_RANK__;
+extern int __MPI_NUM_TASKS__;
 
+#ifdef RD_DEBUG_FLAG
 #define DEBUG_IF_FLAG 1
+#else
+#define DEBUG_IF_FLAG 0
+#endif
 
 #ifdef RD_DEBUG
 #define RD_DEBUG_ASSERT_FLAG 1
@@ -25,29 +31,44 @@ extern int __VERBOSE__;
 #define EMIT_LEVEL_ERROR 1
 #define EMIT_LEVEL_WARNING 2
 #define EMIT_LEVEL_PROGRESS 3
-#define EMIT_LEVEL_INFO 4
-#define EMIT_LEVEL_DEBUG 5
+#define EMIT_LEVEL_MPROGRESS 4
+#define EMIT_LEVEL_INFO 5
+#define EMIT_LEVEL_DEBUG 6
+#define EMIT_LEVEL_MPI_DEBUG 7
+
+#define progress_macro(i, k)                                                   \
+  (((std::chrono::high_resolution_clock::now() - CLOCK_START).count() /        \
+    static_cast<double>(i)) *                                                  \
+   (static_cast<double>(k - i)) / 1e9 / 3600.0)
 
 #define print_clock                                                            \
   do {                                                                         \
-    fprintf(stdout, "[%.2f] ",                                                 \
-            ((double)clock() - CLOCK_START) / CLOCKS_PER_SEC);                 \
+    std::chrono::duration<double> diff =                                       \
+        std::chrono::high_resolution_clock::now() - CLOCK_START;               \
+    printf("[%.2f] ", diff.count());                                           \
   } while (0)
 
 #define debug_print(level, fmt, ...)                                           \
   do {                                                                         \
-    if (DEBUG_IF_FLAG && __VERBOSE__ >= level) {                               \
-      print_clock;                                                             \
-      if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                   \
-        fprintf(stdout, "[%s:%d]: ", __func__, __LINE__);                      \
+    if (DEBUG_IF_FLAG || level < EMIT_LEVEL_DEBUG) {                           \
+      if (__VERBOSE__ >= level &&                                              \
+          (__MPI_RANK__ == 0 || level == EMIT_LEVEL_MPI_DEBUG)) {              \
+        print_clock;                                                           \
+        if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                 \
+          printf("[%s:%d]", __func__, __LINE__);                               \
+          if (level == EMIT_LEVEL_MPI_DEBUG) {                                 \
+            printf(" [Rank: %d]", __MPI_RANK__);                               \
+          }                                                                    \
+          printf(" : ");                                                       \
+        }                                                                      \
+        if (level == EMIT_LEVEL_WARNING) {                                     \
+          printf("[Warning] ");                                                \
+        }                                                                      \
+        if (level == EMIT_LEVEL_ERROR) {                                       \
+          printf("[ERROR] ");                                                  \
+        }                                                                      \
+        printf(fmt "\n", __VA_ARGS__);                                         \
       }                                                                        \
-      if (level == EMIT_LEVEL_WARNING) {                                       \
-        fprintf(stdout, "[Warning] ");                                         \
-      }                                                                        \
-      if (level == EMIT_LEVEL_ERROR) {                                         \
-        fprintf(stdout, "[ERROR] ");                                           \
-      }                                                                        \
-      fprintf(stdout, fmt "\n", __VA_ARGS__);                                  \
     }                                                                          \
   } while (0)
 
@@ -63,11 +84,10 @@ extern int __VERBOSE__;
       int frames = backtrace(callstack, 128);                                  \
       char **bt_symbols = backtrace_symbols(callstack, frames);                \
       print_clock;                                                             \
-      fprintf(stderr, "BACKTRACE AT %s:%d:%s():\n", __FILE__, __LINE__,        \
-              __func__);                                                       \
+      printf("BACKTRACE AT %s:%d:%s():\n", __FILE__, __LINE__, __func__);      \
       for (int i = 0; i < frames; ++i) {                                       \
         print_clock;                                                           \
-        fprintf(stderr, "%s\n", bt_symbols[i]);                                \
+        printf("%s\n", bt_symbols[i]);                                         \
       }                                                                        \
     }                                                                          \
   } while (0)
@@ -87,82 +107,4 @@ extern int __VERBOSE__;
       }                                                                        \
     }                                                                          \
   } while (0)
-
-#define turn_on_progress()                                                     \
-  do {                                                                         \
-    __PROGRESS_BAR_FLAG__ = true;                                              \
-  } while (0)
-
-#define turn_off_progress()                                                    \
-  do {                                                                         \
-    __PROGRESS_BAR_FLAG__ = false;                                             \
-  } while (0)
-
-#define toggle_progress()                                                      \
-  do {                                                                         \
-    __PROGRESS_BAR_FLAG__ = !__PROGRESS_BAR_FLAG__;                            \
-  } while (0)
-
-#define print_progress(done, total)                                            \
-  do {                                                                         \
-    if (__PROGRESS_BAR_FLAG__) {                                               \
-      struct winsize w;                                                        \
-      ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);                                    \
-      print_progress_cols(done, total, w.ws_col);                              \
-    }                                                                          \
-  } while (0)
-
-#define print_progress_cols(done, total, cols)                                 \
-  do {                                                                         \
-    if (__PROGRESS_BAR_FLAG__) {                                               \
-      size_t adj_cols = cols - 5;                                              \
-      if (done == 0)                                                           \
-        adj_cols--;                                                            \
-      size_t total_padding = 0;                                                \
-      size_t tmp = total;                                                      \
-      while (tmp != 0) {                                                       \
-        tmp /= 10;                                                             \
-        adj_cols--;                                                            \
-        total_padding++;                                                       \
-      }                                                                        \
-      size_t done_padding = total_padding;                                     \
-      tmp = done;                                                              \
-      while (tmp != 0) {                                                       \
-        tmp /= 10;                                                             \
-        adj_cols--;                                                            \
-        done_padding--;                                                        \
-      }                                                                        \
-      if (done == 0)                                                           \
-        done_padding = total_padding - 1;                                      \
-      adj_cols -= done_padding;                                                \
-      size_t done_cols = (done * adj_cols / total);                            \
-      size_t left_cols = adj_cols - done_cols;                                 \
-      printf("\r");                                                            \
-      fprintf(stdout, "[");                                                    \
-      fprintf(stdout, "\e[32m");                                               \
-      for (size_t i = 0; i < done_cols; ++i) {                                 \
-        fprintf(stdout, "=");                                                  \
-      }                                                                        \
-      fprintf(stdout, "\e[31m");                                               \
-      for (size_t i = 0; i < left_cols; ++i) {                                 \
-        fprintf(stdout, "-");                                                  \
-      }                                                                        \
-      fprintf(stdout, "\e[0m][");                                              \
-      for (size_t _i_ = 0; _i_ < done_padding; ++_i_) {                        \
-        fprintf(stdout, " ");                                                  \
-      }                                                                        \
-      fprintf(stdout, "\e[33m%lu\e[0m/\e[33m%lu\e[0m]", done, total);          \
-      fprintf(stdout, "\e[0m");                                                \
-      fflush(stdout);                                                          \
-    }                                                                          \
-  } while (0)
-
-#define finish_progress()                                                      \
-  do {                                                                         \
-    if (__PROGRESS_BAR_FLAG__) {                                               \
-      fprintf(stdout, "\n");                                                   \
-      fflush(stdout);                                                          \
-    }                                                                          \
-  } while (0)
-
 #endif

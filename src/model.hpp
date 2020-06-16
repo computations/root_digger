@@ -4,10 +4,15 @@
 extern "C" {
 #include <libpll/pll.h>
 }
+#include "checkpoint.hpp"
 #include "debug.h"
 #include "msa.hpp"
 #include "tree.hpp"
+#include "util.hpp"
 #include <functional>
+#ifdef MPI_BUILD
+#include <mpi.h>
+#endif
 #include <random>
 #include <string>
 #include <utility>
@@ -36,11 +41,24 @@ model_params_t parse_model_file(const std::string &model_filename);
 
 model_params_t random_params(size_t size, uint64_t seed);
 
+#ifdef MPI_VERSION
+constexpr const int rd_mpi_results_t_nitems = 3;
+#endif
+
 class model_t {
 public:
+  model_t(
+      rooted_tree_t t, const std::vector<msa_t> &msa,
+      const std::vector<size_t> &rate_cats,
+      const std::vector<rate_category::rate_category_e> &rate_category_types,
+      bool invariant_sites, uint64_t seed, bool early_stop);
   model_t(rooted_tree_t t, const std::vector<msa_t> &msa,
           const std::vector<size_t> &rate_cats, bool invariant_sites,
-          uint64_t seed, bool early_stop);
+          uint64_t seed, bool early_stop)
+      : model_t(t, msa, rate_cats,
+                std::vector<rate_category::rate_category_e>(
+                    rate_cats.size(), rate_category::MEAN),
+                invariant_sites, seed, early_stop){};
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
@@ -49,13 +67,14 @@ public:
   std::pair<root_location_t, double> optimize_root_location(size_t min_roots,
                                                             double root_ratio);
 
-  std::pair<root_location_t, double> optimize_all(size_t min_roots,
-                                                  double root_ratio,
-                                                  double atol, double pgtol,
-                                                  double brtol, double factor);
+  std::pair<root_location_t, double> search(size_t min_roots, double root_ratio,
+                                            double atol, double pgtol,
+                                            double brtol, double factor,
+                                            checkpoint_t &);
 
   std::pair<root_location_t, double>
-  exhaustive_search(double atol, double pgtol, double brtol, double factor);
+  exhaustive_search(double atol, double pgtol, double brtol, double factor,
+                    checkpoint_t &);
 
   const rooted_tree_t &rooted_tree(const root_location_t &root);
   const rooted_tree_t &virtual_rooted_tree(const root_location_t &root);
@@ -68,10 +87,17 @@ public:
   std::vector<std::pair<root_location_t, double>> suggest_roots();
   std::vector<std::pair<root_location_t, double>> suggest_roots(size_t min,
                                                                 double ratio);
-  std::vector<root_location_t> suggest_roots_random(size_t min, double ratio);
+  std::vector<size_t> shuffle_root_indicies();
   std::vector<double> compute_all_root_lh();
   void set_subst_rates(size_t, const model_params_t &);
   void set_freqs(size_t, const model_params_t &);
+  void assign_indicies(const std::vector<size_t> &);
+  void assign_indicies(size_t, size_t);
+  void assign_indicies(size_t beg, size_t end, std::vector<size_t> idx);
+  void assign_indicies();
+  void assign_indicies_by_rank_search(size_t, double, size_t, size_t,
+                                      checkpoint_t &);
+  void assign_indicies_by_rank_exhaustive(size_t, size_t, checkpoint_t &);
 
 private:
   std::pair<root_location_t, double>
@@ -83,14 +109,23 @@ private:
   void set_subst_rates_random(size_t, const msa_t &);
   void set_subst_rates_random(size_t, size_t);
   void set_subst_rates_uniform();
+  void set_gamma_weights(size_t, model_params_t);
   void set_gamma_rates(size_t);
-  void set_gamma_rates(size_t, double);
+  void set_gamma_rates(size_t, const model_params_t &);
+  void set_gamma_rates_mean(size_t);
+  void set_gamma_rates_mean(size_t, double);
+  void set_gamma_rates_median(size_t);
+  void set_gamma_rates_median(size_t, double);
+  void set_gamma_rates_free(size_t);
+  void set_gamma_rates_free(size_t, model_params_t);
   void update_invariant_sites(size_t);
   void set_tip_states(size_t, const msa_t &);
   void set_empirical_freqs(size_t);
   void set_empirical_freqs();
   void set_freqs_all_free(size_t, model_params_t);
   void move_root(const root_location_t &new_root);
+  void update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
+                        const std::vector<double> &branch_lengths);
   double bfgs_rates(model_params_t &initial_rates, const root_location_t &rl,
                     size_t partition_index, double pgtol, double factor);
   double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,
@@ -99,16 +134,34 @@ private:
                   size_t partition_index);
   double gd_freqs(model_params_t &initial_rates, const root_location_t &rl,
                   size_t partition_index);
-  double bfgs_gamma(double &intial_alpha, const root_location_t &rl,
-                    size_t partition_index, double pgtol, double factor);
-  double gd_gamma(double &intial_alpha, const root_location_t &rl,
-                  size_t partition_index);
+  double bfgs_gamma_rates(model_params_t &intial_alpha,
+                          const root_location_t &rl, size_t partition_index,
+                          double pgtol, double factor);
+  double gd_gamma_rates(model_params_t &intial_alpha, const root_location_t &rl,
+                        size_t partition_index);
+  double bfgs_gamma_weights(model_params_t &intial_alpha,
+                            const root_location_t &rl, size_t partition_index,
+                            double pgtol, double factor);
+  double gd_gamma_weights(model_params_t &intial_alpha,
+                          const root_location_t &rl, size_t partition_index);
+
+  std::pair<size_t, size_t> compute_chunk_size_mod(size_t root_count,
+                                                   size_t num_tasks) const;
+  std::pair<size_t, size_t> compute_chunk_size_mod(size_t num_tasks) const;
+
+#ifdef MPI_VERSION
+  void gather_results(std::vector<std::pair<root_location_t, double>> &,
+                      size_t);
+#endif
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;
+  std::vector<rate_category::rate_category_e> _rate_category_types;
   std::vector<double> _partition_weights;
-  std::vector<std::vector<double>> _rate_weights;
+  std::vector<model_params_t> _rate_rates;
+  std::vector<model_params_t> _rate_weights;
   std::vector<std::vector<unsigned int>> _param_indicies;
+  std::vector<size_t> _assigned_idx;
   std::minstd_rand _random_engine;
   bool _invariant_sites;
   uint64_t _seed;

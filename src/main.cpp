@@ -1,16 +1,19 @@
 extern "C" {
 #include <libpll/pll.h>
 }
-#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <cmath>
-#include <ctime>
 #include <fstream>
 #include <getopt.h>
 #include <iomanip>
 #include <iostream>
-#include <memory>
+#include <omp.h>
+#include <sstream>
+#ifdef MPI_BUILD
+#include <mpi.h>
+#endif
+#include <cstdlib>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -18,9 +21,13 @@ extern "C" {
 
 #include "debug.h"
 int __VERBOSE__ = EMIT_LEVEL_PROGRESS;
+int __MPI_RANK__ = 0;
+int __MPI_NUM_TASKS__ = 1;
+#include "checkpoint.hpp"
 #include "model.hpp"
 #include "msa.hpp"
 #include "tree.hpp"
+#include "util.hpp"
 
 #define STRING(s) #s
 #define STRINGIFY(s) STRING(s)
@@ -36,7 +43,7 @@ static void print_version() {
 
 static void print_run_header(
     const std::chrono::time_point<std::chrono::system_clock> &start_time,
-    uint64_t seed) {
+    uint64_t seed, size_t threads, int argv, char **argc) {
   time_t st = std::chrono::system_clock::to_time_t(start_time);
   char time_string[256];
   std::strftime(time_string, sizeof(time_string), "%F %T", std::localtime(&st));
@@ -44,63 +51,21 @@ static void print_run_header(
   print_version();
   debug_print(EMIT_LEVEL_IMPORTANT, "Started: %s", time_string);
   debug_print(EMIT_LEVEL_IMPORTANT, "Seed: %lu", seed);
+  debug_print(EMIT_LEVEL_IMPORTANT, "Number of threads per proc: %lu", threads);
+#ifdef MPI_VERSION
+  debug_print(EMIT_LEVEL_IMPORTANT, "Number of procs %d", __MPI_NUM_TASKS__);
+#endif
+  debug_print(EMIT_LEVEL_IMPORTANT, "Command: %s",
+              combine_argv_argc(argv, argc).c_str());
+  debug_string(EMIT_LEVEL_IMPORTANT,
+               "Please report any bugs to "
+               "https://groups.google.com/forum/#!forum/raxml");
 }
 
-class initialized_flag_t {
-public:
-  enum value_t {
-    uninitalized,
-    initialized_true,
-    initialized_false,
-  };
-  initialized_flag_t() : value(value_t::uninitalized){};
-  constexpr initialized_flag_t(const value_t &v) : value(v) {}
-  constexpr bool operator==(const initialized_flag_t &rhs) const {
-    return rhs.value == value;
-  }
-  constexpr bool operator!=(const initialized_flag_t &rhs) const {
-    return rhs.value != value;
-  }
-  constexpr bool initalized() const { return value != value_t::uninitalized; }
-  initialized_flag_t &operator=(const initialized_flag_t &rhs) {
-    value = rhs.value;
-    return *this;
-  }
-  bool convert_with_default(bool default_value) {
-    if (value == value_t::uninitalized)
-      return default_value;
-    return value == value_t::initialized_true;
-  }
-
-private:
-  value_t value;
-};
-
-struct cli_options_t {
-  std::string msa_filename;
-  std::string tree_filename;
-  std::string output_tree_filename;
-  std::string model_filename;
-  std::string freqs_filename;
-  std::string partition_filename;
-  std::string data_type;
-  std::vector<size_t> rate_cats{1};
-  uint64_t seed = std::random_device()();
-  size_t min_roots = 1;
-  double root_ratio = 0.01;
-  double abs_tolerance = 1e-7;
-  double factor = 1e4;
-  double br_tolerance = 1e-12;
-  double bfgs_tol = 1e-7;
-  const unsigned int states = 4;
-  bool silent = false;
-  bool exhaustive = false;
-  bool echo = false;
-  bool invariant_sites = false;
-  initialized_flag_t early_stop;
-};
-
 static void print_usage() {
+  if (__MPI_RANK__ != 0) {
+    return;
+  }
   std::cout
       << "Usage: rd [options]\n"
       << "Version: " << GIT_REV_STRING << "\n"
@@ -112,6 +77,8 @@ static void print_usage() {
       << "    --partition [FILE]\n"
       << "           Optional file containing the partition specification.\n"
       << "           Format is the same as RAxML-NG partition file.\n"
+      << "    --prefix [STRING]\n"
+      << "           Prefix for the output files.\n"
       << "    --exhaustive\n"
       << "           Enable exhaustive mode. This will attempt to root a tree\n"
       << "           at every branch, and then report the results using LWR.\n"
@@ -146,6 +113,8 @@ static void print_usage() {
       << "           Tolerance for the BFGS steps. Default is 1e-7\n"
       << "    --factor [NUMBER]\n"
       << "           Factor for the BFGS steps. Default is 1e4\n"
+      << "    --threads [NUMBER]\n"
+      << "           Number of threads to use\n"
       << "    --silent\n"
       << "           Suppress output except for the final tree\n"
       << "    --verbose\n"
@@ -154,140 +123,229 @@ static void print_usage() {
       << std::endl;
 }
 
-int main(int argv, char **argc) {
-  auto start_time = std::chrono::system_clock::now();
+cli_options_t parse_options(int argv, char **argc) {
   static struct option long_opts[] = {
       {"msa", required_argument, 0, 0},             /* 0 */
       {"tree", required_argument, 0, 0},            /* 1 */
       {"model", required_argument, 0, 0},           /* 2 */
-      {"seed", required_argument, 0, 0},            /* 4 */
-      {"verbose", no_argument, 0, 0},               /* 5 */
-      {"silent", no_argument, 0, 0},                /* 6 */
-      {"min-roots", required_argument, 0, 0},       /* 7 */
-      {"root-ratio", required_argument, 0, 0},      /* 8 */
-      {"atol", required_argument, 0, 0},            /* 9 */
-      {"brtol", required_argument, 0, 0},           /* 10 */
-      {"bfgstol", required_argument, 0, 0},         /* 11 */
-      {"factor", required_argument, 0, 0},          /* 12 */
-      {"partition", required_argument, 0, 0},       /* 13 */
-      {"treefile", required_argument, 0, 0},        /* 14 */
-      {"exhaustive", no_argument, 0, 0},            /* 15 */
-      {"early-stop", no_argument, 0, 0},            /* 16 */
-      {"no-early-stop", no_argument, 0, 0},         /* 17 */
-      {"rate-cats", required_argument, 0, 0},       /* 18 */
+      {"seed", required_argument, 0, 0},            /* 3 */
+      {"verbose", no_argument, 0, 0},               /* 4 */
+      {"silent", no_argument, 0, 0},                /* 5 */
+      {"min-roots", required_argument, 0, 0},       /* 6 */
+      {"root-ratio", required_argument, 0, 0},      /* 7 */
+      {"atol", required_argument, 0, 0},            /* 8 */
+      {"brtol", required_argument, 0, 0},           /* 9 */
+      {"bfgstol", required_argument, 0, 0},         /* 10 */
+      {"factor", required_argument, 0, 0},          /* 11 */
+      {"partition", required_argument, 0, 0},       /* 12 */
+      {"prefix", required_argument, 0, 0},          /* 13 */
+      {"exhaustive", no_argument, 0, 0},            /* 14 */
+      {"early-stop", no_argument, 0, 0},            /* 15 */
+      {"no-early-stop", no_argument, 0, 0},         /* 16 */
+      {"rate-cats", required_argument, 0, 0},       /* 17 */
+      {"rate-cats-type", required_argument, 0, 0},  /* 18 */
       {"invariant-sites", required_argument, 0, 0}, /* 19 */
-      {"version", no_argument, 0, 0},               /* 20 */
-      {"debug", no_argument, 0, 0},                 /* 21 */
-      {"echo", no_argument, 0, 0},                  /* 22 */
+      {"threads", required_argument, 0, 0},         /* 20 */
+      {"version", no_argument, 0, 0},               /* 21 */
+      {"debug", no_argument, 0, 0},                 /* 22 */
+      {"mpi-debug", no_argument, 0, 0},             /* 22 */
+      {"echo", no_argument, 0, 0},                  /* 23 */
       {0, 0, 0, 0},
   };
+
+  int c;
+  int index = 0;
+  cli_options_t cli_options;
+  while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
+    debug_print(EMIT_LEVEL_DEBUG, "parsing option index: %d", index);
+    switch (index) {
+    case 0: // msa
+      cli_options.msa_filename = optarg;
+      break;
+    case 1: // tree
+      cli_options.tree_filename = optarg;
+      break;
+    case 2: // model
+      cli_options.model_string = optarg;
+      break;
+    case 3: // seed
+      cli_options.seed = static_cast<uint64_t>(atol(optarg));
+      break;
+    case 4: // verbose
+      __VERBOSE__ += 1;
+      break;
+    case 5: // silent
+      __VERBOSE__ = 0;
+      cli_options.silent = true;
+      break;
+    case 6: // min-roots
+      cli_options.min_roots = static_cast<size_t>(atol(optarg));
+      break;
+    case 7: // root-ratio
+      cli_options.root_ratio = atof(optarg);
+      break;
+    case 8: // atol
+      cli_options.abs_tolerance = atof(optarg);
+      break;
+    case 9: // brtol
+      cli_options.br_tolerance = atof(optarg);
+      break;
+    case 10: // bfgs_tol
+      cli_options.bfgs_tol = atof(optarg);
+      break;
+    case 11: // factor
+      cli_options.factor = atof(optarg);
+      break;
+    case 12: // partition
+      cli_options.partition_filename = optarg;
+      break;
+    case 13: // prefix
+      cli_options.prefix = optarg;
+      break;
+    case 14: // exhaustive
+      cli_options.exhaustive = true;
+      break;
+    case 15: // early-stop
+      cli_options.early_stop = initialized_flag_t::initialized_true;
+      break;
+    case 16: // no-early-stop
+      cli_options.early_stop = initialized_flag_t::initialized_false;
+      break;
+    case 17: // rate-cats
+      cli_options.rate_cats = {(size_t)atol(optarg)};
+      break;
+    case 18: // rate-cats-type
+      if (strcmp(optarg, "mean") == 0) {
+        cli_options.rate_category_types.push_back(rate_category::MEAN);
+      } else if (strcmp(optarg, "median") == 0) {
+        cli_options.rate_category_types.push_back(rate_category::MEDIAN);
+      } else if (strcmp(optarg, "free") == 0) {
+        cli_options.rate_category_types.push_back(rate_category::FREE);
+      }
+      break;
+    case 19: // invariant-sites
+      cli_options.invariant_sites = true;
+      break;
+    case 20: // threads
+      cli_options.threads = {(size_t)atol(optarg)};
+      break;
+    case 21: // version
+      print_version();
+      std::exit(0);
+    case 22: // debug
+      __VERBOSE__ = EMIT_LEVEL_DEBUG;
+      break;
+    case 23: // mpi-debug
+      __VERBOSE__ = EMIT_LEVEL_MPI_DEBUG;
+      break;
+    case 24: // echo
+      cli_options.echo = true;
+      break;
+    default:
+      throw std::invalid_argument("An argument was not recognized");
+    }
+  }
+#ifdef MPI_VERSION
+  debug_string(EMIT_LEVEL_DEBUG, "Broadcasting seed");
+  MPI_Bcast(&cli_options.seed, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
+  debug_print(EMIT_LEVEL_MPI_DEBUG, "seed: %lu", cli_options.seed);
+#endif
+
+  if (cli_options.root_ratio < 0) {
+    throw std::runtime_error("Root ratio is negative");
+  }
+
+  return cli_options;
+}
+
+/* This function defines what gets overridden by the checkpoint, and what
+ * doesn't. There are plenty of things that need to stay the same, like the
+ * search options, and the "model". But the number of threads/processes can
+ * change. So this function handles that
+ */
+void merge_options_checkpoint(cli_options_t &cli_options,
+                              checkpoint_t &checkpoint) {
+  if (!checkpoint.existing_checkpoint()) {
+    return;
+  }
+
+  cli_options_t checkpoint_options;
+  checkpoint.load_options(checkpoint_options);
+  checkpoint_options.threads = cli_options.threads;
+  checkpoint_options.silent = cli_options.silent;
+
+  std::swap(cli_options, checkpoint_options);
+}
+
+void verify_options(const cli_options_t &cli_options) {
+  if (cli_options.msa_filename.empty()) {
+    std::cout << "No MSA was given, please supply an MSA" << std::endl;
+    print_usage();
+    std::exit(1);
+  }
+  if (cli_options.tree_filename.empty()) {
+    std::cout << "No tree was given, please supply an tree" << std::endl;
+    print_usage();
+    std::exit(1);
+  }
+}
+
+int wrapped_main(int argv, char **argc) {
+#ifdef MPI_VERSION
+  MPI_Comm_size(MPI_COMM_WORLD, &__MPI_NUM_TASKS__);
+  MPI_Comm_rank(MPI_COMM_WORLD, &__MPI_RANK__);
+#endif
+
+#ifdef MPI_VERSION
+  if (__MPI_NUM_TASKS__ == 1) {
+    debug_string(EMIT_LEVEL_WARNING, "Running MPI version with only 1 process, "
+                                     "is this really what you meant?");
+  }
+#endif
 
   if (argv == 1) {
     print_usage();
     return 0;
   }
+
+  auto start_time = std::chrono::system_clock::now();
+  if (argv == 1) {
+    print_usage();
+    return 0;
+  }
   try {
-    int c;
-    int index = 0;
-    cli_options_t cli_options;
-    while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
-      debug_print(EMIT_LEVEL_DEBUG, "parsing option index: %d", index);
-      switch (index) {
-      case 0: // msa
-        cli_options.msa_filename = optarg;
-        break;
-      case 1: // tree
-        cli_options.tree_filename = optarg;
-        break;
-      case 2: // model
-        cli_options.model_filename = optarg;
-        break;
-      case 3: // seed
-        cli_options.seed = static_cast<uint64_t>(atol(optarg));
-        break;
-      case 4: // verbose
-        __VERBOSE__ += 1;
-        break;
-      case 5: // silent
-        __VERBOSE__ = 0;
-        cli_options.silent = true;
-        break;
-      case 6: // min-roots
-        cli_options.min_roots = static_cast<size_t>(atol(optarg));
-        break;
-      case 7: // root-ratio
-        cli_options.root_ratio = atof(optarg);
-        break;
-      case 8: // atol
-        cli_options.abs_tolerance = atof(optarg);
-        break;
-      case 9: // brtol
-        cli_options.br_tolerance = atof(optarg);
-        break;
-      case 10: // bfgs_tol
-        cli_options.bfgs_tol = atof(optarg);
-        break;
-      case 11: // factor
-        cli_options.factor = atof(optarg);
-        break;
-      case 12: // partition
-        cli_options.partition_filename = optarg;
-        break;
-      case 13: // treefile
-        cli_options.output_tree_filename = optarg;
-        break;
-      case 14: // exhaustive
-        cli_options.exhaustive = true;
-        break;
-      case 15: // early-stop
-        cli_options.early_stop = initialized_flag_t::initialized_true;
-        break;
-      case 16: // no-early-stop
-        cli_options.early_stop = initialized_flag_t::initialized_false;
-        break;
-      case 17: // rate-cats
-        cli_options.rate_cats = {(size_t)atol(optarg)};
-        break;
-      case 18:
-        cli_options.invariant_sites = true;
-        break;
-      case 19: // version
-        print_version();
-        return 0;
-      case 20: // debug
-        __VERBOSE__ = EMIT_LEVEL_DEBUG;
-        break;
-      case 21: // echo
-        cli_options.echo = true;
-        break;
-      default:
-        throw std::invalid_argument("An argument was not recognized");
-      }
+
+    auto cli_options = parse_options(argv, argc);
+
+    checkpoint_t checkpoint(cli_options.prefix);
+    merge_options_checkpoint(cli_options, checkpoint);
+    if (__MPI_RANK__ == 0) {
+      checkpoint.save_options(cli_options);
+      checkpoint.clean();
+    }
+#ifdef MPI_VERSION
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
+    checkpoint.reload();
+    debug_print(EMIT_LEVEL_MPI_DEBUG, "Checkpoint inode %d",
+                checkpoint.get_inode());
+
+    if (cli_options.threads == 0) {
+#ifdef MPI_VERSION
+      cli_options.threads = 1;
+#else
+      cli_options.threads = sysutil_get_cpu_cores();
+#endif
     }
 
-    if (cli_options.msa_filename.empty()) {
-      print_usage();
-      return 1;
-    }
-    if (cli_options.tree_filename.empty()) {
-      print_usage();
-      return 1;
-    }
-
-    model_params_t model_params;
-
-    if (!cli_options.model_filename.empty()) {
-      model_params = parse_model_file(cli_options.model_filename);
-    } else if (cli_options.states == 0) {
-      std::cout << "Please give either a model file, or a number of states to "
-                   "the model"
-                << std::endl;
-      print_usage();
-      return 1;
-    }
+#ifdef _OPENMP
+    omp_set_num_threads(cli_options.threads);
+#endif
 
     if (!cli_options.silent)
-      print_run_header(start_time, cli_options.seed);
+      print_run_header(start_time, cli_options.seed, cli_options.threads, argv,
+                       argc);
 
     debug_print(EMIT_LEVEL_INFO, "abs_tolerance: %.08f",
                 cli_options.abs_tolerance);
@@ -295,19 +353,35 @@ int main(int argv, char **argc) {
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)) {
     }
 
-    const pll_state_t *map = nullptr;
-    if (cli_options.states == 4)
-      map = pll_map_nt;
-    else if (cli_options.states == 20)
-      map = pll_map_aa;
-    else
-      throw std::runtime_error("Data Type is not supported");
+    constexpr const pll_state_t *map = pll_map_nt;
 
-    if (map == nullptr) {
-      throw std::invalid_argument(
-          "Root digger only supports protein and nucleotide data");
+    /* Parse the model */
+    if (!cli_options.model_string.empty()) {
+      auto mi = parse_model_info(cli_options.model_string);
+      cli_options.rate_cats.clear();
+      cli_options.rate_category_types.clear();
+      cli_options.rate_cats.push_back(mi.ratehet_opts.rate_cats);
+      cli_options.rate_category_types.push_back(
+          mi.ratehet_opts.rate_category_type);
+      if (mi.ratehet_opts.alpha_init) {
+        debug_string(EMIT_LEVEL_WARNING,
+                     "Ignoring alpha in model string as it currently "
+                     "is not suported");
+      }
+      auto subst_str{mi.subst_str};
+
+      for (auto &ch : subst_str) {
+        ch = std::tolower(ch);
+      }
+      if (subst_str != "unrest") {
+        debug_print(EMIT_LEVEL_WARNING,
+                    "Ignoring subst matrix %s for model from command line"
+                    ". Currently only UNREST is supported",
+                    mi.subst_str.c_str());
+      }
     }
 
+    /* Parse the MSA */
     std::vector<msa_t> msa;
     msa_partitions_t part_infos;
     if (cli_options.partition_filename.empty()) {
@@ -319,6 +393,7 @@ int main(int argv, char **argc) {
       msa = unparted_msa.partition(part_infos);
     }
 
+    /* Parse the partitions */
     if (part_infos.size() > 0) {
       if (cli_options.rate_cats.size() > 0) {
         debug_string(EMIT_LEVEL_WARNING,
@@ -354,10 +429,21 @@ int main(int argv, char **argc) {
       }
     }
 
+    /* Set some defaults for rates */
+    if (cli_options.rate_category_types.size() == 0) {
+      cli_options.rate_category_types.push_back(rate_category::MEAN);
+    }
+
+    if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0) {
+      throw std::runtime_error("Rate categories cannot be zero");
+    }
+
+    /* Check the msa for validity */
     for (auto &m : msa) {
       m.valid_data();
     }
 
+    /* Make the tree */
     rooted_tree_t tree{cli_options.tree_filename};
 
     if (cli_options.min_roots > tree.root_count()) {
@@ -365,14 +451,11 @@ int main(int argv, char **argc) {
           "Min roots is larger than the number of roots on the tree");
     }
 
-    if (cli_options.root_ratio < 0) {
-      throw std::runtime_error("Root ratio is negative");
-    }
-
     model_t model{
         tree,
         msa,
         cli_options.rate_cats,
+        cli_options.rate_category_types,
         cli_options.invariant_sites,
         cli_options.seed,
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)};
@@ -388,45 +471,81 @@ int main(int argv, char **argc) {
 
     model.compute_lh(tree.root_location(0));
     root_location_t final_rl;
-    double final_lh;
+    double final_lh = -std::numeric_limits<double>::infinity();
     std::string final_tree_string;
     if (!cli_options.exhaustive) {
-      auto tmp =
-          model.optimize_all(cli_options.min_roots, cli_options.root_ratio,
-                             cli_options.abs_tolerance, cli_options.bfgs_tol,
-                             cli_options.br_tolerance, cli_options.factor);
-      final_rl = tmp.first;
-      final_lh = tmp.second;
-      final_tree_string = model.rooted_tree(final_rl).newick();
+      model.assign_indicies_by_rank_search(
+          cli_options.min_roots, cli_options.root_ratio,
+          static_cast<size_t>(__MPI_RANK__),
+          static_cast<size_t>(__MPI_NUM_TASKS__), checkpoint);
+#ifdef MPI_VERSION
+      MPI_Barrier(MPI_COMM_WORLD);
+#endif
+      auto tmp = model.search(cli_options.min_roots, cli_options.root_ratio,
+                              cli_options.abs_tolerance, cli_options.bfgs_tol,
+                              cli_options.br_tolerance, cli_options.factor,
+                              checkpoint);
+      if (__MPI_RANK__ == 0) {
+        final_rl = tmp.first;
+        final_lh = tmp.second;
+        final_tree_string = model.rooted_tree(final_rl).newick();
+      }
     } else {
+
+      model.assign_indicies_by_rank_exhaustive(
+          static_cast<size_t>(__MPI_RANK__),
+          static_cast<size_t>(__MPI_NUM_TASKS__), checkpoint);
+
+#ifdef MPI_VERSION
+      MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
       auto tmp = model.exhaustive_search(
           cli_options.abs_tolerance, cli_options.bfgs_tol,
-          cli_options.br_tolerance, cli_options.factor);
-      final_rl = tmp.first;
-      final_lh = tmp.second;
-      final_tree_string = model.virtual_rooted_tree(final_rl).newick();
+          cli_options.br_tolerance, cli_options.factor, checkpoint);
+      if (__MPI_RANK__ == 0) {
+        final_rl = tmp.first;
+        final_lh = tmp.second;
+        final_tree_string = model.virtual_rooted_tree(final_rl).newick();
+      }
     }
+
     if (!cli_options.silent) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }
-    std::cout << final_tree_string << std::endl;
+
+    if (__MPI_RANK__ == 0) {
+      std::cout << final_tree_string << std::endl;
+    }
+
     auto end_time = std::chrono::system_clock::now();
 
     std::chrono::duration<double> duration = end_time - start_time;
 
-    if (!cli_options.silent)
+    if (!cli_options.silent && __MPI_RANK__ == 0)
       std::cout << "Inference took: " << duration.count() << "s" << std::endl;
 
-    if (!cli_options.output_tree_filename.empty()) {
-      std::ofstream outfile{cli_options.output_tree_filename};
+    if (__MPI_RANK__ == 0) {
+      std::ofstream outfile{cli_options.prefix + ".rooted.tree"};
       outfile << final_tree_string;
     }
-
   } catch (const std::exception &e) {
-    std::cout << "There was an error during processing:\n"
-              << e.what() << std::endl;
+    if (__MPI_RANK__ == 0) {
+      std::cout << "There was an error during processing:\n"
+                << e.what() << std::endl;
+    }
     return 1;
   }
 
   return 0;
+}
+
+int main(int argv, char **argc) {
+#ifdef MPI_VERSION
+  MPI_Init(&argv, &argc);
+#endif
+  wrapped_main(argv, argc);
+#ifdef MPI_VERSION
+  MPI_Finalize();
+#endif
 }

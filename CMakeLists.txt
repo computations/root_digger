@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.00)
 project(root_digger)
 
+option(MPI_BUILD "Build with MPI" OFF)
+
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer " CACHE INTERNAL "")
 set(CMAKE_C_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 
 find_package(Git)
@@ -30,16 +32,26 @@ if(GIT_FOUND)
     endif()
 endif()
 
-if( STATIC_BUILD )
+find_package(OpenMP)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EX_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+
+find_package(MPI)
+
+if(STATIC_BUILD)
     set(STATIC_GSL ON)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EX_LINKER_FLAGS} -static")
+    add_dependencies(rd gsl)
 endif()
 
-if( NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
-    set(RD_BUILD_VERSION "1.1.2")
+if(NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
+    set(RD_BUILD_VERSION "1.4.1")
     set(RD_BUILD_COMMIT "From Release")
+endif()
+
+if(MPI_BUILD)
+    set(RD_BUILD_VERSION "${RD_BUILD_VERSION}-mpi")
 endif()
 
 
@@ -53,7 +65,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 add_subdirectory(src)
 
 find_library(ASAN_FOUND asan)
-if(ASAN_FOUND)
+if(ASAN_FOUND AND NOT MPI_BUILD)
     add_subdirectory(test)
     add_subdirectory(benchmark)
 endif()

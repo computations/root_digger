@@ -328,6 +328,7 @@ TEST_CASE("model_t optimize all", "[model_t]") {
      * it has something to do with the voodoo that catch is doing, which causes
      * stuff to work weirdly
      */
+    model.assign_indicies_by_rank_search(1, 0.0, 0, 1);
     auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
@@ -336,6 +337,7 @@ TEST_CASE("model_t optimize all", "[model_t]") {
   }
 
   SECTION("three min roots") {
+    model.assign_indicies_by_rank_search(3, 0.0, 0, 1);
     auto tmp = model.optimize_all(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
@@ -353,6 +355,7 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   model_t model{tree, msa, {1}, true, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   model.compute_lh(tree.root_location(0));
+  model.assign_indicies_by_rank_search(1, 0.0, 0, 1);
   auto initial_rl = model.optimize_root_location(1, .05);
   auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e-7, 1e7);
   auto final_rl = tmp.first;
@@ -392,6 +395,7 @@ TEST_CASE("model_t exhaustive search", "[model_t]") {
   model_t model{tree, msa, {1}, true, seed, false};
   model.initialize_partitions(msa);
   model.compute_lh(tree.root_location(0));
+  model.assign_indicies_by_rank_exhaustive(0, 1);
   model.exhaustive_search(1e-3, 1e-3, 1e-3, 1e12);
 }
 
@@ -417,6 +421,7 @@ TEST_CASE("model_t test no invariant sites", "[model_t]") {
   auto initial_rl = model.optimize_root_location(1, .05);
 
   SECTION("one min root") {
+    model.assign_indicies_by_rank_search(1, 0.0, 0, 1);
     auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
@@ -426,6 +431,7 @@ TEST_CASE("model_t test no invariant sites", "[model_t]") {
   }
 
   SECTION("3 min roots") {
+    model.assign_indicies_by_rank_search(3, 0.0, 0, 1);
     auto tmp = model.optimize_all(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
