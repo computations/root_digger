@@ -107,7 +107,7 @@ public:
   }
   bool initalized() const { return value != value_t::uninitalized; }
 
-  bool convert_with_default(bool default_value) {
+  bool convert_with_default(bool default_value) const {
     if (value == value_t::uninitalized)
       return default_value;
     return value == value_t::initialized_true;
