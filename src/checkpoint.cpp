@@ -1,6 +1,7 @@
 #include "checkpoint.hpp"
 #include "debug.h"
 #include "util.hpp"
+#include <bits/stdint-uintn.h>
 #include <fcntl.h>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -108,6 +109,32 @@ template <> size_t read(int fd, cli_options_t &options) {
   return total_read;
 }
 
+template <> size_t write(int fd, const partition_parameters_t &pp) {
+  size_t total_written = 0;
+  total_written += write(fd, pp.subst_rates);
+  total_written += write(fd, pp.freqs);
+  total_written += write(fd, pp.gamma_alpha);
+  total_written += write(fd, pp.gamma_weights);
+  return total_written;
+}
+
+template <> size_t read(int fd, partition_parameters_t &pp) {
+  size_t total_read = 0;
+  total_read += read(fd, pp.subst_rates);
+  total_read += read(fd, pp.freqs);
+  total_read += read(fd, pp.gamma_alpha);
+  total_read += read(fd, pp.gamma_weights);
+  return total_read;
+}
+
+template <>
+std::pair<uint32_t, uint32_t>
+compute_checksum_components(const partition_parameters_t &pp, uint32_t a,
+                            uint32_t b) {
+  return compute_checksum_components(a, b, pp.subst_rates, pp.freqs,
+                                     pp.gamma_alpha, pp.gamma_weights);
+}
+
 checkpoint_t::checkpoint_t(const std::string &prefix) {
   _checkpoint_filename = prefix + ".ckp";
   _existing_results = (access(_checkpoint_filename.c_str(), F_OK) != -1);
@@ -134,9 +161,10 @@ void checkpoint_t::clean() {
     cli_options_t options;
     read_with_success(_file_descriptor, options);
     write_with_success(copy_fd, options);
-    auto progress = current_progress();
+    auto progress = read_results();
     for (auto result : progress) {
-      write_with_checksum(copy_fd, result);
+      write_with_checksum(copy_fd, result.first);
+      write_with_checksum(copy_fd, result.second);
     }
     close(copy_fd);
     rename(backup_filename.c_str(), _checkpoint_filename.c_str());
@@ -148,6 +176,10 @@ void checkpoint_t::write(const rd_result_t &result) {
               result.root_id);
   auto lock = write_lock<fcntl_lock_behavior::block>();
   write_with_checksum(_file_descriptor, result);
+}
+void checkpoint_t::write(
+    const std::vector<partition_parameters_t> &parameters) {
+  write_with_checksum(_file_descriptor, parameters);
 }
 
 void checkpoint_t::save_options(const cli_options_t &options) {
@@ -167,42 +199,11 @@ void checkpoint_t::load_options(cli_options_t &options) {
 
 std::vector<rd_result_t> checkpoint_t::current_progress() {
   std::vector<rd_result_t> results;
-  auto lock = write_lock<fcntl_lock_behavior::block>();
-  auto current_fd = fcntl(_file_descriptor, F_DUPFD, 0);
-
-  lseek(current_fd, 0, SEEK_SET);
-
-  // read and discard the options header to seek to the start of the results
-  {
-    cli_options_t tmp_opts;
-    read_with_success(current_fd, tmp_opts);
+  auto progress = read_results();
+  results.reserve(progress.size());
+  for (auto &pair : progress) {
+    results.push_back(pair.first);
   }
-
-  auto current_position = lseek(current_fd, 0, SEEK_CUR);
-  auto end_position = lseek(current_fd, 0, SEEK_END);
-  lseek(current_fd, current_position, SEEK_SET);
-
-  while (current_position < end_position) {
-    try {
-      rd_result_t rdr;
-      size_t bytes_read = read_with_checksum(current_fd, rdr);
-      if (bytes_read == expected_read_size<rd_result_t>()) {
-        results.push_back(rdr);
-      } else if (bytes_read == 0) {
-        break;
-      } else {
-        throw std::runtime_error(
-            "Unexpected read size when loading results from the checkpoint");
-      }
-      current_position = lseek(current_fd, 0, SEEK_CUR);
-    } catch (checkpoint_read_success_failure &e) {
-      debug_string(
-          EMIT_LEVEL_WARNING,
-          "Checkpoint file is corrupted, we will resume with what we can");
-      break;
-    }
-  }
-  close(current_fd);
   return results;
 }
 
@@ -247,4 +248,49 @@ void checkpoint_t::reload() {
 
     throw std::runtime_error{"Failed to reload the checkpoint file"};
   }
+}
+
+std::vector<std::pair<rd_result_t, std::vector<partition_parameters_t>>>
+checkpoint_t::read_results() {
+  std::vector<std::pair<rd_result_t, std::vector<partition_parameters_t>>>
+      results;
+  auto lock = write_lock<fcntl_lock_behavior::block>();
+  auto current_fd = fcntl(_file_descriptor, F_DUPFD, 0);
+
+  lseek(current_fd, 0, SEEK_SET);
+
+  // read and discard the options header to seek to the start of the results
+  {
+    cli_options_t tmp_opts;
+    read_with_success(current_fd, tmp_opts);
+  }
+
+  auto current_position = lseek(current_fd, 0, SEEK_CUR);
+  auto end_position = lseek(current_fd, 0, SEEK_END);
+  lseek(current_fd, current_position, SEEK_SET);
+
+  while (current_position < end_position) {
+    try {
+      rd_result_t rdr;
+      size_t bytes_read = read_with_checksum(current_fd, rdr);
+      if (bytes_read == expected_read_size<rd_result_t>()) {
+      } else if (bytes_read == 0) {
+        break;
+      } else {
+        throw std::runtime_error(
+            "Unexpected read size when loading results from the checkpoint");
+      }
+      std::vector<partition_parameters_t> params;
+      read_with_checksum(current_fd, params);
+      results.push_back(std::make_pair(rdr, params));
+      current_position = lseek(current_fd, 0, SEEK_CUR);
+    } catch (checkpoint_read_success_failure &e) {
+      debug_string(
+          EMIT_LEVEL_WARNING,
+          "Checkpoint file is corrupted, we will resume with what we can");
+      break;
+    }
+  }
+  close(current_fd);
+  return results;
 }

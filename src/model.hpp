@@ -18,8 +18,6 @@ extern "C" {
 #include <utility>
 #include <vector>
 
-typedef std::vector<double> model_params_t;
-
 struct dlh_t {
   double lh;
   double dlh;

@@ -12,13 +12,8 @@
 #include <stdint.h>
 #include <string>
 #include <unistd.h>
+#include <utility>
 #include <vector>
-
-struct rd_result_t {
-  size_t root_id;
-  double lh;
-  double alpha;
-};
 
 typedef uint32_t field_flags_t;
 
@@ -36,21 +31,63 @@ class checkpoint_read_success_failure : checkpoint_read_failure {
   using checkpoint_read_failure::checkpoint_read_failure;
 };
 
-/* Implements the Adler-32 checksum
- * Implementation mostly taken from wikipedia
- */
-template <typename T> uint32_t compute_checksum(const T &val) {
+template <typename T>
+std::pair<uint32_t, uint32_t>
+compute_checksum_components(const T &val, uint32_t a = 1, uint32_t b = 0) {
   constexpr const uint32_t MOD_ADLER = 65521;
   const uint8_t *data = reinterpret_cast<const uint8_t *>(&val);
   constexpr size_t data_len = sizeof(T) / sizeof(uint8_t);
-  uint32_t a = 1;
-  uint32_t b = 0;
 
   for (size_t i = 0; i < data_len; ++i) {
     a = (a + data[i]) % MOD_ADLER;
     b = b + a % MOD_ADLER;
   }
+
+  return std::make_pair(a, b);
+}
+
+template <typename T>
+std::pair<uint32_t, uint32_t>
+compute_checksum_components(const std::vector<T> &vals, uint32_t a = 1,
+                            uint32_t b = 0) {
+  auto tmp = std::make_pair(a, b);
+
+  for (auto &val : vals) {
+    tmp = compute_checksum_components(val, tmp.first, tmp.second);
+  }
+  return tmp;
+}
+
+/* Implements the Adler-32 checksum
+ * Implementation mostly taken from wikipedia
+ */
+template <typename T> uint32_t compute_checksum(const T &val) {
+  auto tmp = compute_checksum_components(val);
+  return (tmp.second << 16) | tmp.first;
+}
+
+template <typename T> uint32_t compute_checksum(const std::vector<T> &vals) {
+  uint32_t a = 1;
+  uint32_t b = 0;
+
+  for (auto &val : vals) {
+    auto tmp = compute_checksum_components(val, a, b);
+    a = tmp.first;
+    b = tmp.second;
+  }
   return (b << 16) | a;
+}
+
+template <typename T, typename... Args>
+std::pair<uint32_t, uint32_t>
+compute_checksum_components(uint32_t a, uint32_t b, T &val, Args... args) {
+  auto p = compute_checksum_components(val, a, b);
+  return compute_checksum_components(p.first, p.second, args...);
+}
+
+template <typename... Args> uint32_t compute_checksum(Args... args) {
+  auto p = compute_checksum_components(1, 0, args...);
+  return (p.second << 16) | p.first;
 }
 
 template <typename T> size_t write(int fd, const T &val) {
@@ -87,6 +124,15 @@ template <typename T> size_t write_with_checksum(int fd, const T &val) {
   return bytes_written;
 }
 
+template <typename T>
+size_t write_with_checksum(int fd, const std::vector<T> &vals) {
+  uint32_t checksum = compute_checksum(vals);
+  size_t total_written = 0;
+  total_written += write(fd, vals);
+  total_written += write(fd, checksum);
+  return total_written;
+}
+
 template <typename T> size_t read(int fd, T &val) {
   auto result = read(fd, &val, sizeof(val));
   if (result < 0) {
@@ -102,11 +148,9 @@ template <typename T> size_t read(int fd, std::vector<T> &vals) {
 
   size_t vector_size = 0;
   total_read += read(fd, vector_size);
-  tmp_vals.reserve(vector_size);
+  tmp_vals.resize(vector_size);
   for (size_t i = 0; i < vector_size; ++i) {
-    T tmp_val;
-    total_read += read(fd, tmp_val);
-    tmp_vals.push_back(tmp_val);
+    total_read += read(fd, tmp_vals[i]);
   }
 
   std::swap(tmp_vals, vals);
@@ -142,6 +186,21 @@ template <typename T> size_t read_with_checksum(int fd, T &val) {
   }
   std::swap(val, tmp_val);
   return bytes_read;
+}
+
+template <typename T> size_t read_with_checksum(int fd, std::vector<T> &vals) {
+  std::vector<T> tmp_vals;
+  size_t total_read = 0;
+  uint32_t checksum;
+  total_read += read(fd, tmp_vals);
+  total_read += read(fd, checksum);
+  uint32_t written_checksum = compute_checksum(tmp_vals);
+  if (checksum != written_checksum) {
+    throw checkpoint_read_success_failure{
+        "The current read was unsuccessful due to an unsuccessful write flag"};
+  }
+  std::swap(tmp_vals, vals);
+  return total_read;
 }
 
 template <typename T> constexpr size_t expected_read_size() {
@@ -219,6 +278,7 @@ public:
     write_with_success(_file_descriptor, val);
   }
   void write(const rd_result_t &);
+  void write(const std::vector<partition_parameters_t> &);
   void save_options(const cli_options_t &);
   void load_options(cli_options_t &);
   void reload();
@@ -232,6 +292,9 @@ private:
   fcntl_lock_t<W> write_lock() {
     return fcntl_lock_t<W>(_file_descriptor, F_WRLCK);
   }
+
+  std::vector<std::pair<rd_result_t, std::vector<partition_parameters_t>>>
+  read_results();
 
   std::string _checkpoint_filename;
   int _file_descriptor;
