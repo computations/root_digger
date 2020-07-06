@@ -317,6 +317,11 @@ int wrapped_main(int argv, char **argc) {
 
     auto cli_options = parse_options(argv, argc);
 
+    /* Use the tree path for the prefix */
+    if (cli_options.prefix.empty()) {
+      cli_options.prefix = cli_options.tree_filename;
+    }
+
     checkpoint_t checkpoint(cli_options.prefix);
     merge_options_checkpoint(cli_options, checkpoint);
     if (__MPI_RANK__ == 0) {
