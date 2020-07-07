@@ -1,7 +1,6 @@
 #include "checkpoint.hpp"
 #include "debug.h"
 #include "util.hpp"
-#include <bits/stdint-uintn.h>
 #include <fcntl.h>
 #include <stdexcept>
 #include <sys/stat.h>
