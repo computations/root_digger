@@ -2,6 +2,7 @@
 #include "debug.h"
 #include "model.hpp"
 #include "msa.hpp"
+#include "tree.hpp"
 #include "util.hpp"
 #include <algorithm>
 #include <cmath>
@@ -849,17 +850,21 @@ std::vector<size_t> model_t::shuffle_root_indicies() {
   return idx;
 }
 
-inline partition_parameters_t
-initalize_partition_parameters(size_t states, rate_category::rate_category_e rc,
-                               size_t rate_cat_count) {
+partition_parameters_t model_t::make_partition_parameters(
+    size_t states, rate_category::rate_category_e rc, size_t rate_cat_count) {
   partition_parameters_t pp;
   size_t subst_size = states * states - states;
 
   pp.subst_rates.resize(subst_size);
-  std::fill(pp.subst_rates.begin(), pp.subst_rates.end(), 1.0 / subst_size);
+  for (auto &v : pp.subst_rates) {
+    v = 1.0 / subst_size;
+  }
 
   pp.freqs.resize(states);
   std::fill(pp.freqs.begin(), pp.freqs.end(), 1.0 / states);
+  for (auto &v : pp.freqs) {
+    v = 1.0 / states;
+  }
 
   switch (rc) {
   case rate_category::MEAN:
@@ -869,10 +874,14 @@ initalize_partition_parameters(size_t states, rate_category::rate_category_e rc,
     break;
   case rate_category::FREE:
     pp.gamma_alpha.resize(rate_cat_count);
-    std::fill(pp.gamma_alpha.begin(), pp.gamma_alpha.end(), 1.0);
+    for (auto &v : pp.gamma_alpha) {
+      v = 1.0;
+    }
     pp.gamma_weights.resize(rate_cat_count);
-    std::fill(pp.gamma_weights.begin(), pp.gamma_weights.end(),
-              1.0 / rate_cat_count);
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+    for (auto &v : pp.gamma_weights) {
+      v = dis(_random_engine);
+    }
   }
   return pp;
 }
@@ -912,9 +921,9 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
     saved_params.reserve(_partitions.size());
 
     for (size_t p = 0; p < _partitions.size(); ++p) {
-      params.push_back(initalize_partition_parameters(
-          _partitions[p]->states, _rate_category_types[p],
-          _partitions[p]->rate_cats));
+      params.push_back(make_partition_parameters(_partitions[p]->states,
+                                                 _rate_category_types[p],
+                                                 _partitions[p]->rate_cats));
     }
 
     auto cur_best_rl = rl;
@@ -924,31 +933,13 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
 
       saved_params = params;
 
-      for (size_t i = 0; i < _partitions.size(); ++i) {
-        set_subst_rates(i, params[i].subst_rates);
-        set_freqs_all_free(i, params[i].freqs);
-        set_gamma_rates(i, params[i].gamma_alpha);
-        if (_rate_category_types[i] == rate_category::FREE) {
-          set_gamma_weights(i, params[i].gamma_weights);
-        }
-        if (_rate_category_types[i] == rate_category::FREE) {
-          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Gamma Weights");
-          bfgs_gamma_weights(params[i].gamma_alpha, rl, i, pgtol, factor);
-        }
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Gamma Rates");
-        bfgs_gamma_rates(params[i].gamma_alpha, rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optmizing Rates");
-        bfgs_rates(params[i].subst_rates, rl, i, pgtol, factor);
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Freqs");
-        bfgs_freqs(params[i].freqs, rl, i, pgtol, factor);
-      }
+      optimize_params(params, rl, pgtol, factor, true);
 
       debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
       auto cur = optimize_root_location(min_roots, root_ratio);
 
       debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.9f", iter, cur.second);
 
-      // assert(cur.second >= cur_best_lh);
       if (cur.second < cur_best_lh) {
         /* We failed to make any progress, so just give up */
         debug_string(EMIT_LEVEL_DEBUG,
@@ -1000,14 +991,18 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
 #endif
 
   if (__MPI_RANK__ == 0) {
-    auto total_progress = checkpoint.current_progress();
+    auto total_progress = checkpoint.read_results();
     auto total_best_result = *std::max_element(
         total_progress.begin(), total_progress.end(),
-        [](rd_result_t a, rd_result_t b) -> bool { return a.lh < b.lh; });
+        [](std::pair<rd_result_t, std::vector<partition_parameters_t>> a,
+           std::pair<rd_result_t, std::vector<partition_parameters_t>> b)
+            -> bool { return a.first.lh < b.first.lh; });
 
-    best_rl = _tree.root_location(total_best_result.root_id);
-    best_rl.brlen_ratio = total_best_result.alpha;
-    best_lh = total_best_result.lh;
+    best_rl = _tree.root_location(total_best_result.first.root_id);
+    best_rl.brlen_ratio = total_best_result.first.alpha;
+    best_lh = total_best_result.first.lh;
+    best_params = total_best_result.second;
+    set_model_params(best_params);
   }
 
   move_root(best_rl);
@@ -1028,66 +1023,21 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
     set_subst_rates_uniform();
     set_empirical_freqs();
 
-    // move_root(rl);
     _tree.root_by(rl);
     compute_lh(rl);
-    std::vector<model_params_t> subst_rates;
-    std::vector<model_params_t> freqs;
-    std::vector<model_params_t> gamma_alphas;
-    std::vector<model_params_t> gamma_weights;
+    std::vector<partition_parameters_t> params;
 
     for (size_t p = 0; p < _partitions.size(); ++p) {
-      size_t subst_size = _partitions[p]->states;
-      subst_size = subst_size * subst_size - subst_size;
-      freqs.push_back(
-          model_params_t(_partitions[p]->states, 1.0 / _partitions[p]->states));
-      subst_rates.push_back(model_params_t(subst_size, 1.0 / subst_size));
-      switch (_rate_category_types[p]) {
-      case rate_category::MEAN:
-      case rate_category::MEDIAN:
-        gamma_alphas.emplace_back(1, 1.0);
-        break;
-      case rate_category::FREE: {
-        gamma_alphas.emplace_back(_partitions[p]->rate_cats, 1.0);
-        model_params_t wv(_partitions[p]->rate_cats, 0.0);
-        std::uniform_real_distribution<> dis(0.0, 1.0);
-        for (auto &f : wv) {
-          f = dis(_random_engine);
-        }
-        gamma_weights.push_back(wv);
-      } break;
-      }
+      params.push_back(make_partition_parameters(_partitions[p]->states,
+                                                 _rate_category_types[p],
+                                                 _partitions[p]->rate_cats));
     }
 
     root_location_t cur_best_rl = rl;
     double cur_best_lh = -std::numeric_limits<double>::infinity();
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
-      for (size_t i = 0; i < _partitions.size(); ++i) {
-        set_subst_rates(i, subst_rates[i]);
-        set_freqs_all_free(i, freqs[i]);
-        set_gamma_rates(i, gamma_alphas[i]);
-
-        if (_rate_category_types[i] == rate_category::FREE) {
-          set_gamma_weights(i, gamma_weights[i]);
-        }
-
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optmizing rates");
-        bfgs_rates(subst_rates[i], rl, i, pgtol, factor);
-
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing freqs");
-        bfgs_freqs(freqs[i], rl, i, pgtol, factor);
-
-        if (iter % 10 == 0) {
-          debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
-          bfgs_gamma_rates(gamma_alphas[i], rl, i, pgtol, factor);
-
-          if (_rate_category_types[i] == rate_category::FREE) {
-            debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
-            bfgs_gamma_weights(gamma_weights[i], rl, i, pgtol, factor);
-          }
-        }
-      }
+      optimize_params(params, rl, pgtol, factor, (iter % 10 == 0));
 
       if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
         break;
@@ -1129,6 +1079,7 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
     }
 
     checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio});
+    checkpoint.write(params);
     root_index++;
 
     debug_print(EMIT_LEVEL_PROGRESS, "Step %lu / %lu, ETC: %0.2fh", root_index,
@@ -1388,7 +1339,8 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
   }
   set_func(partition_index, parameters);
   score = compute_lh();
-  // assert_string(initial_score >= score, "Failed to improve the likelihood");
+  // assert_string(initial_score >= score, "Failed to improve the
+  // likelihood");
   if (initial_score >= score) {
     std::swap(parameters, initial_params);
   } else {
@@ -1693,4 +1645,49 @@ void model_t::assign_indicies_by_rank_exhaustive(size_t rank, size_t num_tasks,
 #ifdef MPI_VERSION
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
+}
+
+void model_t::set_model_params(
+    const std::vector<partition_parameters_t> &params) {
+  for (size_t i = 0; i < params.size(); ++i) {
+    set_subst_rates(i, params[i].subst_rates);
+    set_freqs(i, params[i].freqs);
+    set_gamma_rates(i, params[i].gamma_alpha);
+    if (_rate_category_types[i] == rate_category::FREE) {
+      set_gamma_weights(i, params[i].gamma_weights);
+    }
+  }
+}
+
+void model_t::optimize_params(std::vector<partition_parameters_t> &params,
+                              const root_location_t &rl, double pgtol,
+                              double factor, bool optimize_gamma) {
+  for (size_t i = 0; i < _partitions.size(); ++i) {
+    set_subst_rates(i, params[i].subst_rates);
+    set_freqs_all_free(i, params[i].freqs);
+    set_gamma_rates(i, params[i].gamma_alpha);
+    if (_rate_category_types[i] == rate_category::FREE) {
+      set_gamma_weights(i, params[i].gamma_weights);
+    }
+
+    if (_rate_category_types[i] == rate_category::FREE) {
+      set_gamma_weights(i, params[i].gamma_weights);
+    }
+
+    debug_string(EMIT_LEVEL_MPROGRESS, "Optmizing rates");
+    bfgs_rates(params[i].subst_rates, rl, i, pgtol, factor);
+
+    debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing freqs");
+    bfgs_freqs(params[i].freqs, rl, i, pgtol, factor);
+
+    if (optimize_gamma) {
+      debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
+      bfgs_gamma_rates(params[i].gamma_alpha, rl, i, pgtol, factor);
+
+      if (_rate_category_types[i] == rate_category::FREE) {
+        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
+        bfgs_gamma_weights(params[i].gamma_weights, rl, i, pgtol, factor);
+      }
+    }
+  }
 }

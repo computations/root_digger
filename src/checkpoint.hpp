@@ -285,6 +285,10 @@ public:
   int get_inode();
   bool existing_checkpoint() const;
   std::vector<rd_result_t> current_progress();
+
+  std::vector<std::pair<rd_result_t, std::vector<partition_parameters_t>>>
+  read_results();
+
   std::vector<size_t> completed_indicies();
 
 private:
@@ -292,9 +296,6 @@ private:
   fcntl_lock_t<W> write_lock() {
     return fcntl_lock_t<W>(_file_descriptor, F_WRLCK);
   }
-
-  std::vector<std::pair<rd_result_t, std::vector<partition_parameters_t>>>
-  read_results();
 
   std::string _checkpoint_filename;
   int _file_descriptor;

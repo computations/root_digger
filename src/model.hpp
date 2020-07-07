@@ -121,6 +121,7 @@ private:
   void set_empirical_freqs(size_t);
   void set_empirical_freqs();
   void set_freqs_all_free(size_t, model_params_t);
+  void set_model_params(const std::vector<partition_parameters_t>&);
   void move_root(const root_location_t &new_root);
   void update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
                         const std::vector<double> &branch_lengths);
@@ -143,14 +144,17 @@ private:
   double gd_gamma_weights(model_params_t &intial_alpha,
                           const root_location_t &rl, size_t partition_index);
 
+  void optimize_params(std::vector<partition_parameters_t> &params,
+                       const root_location_t &rl, double pgtol, double factor,
+                       bool optimize_gamma);
+
   std::pair<size_t, size_t> compute_chunk_size_mod(size_t root_count,
                                                    size_t num_tasks) const;
   std::pair<size_t, size_t> compute_chunk_size_mod(size_t num_tasks) const;
 
-#ifdef MPI_VERSION
-  void gather_results(std::vector<std::pair<root_location_t, double>> &,
-                      size_t);
-#endif
+  partition_parameters_t
+  make_partition_parameters(size_t states, rate_category::rate_category_e rc,
+                            size_t rate_cat_count);
 
   rooted_tree_t _tree;
   std::vector<pll_partition_t *> _partitions;
