@@ -3,6 +3,7 @@
 #include <cmath>
 #include <debug.h>
 #include <model.hpp>
+#include <random>
 
 model_params_t params[] = {
     {1, 2.5, 1, 1, 1, 2.5, 2.5, 1, 1, 1, 2.5, 1},
@@ -14,6 +15,36 @@ model_params_t params[] = {
 model_params_t freqs[] = {
     {.25, .25, .25, .25},
 };
+
+constexpr char base_58_chars[] =
+    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+inline size_t compute_digit_with_base(size_t i, size_t n, size_t base) {
+  return (n % static_cast<size_t>(std::pow(base, i + 1))) / std::pow(base, i);
+}
+
+std::string base_58_encode(uint32_t n) {
+  size_t alphabet_size = sizeof(base_58_chars);
+  size_t len = std::ceil(std::log(n) / std::log(alphabet_size));
+  std::string enc;
+  enc.resize(len);
+  for (size_t i = 0; i < len; ++i) {
+    enc[i] = base_58_chars[compute_digit_with_base(i, n, alphabet_size)];
+  }
+  return enc;
+}
+
+checkpoint_t make_dummy_checkpoint(const std::string &dataset_name) {
+  std::random_device rd;
+  uint64_t nonce =
+      (static_cast<uint64_t>(rd()) << 32) | static_cast<uint64_t>(rd());
+  checkpoint_t ckp(std::string("/tmp/") + dataset_name + "_" +
+                   base_58_encode(nonce));
+  cli_options_t cli_options;
+  ckp.save_options(cli_options);
+  ckp.reload();
+  return ckp;
+}
 
 TEST_CASE("model_t constructor", "[model_t]") {
   for (auto &kv : data_files_dna) {
@@ -328,17 +359,19 @@ TEST_CASE("model_t optimize all", "[model_t]") {
      * it has something to do with the voodoo that catch is doing, which causes
      * stuff to work weirdly
      */
-    model.assign_indicies_by_rank_search(1, 0.0, 0, 1);
-    auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto checkpoint = make_dummy_checkpoint("10.fasta");
+    model.assign_indicies_by_rank_search(1, 0.0, 0, 1, checkpoint);
+    auto tmp = model.search(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12, checkpoint);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
-    //CHECK(final_lh >= initial_lh);
+    // CHECK(final_lh >= initial_lh);
     CHECK(model.compute_lh(final_rl) == Approx(final_lh));
   }
 
   SECTION("three min roots") {
-    model.assign_indicies_by_rank_search(3, 0.0, 0, 1);
-    auto tmp = model.optimize_all(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto checkpoint = make_dummy_checkpoint("10.fasta");
+    model.assign_indicies_by_rank_search(3, 0.0, 0, 1, checkpoint);
+    auto tmp = model.search(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12, checkpoint);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
     CHECK(final_lh >= initial_lh);
@@ -352,12 +385,13 @@ TEST_CASE("model_t optimize all, slow", "[!hide][all_data][model_t]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
+  auto checkpoint = make_dummy_checkpoint("101.phy");
   model_t model{tree, msa, {1}, true, seed, false};
   model.initialize_partitions_uniform_freqs(msa);
   model.compute_lh(tree.root_location(0));
-  model.assign_indicies_by_rank_search(1, 0.0, 0, 1);
+  model.assign_indicies_by_rank_search(1, 0.0, 0, 1, checkpoint);
   auto initial_rl = model.optimize_root_location(1, .05);
-  auto tmp = model.optimize_all(1, 0.0, 1e-7, 1e-7, 1e-7, 1e7);
+  auto tmp = model.search(1, 0.0, 1e-7, 1e-7, 1e-7, 1e7, checkpoint);
   auto final_rl = tmp.first;
   auto final_lh = tmp.second;
   CHECK(final_lh >= initial_rl.second);
@@ -392,11 +426,12 @@ TEST_CASE("model_t exhaustive search", "[model_t]") {
   msa.emplace_back(ds.first);
   rooted_tree_t tree{ds.second};
   uint64_t seed = std::rand();
+  auto checkpoint = make_dummy_checkpoint("10.fasta");
   model_t model{tree, msa, {1}, true, seed, false};
   model.initialize_partitions(msa);
   model.compute_lh(tree.root_location(0));
-  model.assign_indicies_by_rank_exhaustive(0, 1);
-  model.exhaustive_search(1e-3, 1e-3, 1e-3, 1e12);
+  model.assign_indicies_by_rank_exhaustive(0, 1, checkpoint);
+  model.exhaustive_search(1e-3, 1e-3, 1e-3, 1e12, checkpoint);
 }
 
 TEST_CASE("model_t different rate categories", "[model_t]") {
@@ -421,8 +456,9 @@ TEST_CASE("model_t test no invariant sites", "[model_t]") {
   auto initial_rl = model.optimize_root_location(1, .05);
 
   SECTION("one min root") {
-    model.assign_indicies_by_rank_search(1, 0.0, 0, 1);
-    auto tmp = model.optimize_all(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto checkpoint = make_dummy_checkpoint("10.fasta");
+    model.assign_indicies_by_rank_search(1, 0.0, 0, 1, checkpoint);
+    auto tmp = model.search(1, 0.0, 1e-3, 1e-3, 1e-3, 1e12, checkpoint);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
     CHECK(final_lh >= initial_rl.second);
@@ -431,8 +467,10 @@ TEST_CASE("model_t test no invariant sites", "[model_t]") {
   }
 
   SECTION("3 min roots") {
-    model.assign_indicies_by_rank_search(3, 0.0, 0, 1);
-    auto tmp = model.optimize_all(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12);
+    auto checkpoint = make_dummy_checkpoint("10.fasta");
+    CHECK_NOTHROW(
+        model.assign_indicies_by_rank_search(3, 0.0, 0, 1, checkpoint));
+    auto tmp = model.search(3, 0.0, 1e-3, 1e-3, 1e-3, 1e12, checkpoint);
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
     CHECK(final_lh >= initial_rl.second);
