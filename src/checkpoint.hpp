@@ -277,8 +277,7 @@ public:
     auto lock = write_lock<fcntl_lock_behavior::block>();
     write_with_success(_file_descriptor, val);
   }
-  void write(const rd_result_t &);
-  void write(const std::vector<partition_parameters_t> &);
+  void write(const rd_result_t &, const std::vector<partition_parameters_t> &);
   void save_options(const cli_options_t &);
   void load_options(cli_options_t &);
   void reload();
@@ -291,11 +290,16 @@ public:
 
   std::vector<size_t> completed_indicies();
 
+  std::string get_filename() const { return _checkpoint_filename; }
+
 private:
   template <fcntl_lock_behavior::fcntl_lock_block_t W>
   fcntl_lock_t<W> write_lock() {
     return fcntl_lock_t<W>(_file_descriptor, F_WRLCK);
   }
+
+  void write(const rd_result_t &);
+  void write(const std::vector<partition_parameters_t> &);
 
   std::string _checkpoint_filename;
   int _file_descriptor;

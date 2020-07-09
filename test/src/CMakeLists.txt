@@ -5,6 +5,9 @@ add_executable(rd_test
     msa.cpp
     model.cpp
     tree.cpp
+    checkpoint.cpp
+    util.cpp
+    test_util.cpp
     ${RD_SOURCES}
 )
 

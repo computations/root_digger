@@ -979,8 +979,8 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
       rl = cur_best_rl;
     }
 
-    checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio});
-    checkpoint.write(params);
+    checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio},
+                     params);
 
     debug_print(EMIT_LEVEL_DEBUG, "finished optimize_all root, cur_best_lh: %f",
                 cur_best_lh);
@@ -1078,8 +1078,8 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
       rl = cur_rl;
     }
 
-    checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio});
-    checkpoint.write(params);
+    checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio},
+                     params);
     root_index++;
 
     debug_print(EMIT_LEVEL_PROGRESS, "Step %lu / %lu, ETC: %0.2fh", root_index,
@@ -1666,9 +1666,6 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
     set_subst_rates(i, params[i].subst_rates);
     set_freqs_all_free(i, params[i].freqs);
     set_gamma_rates(i, params[i].gamma_alpha);
-    if (_rate_category_types[i] == rate_category::FREE) {
-      set_gamma_weights(i, params[i].gamma_weights);
-    }
 
     if (_rate_category_types[i] == rate_category::FREE) {
       set_gamma_weights(i, params[i].gamma_weights);

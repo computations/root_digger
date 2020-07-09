@@ -97,6 +97,10 @@ public:
                                       checkpoint_t &);
   void assign_indicies_by_rank_exhaustive(size_t, size_t, checkpoint_t &);
 
+  std::vector<size_t> assigned_indicies() const{
+    return _assigned_idx;
+  }
+
 private:
   std::pair<root_location_t, double>
   bisect(const root_location_t &beg, dlh_t d_beg, const root_location_t &end,

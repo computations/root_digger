@@ -1,9 +1,12 @@
 #include "data.hpp"
+#include "test_util.hpp"
+#include <algorithm>
 #include <catch2/catch.hpp>
 #include <cmath>
 #include <debug.h>
 #include <model.hpp>
 #include <random>
+#include <unordered_set>
 
 model_params_t params[] = {
     {1, 2.5, 1, 1, 1, 2.5, 2.5, 1, 1, 1, 2.5, 1},
@@ -15,24 +18,6 @@ model_params_t params[] = {
 model_params_t freqs[] = {
     {.25, .25, .25, .25},
 };
-
-constexpr char base_58_chars[] =
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-inline size_t compute_digit_with_base(size_t i, size_t n, size_t base) {
-  return (n % static_cast<size_t>(std::pow(base, i + 1))) / std::pow(base, i);
-}
-
-std::string base_58_encode(uint32_t n) {
-  size_t alphabet_size = sizeof(base_58_chars);
-  size_t len = std::ceil(std::log(n) / std::log(alphabet_size));
-  std::string enc;
-  enc.resize(len);
-  for (size_t i = 0; i < len; ++i) {
-    enc[i] = base_58_chars[compute_digit_with_base(i, n, alphabet_size)];
-  }
-  return enc;
-}
 
 checkpoint_t make_dummy_checkpoint(const std::string &dataset_name) {
   std::random_device rd;
@@ -476,5 +461,64 @@ TEST_CASE("model_t test no invariant sites", "[model_t]") {
     CHECK(final_lh >= initial_rl.second);
     CHECK(model.compute_lh_root(final_rl) == Approx(final_lh));
     CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+  }
+}
+
+TEST_CASE("assign indicies test", "[model_t]") {
+  auto ckp = make_dummy_checkpoint("10.fasta");
+  // Since 10.fasta has 10 taxa, that makes it have 2n-3 == 17 possible
+  // rootings. So, we want to test that if we write a number of "dummy" results
+  // to the file, we get the right result.
+  auto dummy_results_count = GENERATE(0lu, 1lu, 2lu, 4lu, 8lu);
+  std::random_device rd;
+  std::mt19937 gen(rd());
+
+  std::vector<size_t> possible_idx(17);
+  std::iota(possible_idx.begin(), possible_idx.end(), 0);
+  std::shuffle(possible_idx.begin(), possible_idx.end(), gen);
+  for (size_t i = 0; i < dummy_results_count; ++i) {
+    ckp.write(rd_result_t{possible_idx[i], 0.0, 0.0},
+              std::vector<partition_parameters_t>{});
+  }
+
+  auto ds = data_files_dna["10.fasta"];
+  std::vector<msa_t> msa;
+  msa.emplace_back(ds.first);
+  uint64_t seed = std::rand();
+  rooted_tree_t tree{ds.second};
+  model_t model{tree, msa, {1}, false, seed, false};
+  model.initialize_partitions_uniform_freqs(msa);
+
+  SECTION("search") {
+    auto root_assignment = GENERATE(1lu, 2lu, 3lu, 4lu, 5lu);
+    int expected_size = std::max(static_cast<int>(root_assignment) -
+                                     static_cast<int>(dummy_results_count),
+                                 0);
+    if (static_cast<int>(root_assignment) -
+            static_cast<int>(dummy_results_count) >=
+        0) {
+      REQUIRE_NOTHROW(model.assign_indicies_by_rank_search(root_assignment, 0.0,
+                                                           0, 1, ckp));
+      auto assigned_idx = model.assigned_indicies();
+      REQUIRE(assigned_idx.size() == expected_size);
+      for (size_t j = 0; j < assigned_idx.size(); ++j) {
+        for (size_t i = 0; i < dummy_results_count; ++i) {
+          CHECK(assigned_idx[j] != possible_idx[i]);
+        }
+      }
+    } else {
+      REQUIRE_THROWS(model.assign_indicies_by_rank_search(1, 0.0, 0, 1, ckp));
+    }
+  }
+  SECTION("exhaustive") {
+    int expected_size = std::max(17 - static_cast<int>(dummy_results_count), 0);
+    REQUIRE_NOTHROW(model.assign_indicies_by_rank_exhaustive(0, 1, ckp));
+    auto assigned_idx = model.assigned_indicies();
+    REQUIRE(assigned_idx.size() == expected_size);
+    for (size_t j = 0; j < assigned_idx.size(); ++j) {
+      for (size_t i = 0; i < dummy_results_count; ++i) {
+        CHECK(assigned_idx[j] != possible_idx[i]);
+      }
+    }
   }
 }

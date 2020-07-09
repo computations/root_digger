@@ -173,12 +173,20 @@ void checkpoint_t::clean() {
 void checkpoint_t::write(const rd_result_t &result) {
   debug_print(EMIT_LEVEL_MPI_DEBUG, "Writing result with root id: %lu",
               result.root_id);
-  auto lock = write_lock<fcntl_lock_behavior::block>();
   write_with_checksum(_file_descriptor, result);
 }
+
 void checkpoint_t::write(
     const std::vector<partition_parameters_t> &parameters) {
   write_with_checksum(_file_descriptor, parameters);
+}
+
+void checkpoint_t::write(
+    const rd_result_t &result,
+    const std::vector<partition_parameters_t> &parameters) {
+  auto lock = write_lock<fcntl_lock_behavior::block>();
+  write(result);
+  write(parameters);
 }
 
 void checkpoint_t::save_options(const cli_options_t &options) {
@@ -193,6 +201,7 @@ void checkpoint_t::load_options(cli_options_t &options) {
                  "Loading options from the checkpoint file");
     int read_fd = open(_checkpoint_filename.c_str(), O_RDONLY);
     read_with_success(read_fd, options);
+    close(read_fd);
   }
 }
 

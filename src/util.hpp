@@ -89,25 +89,6 @@ struct partition_parameters_t {
   model_params_t freqs;
   model_params_t gamma_alpha;
   model_params_t gamma_weights;
-
-#if 0
-  partition_parameters_t &operator=(const partition_parameters_t &other) {
-    /* seems dumb, but I benchmarked this to be faster */
-    for (size_t i = 0; i < subst_rates.size(); ++i) {
-      subst_rates[i] = other.subst_rates[i];
-    }
-    for (size_t i = 0; i < freqs.size(); ++i) {
-      freqs[i] = other.freqs[i];
-    }
-    for (size_t i = 0; i < gamma_alpha.size(); ++i) {
-      gamma_alpha[i] = other.gamma_alpha[i];
-    }
-    for (size_t i = 0; i < gamma_weights.size(); ++i) {
-      gamma_weights[i] = other.gamma_weights[i];
-    }
-    return *this;
-  }
-#endif
 };
 
 struct rd_result_t {
@@ -176,6 +157,27 @@ struct cli_options_t {
   bool echo = false;
   bool invariant_sites = false;
   initialized_flag_t early_stop;
+
+  bool operator==(const cli_options_t &other) const {
+    return msa_filename == other.msa_filename &&
+           tree_filename == other.tree_filename && prefix == other.prefix &&
+           model_filename == other.model_filename &&
+           freqs_filename == other.freqs_filename &&
+           partition_filename == other.partition_filename &&
+           data_type == other.data_type && model_string == other.model_string &&
+           rate_cats == other.rate_cats &&
+           rate_category_types == other.rate_category_types &&
+           seed == other.seed && threads == other.threads &&
+           root_ratio == other.root_ratio &&
+           abs_tolerance == other.abs_tolerance && factor == other.factor &&
+           br_tolerance == other.br_tolerance && bfgs_tol == other.bfgs_tol &&
+           states == other.states && exhaustive == other.exhaustive &&
+           echo == other.echo && invariant_sites == other.invariant_sites &&
+           early_stop == other.early_stop;
+  }
+  bool operator!=(const cli_options_t &other) const {
+    return !(*this == other);
+  }
 };
 
 #endif
