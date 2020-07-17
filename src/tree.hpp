@@ -32,6 +32,12 @@ struct root_location_t {
   std::string label() const {
     return edge->label != nullptr ? edge->label : "(null)";
   }
+  bool operator==(const root_location_t &other) const {
+    return edge == other.edge && brlen_ratio == other.brlen_ratio;
+  }
+  bool operator!=(const root_location_t &other) const {
+    return !(*this == other);
+  }
 };
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename);
@@ -120,7 +126,7 @@ public:
 private:
   void sort_root_locations();
   void generate_root_locations();
-  void copy_root_locations(const rooted_tree_t&);
+  void copy_root_locations(const rooted_tree_t &);
   void add_root_space();
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;

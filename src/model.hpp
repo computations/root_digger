@@ -97,9 +97,7 @@ public:
                                       checkpoint_t &);
   void assign_indicies_by_rank_exhaustive(size_t, size_t, checkpoint_t &);
 
-  std::vector<size_t> assigned_indicies() const{
-    return _assigned_idx;
-  }
+  std::vector<size_t> assigned_indicies() const { return _assigned_idx; }
 
 private:
   std::pair<root_location_t, double>
@@ -125,10 +123,11 @@ private:
   void set_empirical_freqs(size_t);
   void set_empirical_freqs();
   void set_freqs_all_free(size_t, model_params_t);
-  void set_model_params(const std::vector<partition_parameters_t>&);
+  void set_model_params(const std::vector<partition_parameters_t> &);
   void move_root(const root_location_t &new_root);
-  void update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
-                        const std::vector<double> &branch_lengths);
+  std::vector<bool>
+  update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
+                   const std::vector<double> &branch_lengths);
   double bfgs_rates(model_params_t &initial_rates, const root_location_t &rl,
                     size_t partition_index, double pgtol, double factor);
   double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,

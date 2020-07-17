@@ -347,17 +347,21 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
   set_freqs(p_index, freqs);
 }
 
-void model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
-                               const std::vector<double> &branch_lengths) {
+std::vector<bool>
+model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
+                          const std::vector<double> &branch_lengths) {
   /* Update the eigen decompositions first */
+  std::vector<bool> updated(_partitions.size(), false);
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
     auto part = _partitions[part_index];
     for (size_t i = 0; i < part->rate_cats; ++i) {
       if (!part->eigen_decomp_valid[i]) {
         pll_update_eigen(part, _param_indicies[part_index][i]);
+        updated[part_index] = true;
       }
     }
   }
+
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
     auto part = _partitions[part_index];
 #pragma omp parallel for collapse(1) schedule(static)
@@ -369,17 +373,19 @@ void model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
                                &branch_length, 1);
     }
   }
+  return updated;
 }
 
 double model_t::compute_lh(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
   std::vector<unsigned int> pmatrix_indices;
   std::vector<double> branch_lengths;
+  bool new_root = root_location != _tree.root_location();
 
   GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
                           branch_lengths);
 
-  update_pmatrices(pmatrix_indices, branch_lengths);
+  auto updated_partitions = update_pmatrices(pmatrix_indices, branch_lengths);
 
   double lh = 0.0;
 
@@ -387,8 +393,10 @@ double model_t::compute_lh(const root_location_t &root_location) {
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
 
-    pll_update_partials(partition, ops.data(),
-                        static_cast<unsigned int>(ops.size()));
+    if (new_root || updated_partitions[i]) {
+      pll_update_partials(partition, ops.data(),
+                          static_cast<unsigned int>(ops.size()));
+    }
 
     lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
                                          _tree.root_scaler_index(),
@@ -410,14 +418,14 @@ double model_t::compute_lh_root(const root_location_t &root) {
     branch_lengths = std::move(std::get<2>(result));
   }
 
-  unsigned int params[] = {0, 0, 0, 0};
   double lh = 0.0;
 
 #pragma omp parallel for reduction(+ : lh)
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
     int result = pll_update_prob_matrices(
-        partition, params, pmatrix_indices.data(), branch_lengths.data(),
+        partition, _param_indicies[i].data(), pmatrix_indices.data(),
+        branch_lengths.data(),
         static_cast<unsigned int>(pmatrix_indices.size()));
 
     if (result == PLL_FAILURE) {
@@ -425,8 +433,8 @@ double model_t::compute_lh_root(const root_location_t &root) {
     }
     pll_update_partials(partition, &op, 1);
     lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
-                                         _tree.root_scaler_index(), params,
-                                         nullptr) *
+                                         _tree.root_scaler_index(),
+                                         _param_indicies[i].data(), nullptr) *
           _partition_weights[i];
   }
   if (std::isnan(lh)) {
@@ -1312,8 +1320,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
            gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
            &iprint, &csave, lsave, isave, dsave);
 
-    debug_print(EMIT_LEVEL_MPROGRESS, "BFGS Iter: %lu Score: %.5f", iters,
-                -score);
+    debug_print(EMIT_LEVEL_INFO, "BFGS Iter: %lu Score: %.5f", iters, -score);
 
     set_func(partition_index, parameters);
     score = compute_lh();
@@ -1663,6 +1670,9 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
                               const root_location_t &rl, double pgtol,
                               double factor, bool optimize_gamma) {
   for (size_t i = 0; i < _partitions.size(); ++i) {
+    debug_print(EMIT_LEVEL_MPROGRESS,
+                "Optimizing parameters for partition: %lu/%lu", i + 1,
+                _partitions.size());
     set_subst_rates(i, params[i].subst_rates);
     set_freqs_all_free(i, params[i].freqs);
     set_gamma_rates(i, params[i].gamma_alpha);

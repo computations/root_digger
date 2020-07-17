@@ -298,9 +298,11 @@ TEST_CASE("model_t liklihood computation", "[model_t]") {
       continue;
     }
     auto rl = tree.root_location(i);
-    model.compute_lh(rl);
-    CHECK(std::fabs(model.compute_lh(rl) - model.compute_lh_root(rl)) ==
-          Approx(0.0));
+    double lh1 = model.compute_lh(rl);
+    double lh2 = model.compute_lh(rl);
+    double lh3 = model.compute_lh_root(rl);
+    CHECK(std::fabs(lh1 - lh2) == Approx(0.0));
+    CHECK(std::fabs(lh3 - lh2) == Approx(0.0));
   }
 }
 
