@@ -2,6 +2,7 @@
 #include "debug.h"
 #include "model.hpp"
 #include "msa.hpp"
+#include "pll.h"
 #include "tree.hpp"
 #include "util.hpp"
 #include <algorithm>
@@ -273,7 +274,6 @@ void model_t::set_gamma_rates_free(size_t p_index, model_params_t free_rates) {
   for (auto &f : free_rates) {
     f /= sum;
   }
-  _rate_rates[p_index] = free_rates;
   debug_print(EMIT_LEVEL_DEBUG, "setting rates to %s",
               to_string(free_rates).c_str());
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
@@ -364,7 +364,7 @@ model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
 
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
     auto part = _partitions[part_index];
-#pragma omp parallel for collapse(1) schedule(static)
+    //#pragma omp parallel for collapse(1) schedule(static)
     for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
       auto param_index = _param_indicies[part_index];
       auto matrix_index = pmatrix_indices[branch];
@@ -408,13 +408,13 @@ double model_t::compute_lh(const root_location_t &root_location) {
 
 double model_t::compute_lh_root(const root_location_t &root) {
   pll_operation_t op;
-  std::vector<unsigned int> pmatrix_indices;
+  std::vector<unsigned int> matrix_indices;
   std::vector<double> branch_lengths;
 
   {
     auto result = _tree.generate_derivative_operations(root);
     op = std::move(std::get<0>(result));
-    pmatrix_indices = std::move(std::get<1>(result));
+    matrix_indices = std::move(std::get<1>(result));
     branch_lengths = std::move(std::get<2>(result));
   }
 
@@ -424,9 +424,9 @@ double model_t::compute_lh_root(const root_location_t &root) {
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
     int result = pll_update_prob_matrices(
-        partition, _param_indicies[i].data(), pmatrix_indices.data(),
+        partition, _param_indicies[i].data(), matrix_indices.data(),
         branch_lengths.data(),
-        static_cast<unsigned int>(pmatrix_indices.size()));
+        static_cast<unsigned int>(matrix_indices.size()));
 
     if (result == PLL_FAILURE) {
       throw std::runtime_error(pll_errmsg);
@@ -437,6 +437,30 @@ double model_t::compute_lh_root(const root_location_t &root) {
                                          _param_indicies[i].data(), nullptr) *
           _partition_weights[i];
   }
+  if (std::isnan(lh)) {
+    throw std::runtime_error("lh at root is not a number: " +
+                             std::to_string(lh));
+  }
+  return lh;
+}
+
+double
+model_t::compute_lh_partition(size_t partition_index,
+                              const std::vector<pll_operation_t> &ops,
+                              const std::vector<unsigned int> &pmatrix_indices,
+                              const std::vector<double> &branch_lengths) {
+
+  pll_update_prob_matrices(
+      _partitions[partition_index], _param_indicies[partition_index].data(),
+      pmatrix_indices.data(), branch_lengths.data(), pmatrix_indices.size());
+
+  pll_update_partials(_partitions[partition_index], ops.data(),
+                      static_cast<unsigned int>(ops.size()));
+  double lh = pll_compute_root_loglikelihood(
+                  _partitions[partition_index], _tree.root_clv_index(),
+                  _tree.root_scaler_index(),
+                  _param_indicies[partition_index].data(), nullptr) *
+              _partition_weights[partition_index];
   if (std::isnan(lh)) {
     throw std::runtime_error("lh at root is not a number: " +
                              std::to_string(lh));
@@ -1045,17 +1069,18 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
     double cur_best_lh = -std::numeric_limits<double>::infinity();
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
+      debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing parameters");
       optimize_params(params, rl, pgtol, factor, (iter % 10 == 0));
 
       if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
         break;
       }
 
-      debug_string(EMIT_LEVEL_INFO, "Optimizing Root Location");
+      debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Root Location");
       auto cur_rl = optimize_alpha(rl, brtol);
       double cur_lh = compute_lh_root(cur_rl);
 
-      debug_print(EMIT_LEVEL_INFO, "Iteration %lu LH: %.5f", iter, cur_lh);
+      debug_print(EMIT_LEVEL_MPROGRESS, "Iteration %lu LH: %.5f", iter, cur_lh);
       debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
                   (cur_lh - cur_best_lh));
 
@@ -1360,16 +1385,23 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
 }
 
 double model_t::bfgs_rates(model_params_t &initial_rates,
-                           const root_location_t &rl, size_t partition_index,
-                           double pgtol, double factor) {
+                           const std::vector<pll_operation_t> &ops,
+                           const std::vector<unsigned int> pmatrix_indices,
+                           const std::vector<double> branch_lengths,
+                           size_t partition_index, double pgtol,
+                           double factor) {
 
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1e4;
   constexpr double epsilon = 1e-4;
+
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs params");
   return bfgs_params(
       initial_rates, partition_index, p_min, p_max, epsilon, pgtol, factor,
-      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this]() -> double {
+        return -this->compute_lh_partition(partition_index, ops,
+                                           pmatrix_indices, branch_lengths);
+      },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_subst_rates(pi, mp);
       });
@@ -1391,8 +1423,11 @@ double model_t::gd_rates(model_params_t &initial_rates,
 }
 
 double model_t::bfgs_freqs(model_params_t &initial_freqs,
-                           const root_location_t &rl, size_t partition_index,
-                           double pgtol, double factor) {
+                           const std::vector<pll_operation_t> &ops,
+                           const std::vector<unsigned int> pmatrix_indices,
+                           const std::vector<double> branch_lengths,
+                           size_t partition_index, double pgtol,
+                           double factor) {
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
@@ -1402,7 +1437,10 @@ double model_t::bfgs_freqs(model_params_t &initial_freqs,
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs freqs");
   double lh = bfgs_params(
       initial_freqs, partition_index, p_min, p_max, epsilon, pgtol, factor,
-      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this]() -> double {
+        return -this->compute_lh_partition(partition_index, ops,
+                                           pmatrix_indices, branch_lengths);
+      },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_freqs_all_free(pi, mp);
       });
@@ -1429,10 +1467,12 @@ double model_t::gd_freqs(model_params_t &initial_freqs,
   return lh;
 }
 
-double model_t::bfgs_gamma_rates(model_params_t &alpha,
-                                 const root_location_t &rl,
-                                 size_t partition_index, double pgtol,
-                                 double factor) {
+double
+model_t::bfgs_gamma_rates(model_params_t &alpha,
+                          const std::vector<pll_operation_t> &ops,
+                          const std::vector<unsigned int> pmatrix_indices,
+                          const std::vector<double> branch_lengths,
+                          size_t partition_index, double pgtol, double factor) {
   constexpr double p_min = 0.2;
   constexpr double p_max = 10000.0;
   constexpr double epsilon = 1e-4;
@@ -1440,7 +1480,10 @@ double model_t::bfgs_gamma_rates(model_params_t &alpha,
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = bfgs_params(
       alpha, partition_index, p_min, p_max, epsilon, pgtol, factor,
-      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this]() -> double {
+        return -this->compute_lh_partition(partition_index, ops,
+                                           pmatrix_indices, branch_lengths);
+      },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_gamma_rates(pi, mp);
       });
@@ -1465,10 +1508,11 @@ double model_t::gd_gamma_rates(model_params_t &alpha, const root_location_t &rl,
   return lh;
 }
 
-double model_t::bfgs_gamma_weights(model_params_t &alpha,
-                                   const root_location_t &rl,
-                                   size_t partition_index, double pgtol,
-                                   double factor) {
+double model_t::bfgs_gamma_weights(
+    model_params_t &alpha, const std::vector<pll_operation_t> &ops,
+    const std::vector<unsigned int> pmatrix_indices,
+    const std::vector<double> branch_lengths, size_t partition_index,
+    double pgtol, double factor) {
   constexpr double p_min = 1e-4;
   constexpr double p_max = 1.0;
   constexpr double epsilon = 1e-4;
@@ -1476,7 +1520,10 @@ double model_t::bfgs_gamma_weights(model_params_t &alpha,
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = bfgs_params(
       alpha, partition_index, p_min, p_max, epsilon, pgtol, factor,
-      [&, this]() -> double { return -this->compute_lh(rl); },
+      [&, this]() -> double {
+        return -this->compute_lh_partition(partition_index, ops,
+                                           pmatrix_indices, branch_lengths);
+      },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_gamma_weights(pi, mp);
       });
@@ -1669,10 +1716,13 @@ void model_t::set_model_params(
 void model_t::optimize_params(std::vector<partition_parameters_t> &params,
                               const root_location_t &rl, double pgtol,
                               double factor, bool optimize_gamma) {
+  std::vector<pll_operation_t> ops;
+  std::vector<unsigned int> pmatrix_indices;
+  std::vector<double> branch_lengths;
+
+  GENERATE_AND_UNPACK_OPS(_tree, rl, ops, pmatrix_indices, branch_lengths);
+#pragma omp parallel for private(ops, pmatrix_indices, branch_lengths)
   for (size_t i = 0; i < _partitions.size(); ++i) {
-    debug_print(EMIT_LEVEL_MPROGRESS,
-                "Optimizing parameters for partition: %lu/%lu", i + 1,
-                _partitions.size());
     set_subst_rates(i, params[i].subst_rates);
     set_freqs_all_free(i, params[i].freqs);
     set_gamma_rates(i, params[i].gamma_alpha);
@@ -1681,19 +1731,23 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
       set_gamma_weights(i, params[i].gamma_weights);
     }
 
-    debug_string(EMIT_LEVEL_MPROGRESS, "Optmizing rates");
-    bfgs_rates(params[i].subst_rates, rl, i, pgtol, factor);
+    debug_string(EMIT_LEVEL_INFO, "Optmizing rates");
+    bfgs_rates(params[i].subst_rates, ops, pmatrix_indices, branch_lengths, i,
+               pgtol, factor);
 
-    debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing freqs");
-    bfgs_freqs(params[i].freqs, rl, i, pgtol, factor);
+    debug_string(EMIT_LEVEL_INFO, "Optimizing freqs");
+    bfgs_freqs(params[i].freqs, ops, pmatrix_indices, branch_lengths, i, pgtol,
+               factor);
 
     if (optimize_gamma) {
-      debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma rates");
-      bfgs_gamma_rates(params[i].gamma_alpha, rl, i, pgtol, factor);
+      debug_string(EMIT_LEVEL_INFO, "Optimizing gamma rates");
+      bfgs_gamma_rates(params[i].gamma_alpha, ops, pmatrix_indices,
+                       branch_lengths, i, pgtol, factor);
 
       if (_rate_category_types[i] == rate_category::FREE) {
-        debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing gamma weights");
-        bfgs_gamma_weights(params[i].gamma_weights, rl, i, pgtol, factor);
+        debug_string(EMIT_LEVEL_INFO, "Optimizing gamma weights");
+        bfgs_gamma_weights(params[i].gamma_weights, ops, pmatrix_indices,
+                           branch_lengths, i, pgtol, factor);
       }
     }
   }

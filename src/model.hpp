@@ -60,6 +60,10 @@ public:
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
+  double compute_lh_partition(size_t partition_index,
+                              const std::vector<pll_operation_t> &ops,
+                              const std::vector<unsigned int> &pmatrix_indices,
+                              const std::vector<double> &branch_lengths);
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root, double atol);
   std::pair<root_location_t, double> optimize_root_location(size_t min_roots,
@@ -128,22 +132,33 @@ private:
   std::vector<bool>
   update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
                    const std::vector<double> &branch_lengths);
-  double bfgs_rates(model_params_t &initial_rates, const root_location_t &rl,
+  double bfgs_rates(model_params_t &initial_rates,
+                    const std::vector<pll_operation_t> &ops,
+                    const std::vector<unsigned int> pmatrix_indices,
+                    const std::vector<double> branch_lengths,
                     size_t partition_index, double pgtol, double factor);
-  double bfgs_freqs(model_params_t &initial_rates, const root_location_t &rl,
+  double bfgs_freqs(model_params_t &initial_rates,
+                    const std::vector<pll_operation_t> &ops,
+                    const std::vector<unsigned int> pmatrix_indices,
+                    const std::vector<double> branch_lengths,
                     size_t partition_index, double pgtol, double factor);
   double gd_rates(model_params_t &initial_rates, const root_location_t &rl,
                   size_t partition_index);
   double gd_freqs(model_params_t &initial_rates, const root_location_t &rl,
                   size_t partition_index);
   double bfgs_gamma_rates(model_params_t &intial_alpha,
-                          const root_location_t &rl, size_t partition_index,
-                          double pgtol, double factor);
+                          const std::vector<pll_operation_t> &ops,
+                          const std::vector<unsigned int> pmatrix_indices,
+                          const std::vector<double> branch_lengths,
+                          size_t partition_index, double pgtol, double factor);
   double gd_gamma_rates(model_params_t &intial_alpha, const root_location_t &rl,
                         size_t partition_index);
   double bfgs_gamma_weights(model_params_t &intial_alpha,
-                            const root_location_t &rl, size_t partition_index,
-                            double pgtol, double factor);
+                            const std::vector<pll_operation_t> &ops,
+                            const std::vector<unsigned int> pmatrix_indices,
+                            const std::vector<double> branch_lengths,
+                            size_t partition_index, double pgtol,
+                            double factor);
   double gd_gamma_weights(model_params_t &intial_alpha,
                           const root_location_t &rl, size_t partition_index);
 

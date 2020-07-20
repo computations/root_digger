@@ -1,3 +1,4 @@
+#include <numeric>
 extern "C" {
 #include <libpll/pll.h>
 }
@@ -436,7 +437,10 @@ int wrapped_main(int argv, char **argc) {
 
     /* Set some defaults for rates */
     if (cli_options.rate_category_types.size() == 0) {
-      cli_options.rate_category_types.push_back(rate_category::MEAN);
+      cli_options.rate_category_types.resize(cli_options.rate_cats.size());
+      for(auto &i : cli_options.rate_category_types){
+        i = rate_category::MEAN;
+      }
     }
 
     if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0) {
