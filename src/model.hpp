@@ -60,10 +60,6 @@ public:
   ~model_t();
   double compute_lh(const root_location_t &root_location);
   double compute_lh_root(const root_location_t &root);
-  double compute_lh_partition(size_t partition_index,
-                              const std::vector<pll_operation_t> &ops,
-                              const std::vector<unsigned int> &pmatrix_indices,
-                              const std::vector<double> &branch_lengths);
   dlh_t compute_dlh(const root_location_t &root_location);
   root_location_t optimize_alpha(const root_location_t &root, double atol);
   std::pair<root_location_t, double> optimize_root_location(size_t min_roots,
@@ -129,9 +125,20 @@ private:
   void set_freqs_all_free(size_t, model_params_t);
   void set_model_params(const std::vector<partition_parameters_t> &);
   void move_root(const root_location_t &new_root);
+
+  bool update_eigen_partition(size_t partition_index);
+  void
+  update_pmatrix_partition(size_t partition_index,
+                           const std::vector<unsigned int> &pmatrix_indices,
+                           const std::vector<double> &branch_lengths);
   std::vector<bool>
   update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
                    const std::vector<double> &branch_lengths);
+  double compute_lh_partition(size_t partition_index,
+                              const std::vector<pll_operation_t> &ops,
+                              const std::vector<unsigned int> &pmatrix_indices,
+                              const std::vector<double> &branch_lengths);
+
   double bfgs_rates(model_params_t &initial_rates,
                     const std::vector<pll_operation_t> &ops,
                     const std::vector<unsigned int> pmatrix_indices,

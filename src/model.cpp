@@ -1,5 +1,6 @@
 #include "checkpoint.hpp"
 #include "debug.h"
+#include "libpll/pll.h"
 #include "model.hpp"
 #include "msa.hpp"
 #include "pll.h"
@@ -347,31 +348,46 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
   set_freqs(p_index, freqs);
 }
 
+bool model_t::update_eigen_partition(size_t partition_index) {
+  bool updated = false;
+  auto part = _partitions[partition_index];
+  for (size_t i = 0; i < part->rate_cats; ++i) {
+    if (!part->eigen_decomp_valid[i]) {
+      int result = pll_update_eigen(part, _param_indicies[partition_index][i]);
+      updated = true;
+      if (result == PLL_FAILURE) {
+        throw std::runtime_error{"Failed to update the eigen decomposition"};
+      }
+    }
+  }
+  return updated;
+}
+
+void model_t::update_pmatrix_partition(
+    size_t partition_index, const std::vector<unsigned int> &pmatrix_indices,
+    const std::vector<double> &branch_lengths) {
+  auto part = _partitions[partition_index];
+#pragma omp parallel for collapse(1) schedule(static)
+  for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
+    auto param_index = _param_indicies[partition_index];
+    auto matrix_index = pmatrix_indices[branch];
+    auto branch_length = branch_lengths[branch];
+    pll_update_prob_matrices(part, param_index.data(), &matrix_index,
+                             &branch_length, 1);
+  }
+}
+
 std::vector<bool>
 model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
                           const std::vector<double> &branch_lengths) {
   /* Update the eigen decompositions first */
   std::vector<bool> updated(_partitions.size(), false);
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
-    auto part = _partitions[part_index];
-    for (size_t i = 0; i < part->rate_cats; ++i) {
-      if (!part->eigen_decomp_valid[i]) {
-        pll_update_eigen(part, _param_indicies[part_index][i]);
-        updated[part_index] = true;
-      }
-    }
+    updated[part_index] = update_eigen_partition(part_index);
   }
 
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
-    auto part = _partitions[part_index];
-    //#pragma omp parallel for collapse(1) schedule(static)
-    for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
-      auto param_index = _param_indicies[part_index];
-      auto matrix_index = pmatrix_indices[branch];
-      auto branch_length = branch_lengths[branch];
-      pll_update_prob_matrices(part, param_index.data(), &matrix_index,
-                               &branch_length, 1);
-    }
+    update_pmatrix_partition(part_index, pmatrix_indices, branch_lengths);
   }
   return updated;
 }
@@ -450,12 +466,13 @@ model_t::compute_lh_partition(size_t partition_index,
                               const std::vector<unsigned int> &pmatrix_indices,
                               const std::vector<double> &branch_lengths) {
 
-  pll_update_prob_matrices(
-      _partitions[partition_index], _param_indicies[partition_index].data(),
-      pmatrix_indices.data(), branch_lengths.data(), pmatrix_indices.size());
+  bool update_partials = update_eigen_partition(partition_index);
+  if (update_partials) {
+    update_pmatrix_partition(partition_index, pmatrix_indices, branch_lengths);
+    pll_update_partials(_partitions[partition_index], ops.data(),
+                        static_cast<unsigned int>(ops.size()));
+  }
 
-  pll_update_partials(_partitions[partition_index], ops.data(),
-                      static_cast<unsigned int>(ops.size()));
   double lh = pll_compute_root_loglikelihood(
                   _partitions[partition_index], _tree.root_clv_index(),
                   _tree.root_scaler_index(),
@@ -1721,7 +1738,7 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
   std::vector<double> branch_lengths;
 
   GENERATE_AND_UNPACK_OPS(_tree, rl, ops, pmatrix_indices, branch_lengths);
-#pragma omp parallel for private(ops, pmatrix_indices, branch_lengths)
+#pragma omp parallel for schedule(dynamic)
   for (size_t i = 0; i < _partitions.size(); ++i) {
     set_subst_rates(i, params[i].subst_rates);
     set_freqs_all_free(i, params[i].freqs);
