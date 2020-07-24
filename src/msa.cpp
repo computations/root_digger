@@ -671,7 +671,7 @@ bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   // labels subset taxa
   for (const std::string &k : labels) {
     if (taxa.find(k) == taxa.end()) {
-      debug_print(EMIT_LEVEL_DEBUG, "Taxa %s in msa is not present on the tree",
+      debug_print(EMIT_LEVEL_ERROR, "Taxa %s in msa is not present on the tree",
                   k.c_str());
       ret = false;
     }
@@ -680,7 +680,7 @@ bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   // taxa subset labels
   for (const std::string &k : taxa) {
     if (labels.find(k) == labels.end()) {
-      debug_print(EMIT_LEVEL_DEBUG, "Taxa %s on tree is not present in the msa",
+      debug_print(EMIT_LEVEL_ERROR, "Taxa %s on tree is not present in the msa",
                   k.c_str());
       ret = false;
     }
