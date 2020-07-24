@@ -893,7 +893,6 @@ model_t::suggest_roots(size_t min, double ratio) {
 
 std::vector<size_t> model_t::shuffle_root_indicies() {
   std::vector<size_t> idx(_tree.root_count());
-  ;
   std::iota(idx.begin(), idx.end(), 0);
   std::shuffle(idx.begin(), idx.end(), _random_engine);
   return idx;
