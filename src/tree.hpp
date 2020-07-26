@@ -58,6 +58,7 @@ public:
 
   rooted_tree_t(rooted_tree_t &&other)
       : _tree{std::move(other._tree)}, _roots{std::move(other._roots)},
+        _root_annotations{std::move(other._root_annotations)},
         _rooted{other._rooted} {
     other._tree = nullptr;
   }
@@ -97,6 +98,7 @@ public:
              std::vector<double>>
   generate_root_update_operations(const root_location_t &new_root);
 
+  void root_by(unsigned int root_id);
   void root_by(const root_location_t &);
   void update_root(root_location_t);
   void unroot();
@@ -104,7 +106,8 @@ public:
   bool branch_length_sanity_check() const;
   bool sanity_check() const;
 
-  std::string newick() const;
+  std::string newick(bool annotations = true) const;
+  void clear_newick_annotations();
 
   void show_tree() const;
   void annotate_node(const root_location_t &rl, const std::string &key,
@@ -136,6 +139,9 @@ private:
   void clear_traversal_data(pll_unode_t *);
   void annotate_node(pll_unode_t *node_id, const std::string &key,
                      const std::string &value);
+  void copy_annotations(const rooted_tree_t &other);
+  std::unordered_map<pll_unode_t *, pll_unode_t *>
+  make_node_bijection(const rooted_tree_t &other);
 
   pll_utree_t *_tree;
   root_location_t _current_rl;

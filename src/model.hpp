@@ -74,9 +74,11 @@ public:
   exhaustive_search(double atol, double pgtol, double brtol, double factor,
                     checkpoint_t &);
 
-  const rooted_tree_t &rooted_tree(const root_location_t &root);
-  const rooted_tree_t &virtual_rooted_tree(const root_location_t &root);
-  const rooted_tree_t &unrooted_tree();
+  void initialize();
+  void finalize();
+  rooted_tree_t rooted_tree(const root_location_t &root) const;
+  rooted_tree_t virtual_rooted_tree(const root_location_t &root) const;
+  rooted_tree_t unrooted_tree() const;
 
   void initialize_partitions(const std::vector<msa_t> &);
   void initialize_partitions_uniform_freqs(const std::vector<msa_t> &);

@@ -1,4 +1,5 @@
 #include "tree.hpp"
+#include <stdexcept>
 extern "C" {
 #include <libpll/pll_tree.h>
 }
@@ -23,10 +24,14 @@ static void clean_root_unode(pll_unode_t *node) {
 }
 
 rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
+  if (other.rooted()) {
+    throw std::runtime_error{"Attempted to copy a tree that is rooted"};
+  }
   _tree = pll_utree_clone(other._tree);
   _rooted = other._rooted;
 
   copy_root_locations(other);
+  copy_annotations(other);
 
   if (!_rooted) {
     add_root_space();
@@ -36,7 +41,7 @@ rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
 rooted_tree_t::~rooted_tree_t() {
   auto deallocate_data = [](void *n) {
     assert(n != (void *)0xdeadbeef);
-    if (n)
+    if (n != nullptr)
       free(n);
   };
   if (_tree != nullptr) {
@@ -51,16 +56,21 @@ rooted_tree_t::~rooted_tree_t() {
 rooted_tree_t &rooted_tree_t::operator=(rooted_tree_t &&other) {
   _tree = std::move(other._tree);
   _roots = std::move(other._roots);
+  _root_annotations = std::move(other._root_annotations);
   _rooted = other._rooted;
   other._tree = nullptr;
   return *this;
 }
 
 rooted_tree_t &rooted_tree_t::operator=(const rooted_tree_t &other) {
+  if (other.rooted()) {
+    throw std::runtime_error{"Attempted to copy a tree that is rooted"};
+  }
   _tree = pll_utree_clone(other._tree);
   _rooted = other._rooted;
 
   copy_root_locations(other);
+  copy_annotations(other);
 
   if (!_rooted) {
     add_root_space();
@@ -132,10 +142,11 @@ std::unordered_set<std::string> rooted_tree_t::label_set() const {
 void rooted_tree_t::copy_root_locations(const rooted_tree_t &other) {
   _roots.clear();
   std::unordered_map<pll_unode_t *, size_t> id_map;
-  id_map.reserve(other.root_count());
+  id_map.reserve(other.root_count() * 2);
   for (const auto &r : other.roots()) {
     debug_print(EMIT_LEVEL_DEBUG, "mapping %p to %lu", (void *)r.edge, r.id);
     id_map[r.edge] = r.id;
+    id_map[r.edge->back] = r.id;
   }
 
   auto other_trav = other.full_traverse();
@@ -146,12 +157,19 @@ void rooted_tree_t::copy_root_locations(const rooted_tree_t &other) {
                              "constructor, something is seriously wrong");
   }
 
+  std::unordered_set<size_t> consumed_ids;
   for (size_t i = 0; i < other_trav.size(); ++i) {
-    auto res = id_map.find(other_trav[i]);
-    if (res != id_map.end()) {
+    auto id_map_res = id_map.find(other_trav[i]);
+    if (id_map_res != id_map.end() &&
+        consumed_ids.find(id_map_res->second) == consumed_ids.end()) {
       auto edge = our_trav[i];
-      _roots.push_back({edge, res->second, edge->length, 0.5});
+      _roots.push_back({edge, id_map_res->second, edge->length, 0.5});
+      consumed_ids.insert(id_map_res->second);
     }
+  }
+
+  if (_roots.size() != other._roots.size()) {
+    throw std::runtime_error{"We got the wrong number of roots after copy"};
   }
   sort_root_locations();
 }
@@ -231,6 +249,8 @@ std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
   trav_buf.resize(trav_size);
   return trav_buf;
 }
+
+void rooted_tree_t::root_by(unsigned int root_id) { root_by(_roots[root_id]); }
 
 void rooted_tree_t::root_by(const root_location_t &root_location) {
   debug_print(EMIT_LEVEL_DEBUG, "rooting by node labeled: %s",
@@ -398,9 +418,8 @@ rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
   return std::make_tuple(op, pmatrix_indices, branch_lengths);
 }
 
-std::string rooted_tree_t::newick() const {
-  if (!_root_annotations.empty()) {
-
+std::string rooted_tree_t::newick(bool annotations) const {
+  if (!_root_annotations.empty() && annotations) {
     auto fold_operation = [](std::string a,
                              std::pair<std::string, std::string> b) {
       return std::move(a) + ':' + std::move(b.first) + '=' +
@@ -707,7 +726,46 @@ void rooted_tree_t::annotate_branch(const root_location_t &rl,
 
   if (node_count > 2) {
     annotate_node(rl.edge->back, key, right_value);
-  } else {
+  } else { // We have a root in this case (or a "fake node")
     annotate_node(rl.edge->back->next->back, key, right_value);
+  }
+}
+
+std::unordered_map<pll_unode_t *, pll_unode_t *>
+rooted_tree_t::make_node_bijection(const rooted_tree_t &other) {
+  std::unordered_map<pll_unode_t *, pll_unode_t *> bijection;
+  auto our_nodes = full_traverse();
+  auto their_nodes = other.full_traverse();
+
+  if (our_nodes.size() != their_nodes.size()) {
+    throw std::runtime_error{
+        "Can't create a bijection between two different sized trees"};
+  }
+
+  for (size_t i = 0; i < our_nodes.size(); ++i) {
+    pll_unode_t *our_cur_node = our_nodes[i];
+    pll_unode_t *their_cur_node = their_nodes[i];
+    do {
+      bijection[their_cur_node] = our_cur_node;
+      our_cur_node = our_cur_node->next;
+      their_cur_node = their_cur_node->next;
+      if (!(our_cur_node == nullptr && their_cur_node == nullptr) &&
+          !(our_cur_node != nullptr && their_cur_node != nullptr)) {
+        throw std::runtime_error{"There is a difference in topology discoverd "
+                                 "when trying to make a bijective map"};
+      }
+    } while (our_cur_node != nullptr && their_cur_node != nullptr &&
+             our_cur_node != our_nodes[i] && their_cur_node != their_nodes[i]);
+  }
+  return bijection;
+}
+
+void rooted_tree_t::copy_annotations(const rooted_tree_t &other) {
+  auto bijection = make_node_bijection(other);
+
+  for (auto &kv : other._root_annotations) {
+    auto &node = kv.first;
+    auto &annotation = kv.second;
+    _root_annotations[bijection.at(node)] = annotation;
   }
 }

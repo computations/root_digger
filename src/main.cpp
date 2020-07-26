@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <numeric>
 extern "C" {
 #include <libpll/pll.h>
@@ -438,7 +439,7 @@ int wrapped_main(int argv, char **argc) {
     /* Set some defaults for rates */
     if (cli_options.rate_category_types.size() == 0) {
       cli_options.rate_category_types.resize(cli_options.rate_cats.size());
-      for(auto &i : cli_options.rate_category_types){
+      for (auto &i : cli_options.rate_category_types) {
         i = rate_category::MEAN;
       }
     }
@@ -478,7 +479,7 @@ int wrapped_main(int argv, char **argc) {
       std::cout << tree.newick() << std::endl;
     }
 
-    model.compute_lh(tree.root_location(0));
+    model.initialize();
     root_location_t final_rl;
     double final_lh = -std::numeric_limits<double>::infinity();
     std::string final_tree_string;
@@ -495,9 +496,12 @@ int wrapped_main(int argv, char **argc) {
                               cli_options.br_tolerance, cli_options.factor,
                               checkpoint);
       if (__MPI_RANK__ == 0) {
+        model.finalize();
         final_rl = tmp.first;
         final_lh = tmp.second;
-        final_tree_string = model.rooted_tree(final_rl).newick();
+        std::ofstream outfile{cli_options.prefix + ".rooted.tree"};
+        final_tree_string = model.rooted_tree(final_rl).newick(false);
+        outfile << final_tree_string;
       }
     } else {
 
@@ -513,9 +517,19 @@ int wrapped_main(int argv, char **argc) {
           cli_options.abs_tolerance, cli_options.bfgs_tol,
           cli_options.br_tolerance, cli_options.factor, checkpoint);
       if (__MPI_RANK__ == 0) {
+        model.finalize();
         final_rl = tmp.first;
         final_lh = tmp.second;
         final_tree_string = model.virtual_rooted_tree(final_rl).newick();
+        {
+          std::ofstream outfile{cli_options.prefix + ".lwr.tree"};
+          outfile << final_tree_string;
+        }
+        {
+          std::ofstream outfile{cli_options.prefix + ".rooted.tree"};
+          auto tmp_tree = model.rooted_tree(final_rl);
+          outfile << tmp_tree.newick(false);
+        }
       }
     }
 
@@ -535,8 +549,6 @@ int wrapped_main(int argv, char **argc) {
       std::cout << "Inference took: " << duration.count() << "s" << std::endl;
 
     if (__MPI_RANK__ == 0) {
-      std::ofstream outfile{cli_options.prefix + ".rooted.tree"};
-      outfile << final_tree_string;
     }
   } catch (const std::exception &e) {
     if (__MPI_RANK__ == 0) {

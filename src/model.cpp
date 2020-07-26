@@ -1168,25 +1168,44 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
       _tree.annotate_lh(rl, result.lh);
       _tree.annotate_ratio(rl, result.alpha);
     }
+    auto total_best_result = *std::max_element(
+        total_progress.begin(), total_progress.end(),
+        [](rd_result_t a, rd_result_t b)
+            -> bool { return a.lh < b.lh; });
+
+    best_rl = _tree.root_location(total_best_result.root_id);
+    best_rl.brlen_ratio = total_best_result.alpha;
+    best_lh = total_best_result.lh;
   }
 
   return {best_rl, best_lh};
 }
 
-const rooted_tree_t &model_t::rooted_tree(const root_location_t &root) {
-  _tree.root_by(root);
-  return _tree;
+void model_t::initialize(){
+  compute_lh(_tree.root_location(0));
 }
 
-const rooted_tree_t &model_t::virtual_rooted_tree(const root_location_t &root) {
-  _tree.root_by(root);
+void model_t::finalize(){
   _tree.unroot();
-  return _tree;
 }
 
-const rooted_tree_t &model_t::unrooted_tree() {
-  _tree.unroot();
-  return _tree;
+rooted_tree_t model_t::rooted_tree(const root_location_t &root) const{
+  rooted_tree_t new_tree(_tree);
+  new_tree.root_by(root.id);
+  return new_tree;
+}
+
+rooted_tree_t model_t::virtual_rooted_tree(const root_location_t &root) const {
+  rooted_tree_t new_tree(_tree);
+  new_tree.root_by(root.id);
+  new_tree.unroot();
+  return new_tree;
+}
+
+rooted_tree_t model_t::unrooted_tree() const{
+  rooted_tree_t new_tree(_tree);
+  new_tree.unroot();
+  return new_tree;
 }
 
 void model_t::initialize_partitions(const std::vector<msa_t> &msa) {
