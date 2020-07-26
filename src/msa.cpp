@@ -1,5 +1,6 @@
 #include "debug.h"
 #include "msa.hpp"
+#include "pll.h"
 #include <cctype>
 #include <fstream>
 #include <functional>
@@ -23,7 +24,8 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
           pll_phylip_open(msa_filename.c_str(), pll_map_generic)) {
     pll_msa_t *pll_msa = nullptr;
     if ((pll_msa = pll_phylip_parse_interleaved(fd)) ||
-        (pll_msa = pll_phylip_parse_sequential(fd))) {
+        ((pll_phylip_rewind(fd) == PLL_SUCCESS) &&
+         (pll_msa = pll_phylip_parse_sequential(fd)))) {
       pll_phylip_close(fd);
       return pll_msa;
     } else {
