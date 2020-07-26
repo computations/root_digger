@@ -940,8 +940,7 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
                 double brtol, double factor, checkpoint_t &checkpoint) {
 
   if (_assigned_idx.size() == 0) {
-    throw std::runtime_error(
-        "Indicies were not assigned before calling optimizations functions");
+    debug_string(EMIT_LEVEL_WARNING, "There is no work to be done");
   }
   double best_lh = -std::numeric_limits<double>::infinity();
   root_location_t best_rl;
@@ -1060,6 +1059,10 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
 std::pair<root_location_t, double>
 model_t::exhaustive_search(double atol, double pgtol, double brtol,
                            double factor, checkpoint_t &checkpoint) {
+
+  if (_assigned_idx.size() == 0) {
+    debug_string(EMIT_LEVEL_WARNING, "There is no work to be done");
+  }
   size_t root_index = 0;
   root_location_t best_rl;
   double best_lh = -std::numeric_limits<double>::infinity();
