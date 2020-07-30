@@ -72,91 +72,93 @@ static void print_usage() {
       << "Usage: rd [options]\n"
       << "Version: " << GIT_REV_STRING << "\n"
       << "Application Options:\n"
-      << "    --msa [FILE]\n"
-      << "           File containing the alignment.\n"
-      << "    --tree [FILE]\n"
-      << "           File containing the tree, with branch lengths.\n"
-      << "    --partition [FILE]\n"
-      << "           Optional file containing the partition specification.\n"
-      << "           Format is the same as RAxML-NG partition file.\n"
-      << "    --prefix [STRING]\n"
-      << "           Prefix for the output files.\n"
-      << "    --exhaustive\n"
-      << "           Enable exhaustive mode. This will attempt to root a tree\n"
-      << "           at every branch, and then report the results using LWR.\n"
-      << "    --early-stop\n"
-      << "           Enable early stopping. This will cause cause the search\n"
-      << "           to terminate when the root placement is sufficently\n"
-      << "           close for 2 consecutive iterations. How close they need\n"
-      << "           to be is controled by brtol. Is enabled by default for\n"
-      << "           search mode and disabled by default for exhaustive mode.\n"
-      << "    --no-early-stop\n"
-      << "           Force disable early stop.\n"
-      << "    --seed [NUMBER]\n"
-      << "           Random seed to use. Optional\n"
-      << "    --rate-cats [NUMBER]\n"
-      << "           Number of rate categories to use for the model. Default\n"
-      << "           is 1.\n"
-      << "    --invariant-sites\n"
-      << "           Enable invariant sites. Default is off.\n"
-      << "    --min-roots [NUMBER]\n"
-      << "           Minimum number of roots to start from. Optional,\n"
-      << "           Default is 1.\n"
-      << "    --root-ratio [NUMBER]\n"
-      << "           Proportion of potential starting roots to attempt\n"
-      << "           Default is 0.01\n"
-      << "    --atol [NUMBER]\n"
-      << "           Root optmization stopping tolerance. Increase this to \n"
-      << "           improve results.Default is 1e-4\n"
-      << "    --brtol [NUMBER]\n"
-      << "           When early stop mode is enabled, this controls the\n"
-      << "           distance required to trigger. Default is 1e-12\n"
-      << "    --bfgstol [NUMBER]\n"
-      << "           Tolerance for the BFGS steps. Default is 1e-7\n"
-      << "    --factor [NUMBER]\n"
-      << "           Factor for the BFGS steps. Default is 1e4\n"
-      << "    --threads [NUMBER]\n"
-      << "           Number of threads to use\n"
-      << "    --silent\n"
-      << "           Suppress output except for the final tree\n"
-      << "    --verbose\n"
-      << "           Increase the verbosity level. Can be repeated to\n"
-      << "           level further.\n"
+      << "  --msa [FILE]\n"
+      << "         File containing the alignment.\n"
+      << "  --tree [FILE]\n"
+      << "         File containing the tree, with branch lengths.\n"
+      << "  --partition [FILE]\n"
+      << "         Optional file containing the partition specification.\n"
+      << "         Format is the same as RAxML-NG partition file.\n"
+      << "  --prefix [STRING]\n"
+      << "         Prefix for the output files.\n"
+      << "  --exhaustive\n"
+      << "         Enable exhaustive mode. This will attempt to root a tree\n"
+      << "         at every branch, and then report the results using LWR.\n"
+      << "  --early-stop\n"
+      << "         Enable early stopping. This will cause cause the search\n"
+      << "         to terminate when the root placement is sufficently\n"
+      << "         close for 2 consecutive iterations. How close they need\n"
+      << "         to be can be controled by brtol. Is enabled by default for\n"
+      << "         search mode and disabled by default for exhaustive mode.\n"
+      << "  --no-early-stop\n"
+      << "         Force disable early stop.\n"
+      << "  --seed [NUMBER]\n"
+      << "         Random seed to use. Optional\n"
+      << "  --rate-cats [NUMBER]\n"
+      << "         Number of rate categories to use for the model. Default\n"
+      << "         is 1.\n"
+      << "  --invariant-sites\n"
+      << "         Enable invariant sites. Default is off.\n"
+      << "  --min-roots [NUMBER]\n"
+      << "         Minimum number of roots to start from. Optional,\n"
+      << "         Default is 1.\n"
+      << "  --root-ratio [NUMBER]\n"
+      << "         Proportion of potential starting roots to attempt\n"
+      << "         Default is 0.01\n"
+      << "  --atol [NUMBER]\n"
+      << "         Root optmization stopping tolerance. Increase this to \n"
+      << "         improve results.Default is 1e-4\n"
+      << "  --brtol [NUMBER]\n"
+      << "         When early stop mode is enabled, this controls the\n"
+      << "         distance required to trigger. Default is 1e-12\n"
+      << "  --bfgstol [NUMBER]\n"
+      << "         Tolerance for the BFGS steps. Default is 1e-7\n"
+      << "  --factor [NUMBER]\n"
+      << "         Factor for the BFGS steps. Default is 1e4\n"
+      << "  --threads [NUMBER]\n"
+      << "         Number of threads to use\n"
+      << "  --silent\n"
+      << "         Suppress output except for the final tree\n"
+      << "  --verbose\n"
+      << "         Increase the verbosity level. Can be repeated to\n"
+      << "         level further.\n"
       << std::endl;
 }
 
 cli_options_t parse_options(int argv, char **argc) {
   static struct option long_opts[] = {
-      {"msa", required_argument, 0, 0},             /* 0 */
-      {"tree", required_argument, 0, 0},            /* 1 */
-      {"model", required_argument, 0, 0},           /* 2 */
-      {"seed", required_argument, 0, 0},            /* 3 */
-      {"verbose", no_argument, 0, 0},               /* 4 */
-      {"silent", no_argument, 0, 0},                /* 5 */
-      {"min-roots", required_argument, 0, 0},       /* 6 */
-      {"root-ratio", required_argument, 0, 0},      /* 7 */
-      {"atol", required_argument, 0, 0},            /* 8 */
-      {"brtol", required_argument, 0, 0},           /* 9 */
-      {"bfgstol", required_argument, 0, 0},         /* 10 */
-      {"factor", required_argument, 0, 0},          /* 11 */
-      {"partition", required_argument, 0, 0},       /* 12 */
-      {"prefix", required_argument, 0, 0},          /* 13 */
-      {"exhaustive", no_argument, 0, 0},            /* 14 */
-      {"early-stop", no_argument, 0, 0},            /* 15 */
-      {"no-early-stop", no_argument, 0, 0},         /* 16 */
-      {"rate-cats", required_argument, 0, 0},       /* 17 */
-      {"rate-cats-type", required_argument, 0, 0},  /* 18 */
-      {"invariant-sites", required_argument, 0, 0}, /* 19 */
-      {"threads", required_argument, 0, 0},         /* 20 */
-      {"version", no_argument, 0, 0},               /* 21 */
-      {"debug", no_argument, 0, 0},                 /* 22 */
-      {"mpi-debug", no_argument, 0, 0},             /* 22 */
-      {"echo", no_argument, 0, 0},                  /* 23 */
+      {"msa", required_argument, 0, 0},            /* 0 */
+      {"tree", required_argument, 0, 0},           /* 1 */
+      {"model", required_argument, 0, 0},          /* 2 */
+      {"seed", required_argument, 0, 0},           /* 3 */
+      {"verbose", no_argument, 0, 0},              /* 4 */
+      {"silent", no_argument, 0, 0},               /* 5 */
+      {"min-roots", required_argument, 0, 0},      /* 6 */
+      {"root-ratio", required_argument, 0, 0},     /* 7 */
+      {"atol", required_argument, 0, 0},           /* 8 */
+      {"brtol", required_argument, 0, 0},          /* 9 */
+      {"bfgstol", required_argument, 0, 0},        /* 10 */
+      {"factor", required_argument, 0, 0},         /* 11 */
+      {"partition", required_argument, 0, 0},      /* 12 */
+      {"prefix", required_argument, 0, 0},         /* 13 */
+      {"exhaustive", no_argument, 0, 0},           /* 14 */
+      {"early-stop", no_argument, 0, 0},           /* 15 */
+      {"no-early-stop", no_argument, 0, 0},        /* 16 */
+      {"rate-cats", required_argument, 0, 0},      /* 17 */
+      {"rate-cats-type", required_argument, 0, 0}, /* 18 */
+      {"invariant-sites", no_argument, 0, 0},      /* 19 */
+      {"threads", required_argument, 0, 0},        /* 20 */
+      {"version", no_argument, 0, 0},              /* 21 */
+      {"debug", no_argument, 0, 0},                /* 22 */
+      {"mpi-debug", no_argument, 0, 0},            /* 23 */
+      {"echo", no_argument, 0, 0},                 /* 24 */
+      {"help", no_argument, 0, 0},                 /* 25 */
       {0, 0, 0, 0},
   };
 
   int c;
   int index = 0;
+  optind = 0;
   cli_options_t cli_options;
   while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
     debug_print(EMIT_LEVEL_DEBUG, "parsing option index: %d", index);
@@ -243,9 +245,21 @@ cli_options_t parse_options(int argv, char **argc) {
     case 24: // echo
       cli_options.echo = true;
       break;
+    case 25: // help
+      print_usage();
+      std::exit(0);
+      break;
+    case '?':
+    case ':':
+      print_usage();
+      std::exit(0);
     default:
       throw std::invalid_argument("An argument was not recognized");
     }
+  }
+  if (c == '?' || c == ':') {
+    print_usage();
+    std::exit(1);
   }
 #ifdef MPI_VERSION
   debug_string(EMIT_LEVEL_DEBUG, "Broadcasting seed");
