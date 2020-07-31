@@ -528,6 +528,9 @@ partition_info_t parse_partition_info(const std::string &line) {
  */
 msa_partitions_t parse_partition_file(const std::string &filename) {
   std::ifstream partition_file{filename};
+  if(!partition_file){
+    throw std::runtime_error{"Failed to open the partition file"};
+  }
   msa_partitions_t parts;
   for (std::string line; std::getline(partition_file, line);) {
     parts.push_back(parse_partition_info(line));

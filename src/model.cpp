@@ -78,6 +78,9 @@ model_params_t parse_model_params(const std::string &model_string) {
 
 model_params_t parse_model_file(const std::string &model_filename) {
   std::ifstream model_file(model_filename);
+  if(!model_file){
+    throw std::runtime_error{"Failed to open the model file"};
+  }
 
   return parse_model_params(read_file_contents(model_file));
 }
