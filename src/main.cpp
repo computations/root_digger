@@ -332,6 +332,10 @@ int wrapped_main(int argv, char **argc) {
   try {
 
     auto cli_options = parse_options(argv, argc);
+#ifdef MPI_VERSION
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
 
     /* Use the tree path for the prefix */
     if (cli_options.prefix.empty()) {
