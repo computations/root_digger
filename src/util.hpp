@@ -156,6 +156,7 @@ struct cli_options_t {
   bool exhaustive = false;
   bool echo = false;
   bool invariant_sites = false;
+  bool clean= false;
   initialized_flag_t early_stop;
 
   bool operator==(const cli_options_t &other) const {

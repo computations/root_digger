@@ -149,8 +149,9 @@ void checkpoint_t::clean() {
     return;
   }
   std::string backup_filename = _checkpoint_filename + ".bak";
-  if (__MPI_RANK__ == 0 && needs_cleaning()) {
+  if (__MPI_RANK__ == 0) {
     auto lock = write_lock<fcntl_lock_behavior::block>();
+    lseek(_file_descriptor, 0, SEEK_SET);
     auto copy_fd = open(backup_filename.c_str(),
                         O_RDWR | O_CREAT | O_APPEND | O_EXCL, 0640);
     if (copy_fd == -1) {
@@ -304,7 +305,7 @@ checkpoint_t::read_results() {
   return results;
 }
 
-bool checkpoint_t::needs_cleaning(){
+bool checkpoint_t::needs_cleaning() {
   auto lock = write_lock<fcntl_lock_behavior::block>();
   auto current_fd = fcntl(_file_descriptor, F_DUPFD, 0);
 
@@ -336,6 +337,7 @@ bool checkpoint_t::needs_cleaning(){
       debug_string(
           EMIT_LEVEL_WARNING,
           "Checkpoint file is corrupted, we will resume with what we can");
+      close(current_fd);
       return true;
     }
   }

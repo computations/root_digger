@@ -122,6 +122,13 @@ static void print_usage() {
       << "  --verbose\n"
       << "         Increase the verbosity level. Can be repeated to\n"
       << "         level further.\n"
+      << "  --clean\n"
+      << "         Clean the checkpoint file and exit. Normally, this should\n"
+      << "         not be needed, but occasionally cleaining on a multi-node\n"
+      << "         system can take a lot of time. In that case, use this flag\n"
+      << "         on a single node, which will make RootDigger clean the\n"
+      << "         checkpoint file so that the job can be run quickly on\n"
+      << "         multi-node systems.\n"
       << std::endl;
 }
 
@@ -151,8 +158,9 @@ cli_options_t parse_options(int argv, char **argc) {
       {"version", no_argument, 0, 0},              /* 21 */
       {"debug", no_argument, 0, 0},                /* 22 */
       {"mpi-debug", no_argument, 0, 0},            /* 23 */
-      {"echo", no_argument, 0, 0},                 /* 24 */
-      {"help", no_argument, 0, 0},                 /* 25 */
+      {"clean", no_argument, 0, 0},                /* 24 */
+      {"echo", no_argument, 0, 0},                 /* 25 */
+      {"help", no_argument, 0, 0},                 /* 26 */
       {0, 0, 0, 0},
   };
 
@@ -242,10 +250,13 @@ cli_options_t parse_options(int argv, char **argc) {
     case 23: // mpi-debug
       __VERBOSE__ = EMIT_LEVEL_MPI_DEBUG;
       break;
-    case 24: // echo
+    case 24: // clean
+      cli_options.clean = true;
+      break;
+    case 25: // echo
       cli_options.echo = true;
       break;
-    case 25: // help
+    case 26: // help
       print_usage();
       std::exit(0);
       break;
@@ -289,6 +300,7 @@ void merge_options_checkpoint(cli_options_t &cli_options,
   checkpoint.load_options(checkpoint_options);
   checkpoint_options.threads = cli_options.threads;
   checkpoint_options.silent = cli_options.silent;
+  checkpoint_options.clean = cli_options.clean;
 
   std::swap(cli_options, checkpoint_options);
 }
@@ -336,7 +348,6 @@ int wrapped_main(int argv, char **argc) {
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-
     /* Use the tree path for the prefix */
     if (cli_options.prefix.empty()) {
       cli_options.prefix = cli_options.tree_filename;
@@ -345,8 +356,24 @@ int wrapped_main(int argv, char **argc) {
     checkpoint_t checkpoint(cli_options.prefix);
     merge_options_checkpoint(cli_options, checkpoint);
     if (__MPI_RANK__ == 0) {
+      if (cli_options.clean) {
+        debug_print(EMIT_LEVEL_IMPORTANT, "Cleaning the checkpoint file %s",
+                    checkpoint.get_filename().c_str());
+        checkpoint.clean();
+#ifdef MPI_VERSION
+        MPI_Barrier(MPI_COMM_WORLD);
+#endif
+        return 0;
+      }
       checkpoint.save_options(cli_options);
-      checkpoint.clean();
+      if (checkpoint.needs_cleaning()) {
+        checkpoint.clean();
+      }
+    } else if (cli_options.clean) {
+#ifdef MPI_VERSION
+      MPI_Barrier(MPI_COMM_WORLD);
+#endif
+      return 0;
     }
 #ifdef MPI_VERSION
     MPI_Barrier(MPI_COMM_WORLD);
