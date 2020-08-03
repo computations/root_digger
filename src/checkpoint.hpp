@@ -271,6 +271,7 @@ public:
   checkpoint_t(const checkpoint_t &) = delete;
   checkpoint_t &operator=(const checkpoint_t &) = delete;
 
+  bool needs_cleaning();
   void clean();
   template <typename T> void write(const T &val) {
     auto lock = write_lock<fcntl_lock_behavior::block>();

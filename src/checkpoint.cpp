@@ -149,7 +149,7 @@ void checkpoint_t::clean() {
     return;
   }
   std::string backup_filename = _checkpoint_filename + ".bak";
-  if (__MPI_RANK__ == 0) {
+  if (__MPI_RANK__ == 0 && needs_cleaning()) {
     auto lock = write_lock<fcntl_lock_behavior::block>();
     auto copy_fd = open(backup_filename.c_str(),
                         O_RDWR | O_CREAT | O_APPEND | O_EXCL, 0640);
@@ -191,6 +191,7 @@ void checkpoint_t::write(
 
 void checkpoint_t::save_options(const cli_options_t &options) {
   if (!_existing_results) {
+    auto lock = write_lock<fcntl_lock_behavior::block>();
     write_with_success(_file_descriptor, options);
   }
 }
@@ -301,4 +302,43 @@ checkpoint_t::read_results() {
   }
   close(current_fd);
   return results;
+}
+
+bool checkpoint_t::needs_cleaning(){
+  auto lock = write_lock<fcntl_lock_behavior::block>();
+  auto current_fd = fcntl(_file_descriptor, F_DUPFD, 0);
+
+  lseek(current_fd, 0, SEEK_SET);
+
+  {
+    cli_options_t tmp_opts;
+    read_with_success(current_fd, tmp_opts);
+  }
+
+  auto current_position = lseek(current_fd, 0, SEEK_CUR);
+  auto end_position = lseek(current_fd, 0, SEEK_END);
+  lseek(current_fd, current_position, SEEK_SET);
+  while (current_position < end_position) {
+    try {
+      rd_result_t rdr;
+      size_t bytes_read = read_with_checksum(current_fd, rdr);
+      if (bytes_read == expected_read_size<rd_result_t>()) {
+      } else if (bytes_read == 0) {
+        break;
+      } else {
+        throw std::runtime_error(
+            "Unexpected read size when loading results from the checkpoint");
+      }
+      std::vector<partition_parameters_t> params;
+      read_with_checksum(current_fd, params);
+      current_position = lseek(current_fd, 0, SEEK_CUR);
+    } catch (checkpoint_read_success_failure &e) {
+      debug_string(
+          EMIT_LEVEL_WARNING,
+          "Checkpoint file is corrupted, we will resume with what we can");
+      return true;
+    }
+  }
+  close(current_fd);
+  return false;
 }
