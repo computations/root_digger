@@ -117,9 +117,8 @@ template <typename T> size_t write_with_success(int fd, const T &val) {
 template <typename T> size_t write_with_checksum(int fd, const T &val) {
   auto bytes_written = write(fd, val);
   auto checksum = compute_checksum(val);
-  auto pos = lseek(fd, 0, SEEK_CUR);
   debug_print(EMIT_LEVEL_MPI_DEBUG, "writing with checksum: %x to position %lu",
-              checksum, pos);
+              checksum, lseek(fd, 0, SEEK_CUR));
   bytes_written += write(fd, checksum);
   return bytes_written;
 }
