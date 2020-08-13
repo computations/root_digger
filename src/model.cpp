@@ -78,7 +78,7 @@ model_params_t parse_model_params(const std::string &model_string) {
 
 model_params_t parse_model_file(const std::string &model_filename) {
   std::ifstream model_file(model_filename);
-  if(!model_file){
+  if (!model_file) {
     throw std::runtime_error{"Failed to open the model file"};
   }
 
@@ -161,9 +161,6 @@ model_t::model_t(
     total_weight += msa.total_weight();
   }
 
-  for (auto &&pw : _partition_weights) {
-    pw /= (double)total_weight;
-  }
   assign_indicies();
 }
 
@@ -419,8 +416,7 @@ double model_t::compute_lh(const root_location_t &root_location) {
 
     lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
                                          _tree.root_scaler_index(),
-                                         _param_indicies[i].data(), nullptr) *
-          _partition_weights[i];
+                                         _param_indicies[i].data(), nullptr);
   }
   return lh;
 }
@@ -453,8 +449,8 @@ double model_t::compute_lh_root(const root_location_t &root) {
     pll_update_partials(partition, &op, 1);
     lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
                                          _tree.root_scaler_index(),
-                                         _param_indicies[i].data(), nullptr) *
-          _partition_weights[i];
+                                         _param_indicies[i].data(), nullptr);
+    //* _partition_weights[i];
   }
   if (std::isnan(lh)) {
     throw std::runtime_error("lh at root is not a number: " +
@@ -477,10 +473,9 @@ model_t::compute_lh_partition(size_t partition_index,
   }
 
   double lh = pll_compute_root_loglikelihood(
-                  _partitions[partition_index], _tree.root_clv_index(),
-                  _tree.root_scaler_index(),
-                  _param_indicies[partition_index].data(), nullptr) *
-              _partition_weights[partition_index];
+      _partitions[partition_index], _tree.root_clv_index(),
+      _tree.root_scaler_index(), _param_indicies[partition_index].data(),
+      nullptr);
   if (std::isnan(lh)) {
     throw std::runtime_error("lh at root is not a number: " +
                              std::to_string(lh));
@@ -956,13 +951,12 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
   std::vector<partition_parameters_t> best_params;
   best_params.reserve(_partitions.size());
 
+  debug_string(EMIT_LEVEL_PROGRESS, "Starting root search");
+
   for (auto rl_index : _assigned_idx) {
     auto rl = _tree.root_location(rl_index);
     set_subst_rates_uniform();
     set_empirical_freqs();
-    ++root_index;
-    debug_print(EMIT_LEVEL_PROGRESS, "Stage %lu/%lu, ETC: %fh", root_index,
-                root_count, progress_macro(root_index, root_count));
 
     std::vector<partition_parameters_t> params;
     params.reserve(_partitions.size());
@@ -1028,6 +1022,10 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
 
       rl = cur_best_rl;
     }
+
+    ++root_index;
+    debug_print(EMIT_LEVEL_PROGRESS, "Stage %lu/%lu, ETC: %fh", root_index,
+                root_count, progress_macro(root_index, root_count));
 
     checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio},
                      params);
@@ -1153,49 +1151,46 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
 #endif
 
   if (__MPI_RANK__ == 0) {
-    auto total_progress = checkpoint.current_progress();
+    auto total_progress = checkpoint.read_results();
     double max_lh = -std::numeric_limits<double>::infinity();
 
     for (auto result : total_progress) {
-      max_lh = std::max(result.lh, max_lh);
+      max_lh = std::max(result.first.lh, max_lh);
     }
 
     double total_lh = 0;
     for (auto result : total_progress) {
-      total_lh += exp(result.lh - max_lh);
+      total_lh += exp(result.first.lh - max_lh);
     }
     debug_print(EMIT_LEVEL_DEBUG, "LWR denom: %f, %e", total_lh, total_lh - 1);
 
     for (auto result : total_progress) {
-      double lwr = exp((result.lh - max_lh)) / total_lh;
-      auto rl = _tree.root_location(result.root_id);
-      rl.brlen_ratio = result.alpha;
+      double lwr = exp((result.first.lh - max_lh)) / total_lh;
+      auto rl = _tree.root_location(result.first.root_id);
+      rl.brlen_ratio = result.first.alpha;
       _tree.annotate_branch(rl, "LWR", std::to_string(lwr));
-      _tree.annotate_lh(rl, result.lh);
-      _tree.annotate_ratio(rl, result.alpha);
+      _tree.annotate_lh(rl, result.first.lh);
+      _tree.annotate_ratio(rl, result.first.alpha);
     }
     auto total_best_result = *std::max_element(
         total_progress.begin(), total_progress.end(),
-        [](rd_result_t a, rd_result_t b)
-            -> bool { return a.lh < b.lh; });
+        [](std::pair<rd_result_t, std::vector<partition_parameters_t>> a,
+           std::pair<rd_result_t, std::vector<partition_parameters_t>> b)
+            -> bool { return a.first.lh < b.first.lh; });
 
-    best_rl = _tree.root_location(total_best_result.root_id);
-    best_rl.brlen_ratio = total_best_result.alpha;
-    best_lh = total_best_result.lh;
+    best_rl = _tree.root_location(total_best_result.first.root_id);
+    best_rl.brlen_ratio = total_best_result.first.alpha;
+    best_lh = total_best_result.first.lh;
   }
 
   return {best_rl, best_lh};
 }
 
-void model_t::initialize(){
-  compute_lh(_tree.root_location(0));
-}
+void model_t::initialize() { compute_lh(_tree.root_location(0)); }
 
-void model_t::finalize(){
-  _tree.unroot();
-}
+void model_t::finalize() { _tree.unroot(); }
 
-rooted_tree_t model_t::rooted_tree(const root_location_t &root) const{
+rooted_tree_t model_t::rooted_tree(const root_location_t &root) const {
   rooted_tree_t new_tree(_tree);
   new_tree.root_by(root.id);
   return new_tree;
@@ -1208,7 +1203,7 @@ rooted_tree_t model_t::virtual_rooted_tree(const root_location_t &root) const {
   return new_tree;
 }
 
-rooted_tree_t model_t::unrooted_tree() const{
+rooted_tree_t model_t::unrooted_tree() const {
   rooted_tree_t new_tree(_tree);
   new_tree.unroot();
   return new_tree;
