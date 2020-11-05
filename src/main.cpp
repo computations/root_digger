@@ -22,8 +22,8 @@ extern "C" {
 #include <vector>
 
 #include "debug.h"
-int __VERBOSE__ = EMIT_LEVEL_PROGRESS;
-int __MPI_RANK__ = 0;
+int __VERBOSE__       = EMIT_LEVEL_PROGRESS;
+int __MPI_RANK__      = 0;
 int __MPI_NUM_TASKS__ = 1;
 #include "checkpoint.hpp"
 #include "model.hpp"
@@ -45,9 +45,12 @@ static void print_version() {
 
 static void print_run_header(
     const std::chrono::time_point<std::chrono::system_clock> &start_time,
-    uint64_t seed, size_t threads, int argv, char **argc) {
+    uint64_t                                                  seed,
+    size_t                                                    threads,
+    int                                                       argv,
+    char **                                                   argc) {
   time_t st = std::chrono::system_clock::to_time_t(start_time);
-  char time_string[256];
+  char   time_string[256];
   std::strftime(time_string, sizeof(time_string), "%F %T", std::localtime(&st));
   debug_string(EMIT_LEVEL_IMPORTANT, "Running Root Digger");
   print_version();
@@ -57,7 +60,8 @@ static void print_run_header(
 #ifdef MPI_VERSION
   debug_print(EMIT_LEVEL_IMPORTANT, "Number of procs %d", __MPI_NUM_TASKS__);
 #endif
-  debug_print(EMIT_LEVEL_IMPORTANT, "Command: %s",
+  debug_print(EMIT_LEVEL_IMPORTANT,
+              "Command: %s",
               combine_argv_argc(argv, argc).c_str());
   debug_string(EMIT_LEVEL_IMPORTANT,
                "Please report any bugs to "
@@ -65,9 +69,7 @@ static void print_run_header(
 }
 
 static void print_usage() {
-  if (__MPI_RANK__ != 0) {
-    return;
-  }
+  if (__MPI_RANK__ != 0) { return; }
   std::cout
       << "Usage: rd [options]\n"
       << "Version: " << GIT_REV_STRING << "\n"
@@ -166,7 +168,7 @@ cli_options_t parse_options(int argv, char **argc) {
 
   int c;
   int index = 0;
-  optind = 0;
+  optind    = 0;
   cli_options_t cli_options;
   while ((c = getopt_long_only(argv, argc, "", long_opts, &index)) == 0) {
     debug_print(EMIT_LEVEL_DEBUG, "parsing option index: %d", index);
@@ -187,7 +189,7 @@ cli_options_t parse_options(int argv, char **argc) {
       __VERBOSE__ += 1;
       break;
     case 5: // silent
-      __VERBOSE__ = 0;
+      __VERBOSE__        = 0;
       cli_options.silent = true;
       break;
     case 6: // min-roots
@@ -291,16 +293,14 @@ cli_options_t parse_options(int argv, char **argc) {
  * change. So this function handles that
  */
 void merge_options_checkpoint(cli_options_t &cli_options,
-                              checkpoint_t &checkpoint) {
-  if (!checkpoint.existing_checkpoint()) {
-    return;
-  }
+                              checkpoint_t & checkpoint) {
+  if (!checkpoint.existing_checkpoint()) { return; }
 
   cli_options_t checkpoint_options;
   checkpoint.load_options(checkpoint_options);
   checkpoint_options.threads = cli_options.threads;
-  checkpoint_options.silent = cli_options.silent;
-  checkpoint_options.clean = cli_options.clean;
+  checkpoint_options.silent  = cli_options.silent;
+  checkpoint_options.clean   = cli_options.clean;
 
   std::swap(cli_options, checkpoint_options);
 }
@@ -326,8 +326,9 @@ int wrapped_main(int argv, char **argc) {
 
 #ifdef MPI_VERSION
   if (__MPI_NUM_TASKS__ == 1) {
-    debug_string(EMIT_LEVEL_WARNING, "Running MPI version with only 1 process, "
-                                     "is this really what you meant?");
+    debug_string(EMIT_LEVEL_WARNING,
+                 "Running MPI version with only 1 process, "
+                 "is this really what you meant?");
   }
 #endif
 
@@ -357,7 +358,8 @@ int wrapped_main(int argv, char **argc) {
     merge_options_checkpoint(cli_options, checkpoint);
     if (__MPI_RANK__ == 0) {
       if (cli_options.clean) {
-        debug_print(EMIT_LEVEL_IMPORTANT, "Cleaning the checkpoint file %s",
+        debug_print(EMIT_LEVEL_IMPORTANT,
+                    "Cleaning the checkpoint file %s",
                     checkpoint.get_filename().c_str());
         checkpoint.clean();
 #ifdef MPI_VERSION
@@ -366,9 +368,7 @@ int wrapped_main(int argv, char **argc) {
         return 0;
       }
       checkpoint.save_options(cli_options);
-      if (checkpoint.needs_cleaning()) {
-        checkpoint.clean();
-      }
+      if (checkpoint.needs_cleaning()) { checkpoint.clean(); }
     } else if (cli_options.clean) {
 #ifdef MPI_VERSION
       MPI_Barrier(MPI_COMM_WORLD);
@@ -380,8 +380,8 @@ int wrapped_main(int argv, char **argc) {
 #endif
 
     checkpoint.reload();
-    debug_print(EMIT_LEVEL_MPI_DEBUG, "Checkpoint inode %d",
-                checkpoint.get_inode());
+    debug_print(
+        EMIT_LEVEL_MPI_DEBUG, "Checkpoint inode %d", checkpoint.get_inode());
 
     if (cli_options.threads == 0) {
 #ifdef MPI_VERSION
@@ -396,14 +396,14 @@ int wrapped_main(int argv, char **argc) {
 #endif
 
     if (!cli_options.silent)
-      print_run_header(start_time, cli_options.seed, cli_options.threads, argv,
-                       argc);
+      print_run_header(
+          start_time, cli_options.seed, cli_options.threads, argv, argc);
 
-    debug_print(EMIT_LEVEL_INFO, "abs_tolerance: %.08f",
-                cli_options.abs_tolerance);
-    if (cli_options.exhaustive &&
-        cli_options.early_stop.convert_with_default(!cli_options.exhaustive)) {
-    }
+    debug_print(
+        EMIT_LEVEL_INFO, "abs_tolerance: %.08f", cli_options.abs_tolerance);
+    if (cli_options.exhaustive
+        && cli_options.early_stop.convert_with_default(
+            !cli_options.exhaustive)) {}
 
     constexpr const pll_state_t *map = pll_map_nt;
 
@@ -422,9 +422,7 @@ int wrapped_main(int argv, char **argc) {
       }
       auto subst_str{mi.subst_str};
 
-      for (auto &ch : subst_str) {
-        ch = std::tolower(ch);
-      }
+      for (auto &ch : subst_str) { ch = std::tolower(ch); }
       if (subst_str != "unrest") {
         debug_print(EMIT_LEVEL_WARNING,
                     "Ignoring subst matrix %s for model from command line"
@@ -435,14 +433,14 @@ int wrapped_main(int argv, char **argc) {
 
     /* Parse the MSA */
     std::vector<msa_t> msa;
-    msa_partitions_t part_infos;
+    msa_partitions_t   part_infos;
     if (cli_options.partition_filename.empty()) {
       msa.emplace_back(cli_options.msa_filename, map, cli_options.states);
     } else {
-      msa_t unparted_msa{cli_options.msa_filename, map, cli_options.states,
-                         false};
+      msa_t unparted_msa{
+          cli_options.msa_filename, map, cli_options.states, false};
       part_infos = parse_partition_file(cli_options.partition_filename);
-      msa = unparted_msa.partition(part_infos);
+      msa        = unparted_msa.partition(part_infos);
     }
 
     /* Parse the partitions */
@@ -456,9 +454,7 @@ int wrapped_main(int argv, char **argc) {
       for (auto &p : part_infos) {
 
         size_t rate_cats = p.model.ratehet_opts.rate_cats;
-        if (rate_cats == 0) {
-          rate_cats = 1;
-        }
+        if (rate_cats == 0) { rate_cats = 1; }
         cli_options.rate_cats.push_back(rate_cats);
         if (p.model.ratehet_opts.alpha_init) {
           debug_print(EMIT_LEVEL_WARNING,
@@ -468,15 +464,14 @@ int wrapped_main(int argv, char **argc) {
         }
         auto subst_str{p.model.subst_str};
 
-        for (auto &ch : subst_str) {
-          ch = std::tolower(ch);
-        }
+        for (auto &ch : subst_str) { ch = std::tolower(ch); }
 
         if (subst_str != "unrest") {
           debug_print(EMIT_LEVEL_WARNING,
                       "Ignoring subst matrix %s for partition "
                       "%s. Currently only UNREST is supported",
-                      p.model.subst_str.c_str(), p.partition_name.c_str());
+                      p.model.subst_str.c_str(),
+                      p.partition_name.c_str());
         }
       }
     }
@@ -494,9 +489,7 @@ int wrapped_main(int argv, char **argc) {
     }
 
     /* Check the msa for validity */
-    for (auto &m : msa) {
-      m.valid_data();
-    }
+    for (auto &m : msa) { m.valid_data(); }
 
     /* Make the tree */
     rooted_tree_t tree{cli_options.tree_filename};
@@ -520,25 +513,28 @@ int wrapped_main(int argv, char **argc) {
       model.initialize_partitions_uniform_freqs(msa);
     }
 
-    if (cli_options.echo) {
-      std::cout << tree.newick() << std::endl;
-    }
+    if (cli_options.echo) { std::cout << tree.newick() << std::endl; }
 
     model.initialize();
     root_location_t final_rl;
-    double final_lh = -std::numeric_limits<double>::infinity();
-    std::string final_tree_string;
+    double          final_lh = -std::numeric_limits<double>::infinity();
+    std::string     final_tree_string;
     if (!cli_options.exhaustive) {
       model.assign_indicies_by_rank_search(
-          cli_options.min_roots, cli_options.root_ratio,
+          cli_options.min_roots,
+          cli_options.root_ratio,
           static_cast<size_t>(__MPI_RANK__),
-          static_cast<size_t>(__MPI_NUM_TASKS__), checkpoint);
+          static_cast<size_t>(__MPI_NUM_TASKS__),
+          checkpoint);
 #ifdef MPI_VERSION
       MPI_Barrier(MPI_COMM_WORLD);
 #endif
-      auto tmp = model.search(cli_options.min_roots, cli_options.root_ratio,
-                              cli_options.abs_tolerance, cli_options.bfgs_tol,
-                              cli_options.br_tolerance, cli_options.factor,
+      auto tmp = model.search(cli_options.min_roots,
+                              cli_options.root_ratio,
+                              cli_options.abs_tolerance,
+                              cli_options.bfgs_tol,
+                              cli_options.br_tolerance,
+                              cli_options.factor,
                               checkpoint);
       if (__MPI_RANK__ == 0) {
         model.finalize();
@@ -552,19 +548,22 @@ int wrapped_main(int argv, char **argc) {
 
       model.assign_indicies_by_rank_exhaustive(
           static_cast<size_t>(__MPI_RANK__),
-          static_cast<size_t>(__MPI_NUM_TASKS__), checkpoint);
+          static_cast<size_t>(__MPI_NUM_TASKS__),
+          checkpoint);
 
 #ifdef MPI_VERSION
       MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-      auto tmp = model.exhaustive_search(
-          cli_options.abs_tolerance, cli_options.bfgs_tol,
-          cli_options.br_tolerance, cli_options.factor, checkpoint);
+      auto tmp = model.exhaustive_search(cli_options.abs_tolerance,
+                                         cli_options.bfgs_tol,
+                                         cli_options.br_tolerance,
+                                         cli_options.factor,
+                                         checkpoint);
       if (__MPI_RANK__ == 0) {
         model.finalize();
-        final_rl = tmp.first;
-        final_lh = tmp.second;
+        final_rl          = tmp.first;
+        final_lh          = tmp.second;
         final_tree_string = model.virtual_rooted_tree(final_rl).newick();
         {
           std::ofstream outfile{cli_options.prefix + ".lwr.tree"};
@@ -572,7 +571,7 @@ int wrapped_main(int argv, char **argc) {
         }
         {
           std::ofstream outfile{cli_options.prefix + ".rooted.tree"};
-          auto tmp_tree = model.rooted_tree(final_rl);
+          auto          tmp_tree = model.rooted_tree(final_rl);
           outfile << tmp_tree.newick(false);
         }
       }
@@ -582,9 +581,7 @@ int wrapped_main(int argv, char **argc) {
       debug_print(EMIT_LEVEL_IMPORTANT, "Final LogLH: %.5f", final_lh);
     }
 
-    if (__MPI_RANK__ == 0) {
-      std::cout << final_tree_string << std::endl;
-    }
+    if (__MPI_RANK__ == 0) { std::cout << final_tree_string << std::endl; }
 
     auto end_time = std::chrono::system_clock::now();
 
@@ -593,8 +590,7 @@ int wrapped_main(int argv, char **argc) {
     if (!cli_options.silent && __MPI_RANK__ == 0)
       std::cout << "Inference took: " << duration.count() << "s" << std::endl;
 
-    if (__MPI_RANK__ == 0) {
-    }
+    if (__MPI_RANK__ == 0) {}
   } catch (const std::exception &e) {
     if (__MPI_RANK__ == 0) {
       std::cout << "There was an error during processing:\n"

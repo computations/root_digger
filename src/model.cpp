@@ -1,11 +1,3 @@
-#include "checkpoint.hpp"
-#include "debug.h"
-#include "libpll/pll.h"
-#include "model.hpp"
-#include "msa.hpp"
-#include "pll.h"
-#include "tree.hpp"
-#include "util.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -17,6 +9,15 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+
+#include "checkpoint.hpp"
+#include "debug.h"
+#include "libpll/pll.h"
+#include "model.hpp"
+#include "msa.hpp"
+#include "pll.h"
+#include "tree.hpp"
+#include "util.hpp"
 extern "C" {
 #include <lbfgsb.h>
 #include <libpll/pll_msa.h>
@@ -59,11 +60,11 @@ double parse_param(std::string::const_iterator begin,
 
 model_params_t parse_model_params(const std::string &model_string) {
   model_params_t model_params;
-  auto substr_begin = model_string.begin();
+  auto           substr_begin = model_string.begin();
 
   for (auto substr_end = model_string.begin();
-       substr_begin != model_string.end(); ++substr_end) {
-
+       substr_begin != model_string.end();
+       ++substr_end) {
     if (*substr_end == ',') {
       model_params.push_back(parse_param(substr_begin, substr_end));
       substr_begin = substr_end + 1;
@@ -86,29 +87,31 @@ model_params_t parse_model_file(const std::string &model_filename) {
 }
 
 model_params_t random_params(size_t size, uint64_t seed) {
-  model_params_t mp(size);
-  std::minstd_rand engine(seed);
+  model_params_t                   mp(size);
+  std::minstd_rand                 engine(seed);
   std::uniform_real_distribution<> dist(1e-4, 1.0);
-  for (auto &f : mp) {
-    f = dist(engine);
-  }
+  for (auto &f : mp) { f = dist(engine); }
   return mp;
 }
 
 model_t::model_t(
-    rooted_tree_t tree, const std::vector<msa_t> &msas,
-    const std::vector<size_t> &rate_cats,
+    rooted_tree_t                                      tree,
+    const std::vector<msa_t> &                         msas,
+    const std::vector<size_t> &                        rate_cats,
     const std::vector<rate_category::rate_category_e> &rate_category_types,
-    bool invariant_sites, uint64_t seed, bool early_stop)
-    : _rate_category_types{rate_category_types},
-      _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
-
+    bool                                               invariant_sites,
+    uint64_t                                           seed,
+    bool                                               early_stop) :
+    _rate_category_types{rate_category_types},
+    _invariant_sites{invariant_sites},
+    _seed{seed},
+    _early_stop{early_stop} {
   if (_early_stop) {
     debug_string(EMIT_LEVEL_IMPORTANT, "INFO: Early stop is enabled");
   }
 
   _random_engine = std::minstd_rand(_seed);
-  _tree = std::move(tree);
+  _tree          = std::move(tree);
   for (auto rc : rate_cats) {
     _rate_rates.emplace_back(rc, 1.0);
     _rate_weights.emplace_back(rc, 1.0 / rc);
@@ -139,8 +142,8 @@ model_t::model_t(
        ++partition_index) {
     auto &msa = msas[partition_index];
 
-    if (_rate_rates[partition_index].size() >
-        static_cast<size_t>(std::numeric_limits<int>::max())) {
+    if (_rate_rates[partition_index].size()
+        > static_cast<size_t>(std::numeric_limits<int>::max())) {
       throw std::runtime_error("The size of the rate weights for the partition "
                                "is too large to safely cast");
     }
@@ -151,10 +154,15 @@ model_t::model_t(
     }
 
     _partitions.push_back(pll_partition_create(
-        _tree.tip_count(), _tree.branch_count(), msa.states(), msa.length(),
-        _submodels, _tree.branch_count(),
+        _tree.tip_count(),
+        _tree.branch_count(),
+        msa.states(),
+        msa.length(),
+        _submodels,
+        _tree.branch_count(),
         static_cast<unsigned int>(_rate_rates[partition_index].size()),
-        _tree.branch_count(), attributes));
+        _tree.branch_count(),
+        attributes));
     _partition_weights.push_back(msa.total_weight());
 
     set_gamma_rates(partition_index);
@@ -166,8 +174,7 @@ model_t::model_t(
 
 model_t::~model_t() {
   for (auto p : _partitions) {
-    if (p)
-      pll_partition_destroy(p);
+    if (p) pll_partition_destroy(p);
   }
 }
 
@@ -189,12 +196,8 @@ void model_t::set_subst_rates_random(size_t p_index, size_t states) {
 void model_t::set_gamma_weights(size_t p_index, model_params_t w) {
   double sum = 0.0;
   debug_print(EMIT_LEVEL_DEBUG, "input weights %s", to_string(w).c_str());
-  for (auto &f : w) {
-    sum += f;
-  }
-  for (auto &f : w) {
-    f /= sum;
-  }
+  for (auto &f : w) { sum += f; }
+  for (auto &f : w) { f /= sum; }
   debug_print(EMIT_LEVEL_DEBUG, "setting weights to %s", to_string(w).c_str());
   pll_set_category_weights(_partitions[p_index], w.data());
 }
@@ -231,52 +234,50 @@ void model_t::set_gamma_rates(size_t p_index, const model_params_t &alpha) {
 void model_t::set_gamma_rates_mean(size_t p_index) {
   pll_compute_gamma_cats(1.0,
                          static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEAN);
+                         _rate_rates[p_index].data(),
+                         PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_mean(size_t p_index, double alpha) {
   pll_compute_gamma_cats(alpha,
                          static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEDIAN);
+                         _rate_rates[p_index].data(),
+                         PLL_GAMMA_RATES_MEDIAN);
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_median(size_t p_index) {
   pll_compute_gamma_cats(1.0,
                          static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEAN);
+                         _rate_rates[p_index].data(),
+                         PLL_GAMMA_RATES_MEAN);
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_median(size_t p_index, double alpha) {
   pll_compute_gamma_cats(alpha,
                          static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(), PLL_GAMMA_RATES_MEDIAN);
+                         _rate_rates[p_index].data(),
+                         PLL_GAMMA_RATES_MEDIAN);
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_free(size_t p_index) {
-
-  for (auto &r : _rate_rates[p_index]) {
-    r = 1.0;
-  }
+  for (auto &r : _rate_rates[p_index]) { r = 1.0; }
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_free(size_t p_index, model_params_t free_rates) {
-
   double sum = 0.0;
-  debug_print(EMIT_LEVEL_DEBUG, "input rates %s",
-              to_string(free_rates).c_str());
+  debug_print(
+      EMIT_LEVEL_DEBUG, "input rates %s", to_string(free_rates).c_str());
   for (size_t i = 0; i < free_rates.size(); ++i) {
     sum += free_rates[i] * _rate_weights[p_index][i];
   }
-  for (auto &f : free_rates) {
-    f /= sum;
-  }
-  debug_print(EMIT_LEVEL_DEBUG, "setting rates to %s",
-              to_string(free_rates).c_str());
+  for (auto &f : free_rates) { f /= sum; }
+  debug_print(
+      EMIT_LEVEL_DEBUG, "setting rates to %s", to_string(free_rates).c_str());
   pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
@@ -298,15 +299,16 @@ void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
 
   for (int i = 0; i < msa.count(); ++i) {
     try {
-      auto result =
-          pll_set_tip_states(_partitions[p_index], label_map.at(msa.label(i)),
-                             msa.map(), msa.sequence(i));
+      auto result = pll_set_tip_states(_partitions[p_index],
+                                       label_map.at(msa.label(i)),
+                                       msa.map(),
+                                       msa.sequence(i));
       if (result == PLL_FAILURE) {
         throw std::runtime_error("failed to set tip " + std::to_string(i));
       }
     } catch (const std::exception &e) {
-      throw std::runtime_error(std::string("Could not find taxa ") +
-                               msa.label(i) + " in tree");
+      throw std::runtime_error(std::string("Could not find taxa ")
+                               + msa.label(i) + " in tree");
     }
   }
 
@@ -316,7 +318,7 @@ void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
 
 void model_t::set_empirical_freqs(size_t p_index) {
   pll_partition_t *partition = _partitions[p_index];
-  double *emp_freqs = pllmod_msa_empirical_frequencies(partition);
+  double *         emp_freqs = pllmod_msa_empirical_frequencies(partition);
   for (size_t i = 0; i < partition->states; ++i) {
     if (emp_freqs[i] <= 0) {
       throw invalid_empirical_frequencies_exception(
@@ -339,22 +341,18 @@ void model_t::set_freqs(size_t p_index, const model_params_t &freqs) {
 
 void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
   double sum = 0.0;
-  for (auto p : freqs) {
-    sum += p;
-  }
-  for (auto &f : freqs) {
-    f /= sum;
-  }
+  for (auto p : freqs) { sum += p; }
+  for (auto &f : freqs) { f /= sum; }
   set_freqs(p_index, freqs);
 }
 
 bool model_t::update_eigen_partition(size_t partition_index) {
   bool updated = false;
-  auto part = _partitions[partition_index];
+  auto part    = _partitions[partition_index];
   for (size_t i = 0; i < part->rate_cats; ++i) {
     if (!part->eigen_decomp_valid[i]) {
       int result = pll_update_eigen(part, _param_indicies[partition_index][i]);
-      updated = true;
+      updated    = true;
       if (result == PLL_FAILURE) {
         throw std::runtime_error{"Failed to update the eigen decomposition"};
       }
@@ -364,22 +362,23 @@ bool model_t::update_eigen_partition(size_t partition_index) {
 }
 
 void model_t::update_pmatrix_partition(
-    size_t partition_index, const std::vector<unsigned int> &pmatrix_indices,
-    const std::vector<double> &branch_lengths) {
+    size_t                           partition_index,
+    const std::vector<unsigned int> &pmatrix_indices,
+    const std::vector<double> &      branch_lengths) {
   auto part = _partitions[partition_index];
 #pragma omp parallel for collapse(1) schedule(static)
   for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
-    auto param_index = _param_indicies[partition_index];
-    auto matrix_index = pmatrix_indices[branch];
+    auto param_index   = _param_indicies[partition_index];
+    auto matrix_index  = pmatrix_indices[branch];
     auto branch_length = branch_lengths[branch];
-    pll_update_prob_matrices(part, param_index.data(), &matrix_index,
-                             &branch_length, 1);
+    pll_update_prob_matrices(
+        part, param_index.data(), &matrix_index, &branch_length, 1);
   }
 }
 
 std::vector<bool>
 model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
-                          const std::vector<double> &branch_lengths) {
+                          const std::vector<double> &      branch_lengths) {
   /* Update the eigen decompositions first */
   std::vector<bool> updated(_partitions.size(), false);
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
@@ -394,12 +393,12 @@ model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
 
 double model_t::compute_lh(const root_location_t &root_location) {
   std::vector<pll_operation_t> ops;
-  std::vector<unsigned int> pmatrix_indices;
-  std::vector<double> branch_lengths;
+  std::vector<unsigned int>    pmatrix_indices;
+  std::vector<double>          branch_lengths;
   bool new_root = root_location != _tree.root_location();
 
-  GENERATE_AND_UNPACK_OPS(_tree, root_location, ops, pmatrix_indices,
-                          branch_lengths);
+  GENERATE_AND_UNPACK_OPS(
+      _tree, root_location, ops, pmatrix_indices, branch_lengths);
 
   auto updated_partitions = update_pmatrices(pmatrix_indices, branch_lengths);
 
@@ -410,25 +409,27 @@ double model_t::compute_lh(const root_location_t &root_location) {
     auto &partition = _partitions[i];
 
     if (new_root || updated_partitions[i]) {
-      pll_update_partials(partition, ops.data(),
-                          static_cast<unsigned int>(ops.size()));
+      pll_update_partials(
+          partition, ops.data(), static_cast<unsigned int>(ops.size()));
     }
 
-    lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
+    lh += pll_compute_root_loglikelihood(partition,
+                                         _tree.root_clv_index(),
                                          _tree.root_scaler_index(),
-                                         _param_indicies[i].data(), nullptr);
+                                         _param_indicies[i].data(),
+                                         nullptr);
   }
   return lh;
 }
 
 double model_t::compute_lh_root(const root_location_t &root) {
-  pll_operation_t op;
+  pll_operation_t           op;
   std::vector<unsigned int> matrix_indices;
-  std::vector<double> branch_lengths;
+  std::vector<double>       branch_lengths;
 
   {
-    auto result = _tree.generate_derivative_operations(root);
-    op = std::move(std::get<0>(result));
+    auto result    = _tree.generate_derivative_operations(root);
+    op             = std::move(std::get<0>(result));
     matrix_indices = std::move(std::get<1>(result));
     branch_lengths = std::move(std::get<2>(result));
   }
@@ -438,23 +439,25 @@ double model_t::compute_lh_root(const root_location_t &root) {
 #pragma omp parallel for reduction(+ : lh)
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    int result = pll_update_prob_matrices(
-        partition, _param_indicies[i].data(), matrix_indices.data(),
+    int   result    = pll_update_prob_matrices(
+        partition,
+        _param_indicies[i].data(),
+        matrix_indices.data(),
         branch_lengths.data(),
         static_cast<unsigned int>(matrix_indices.size()));
 
-    if (result == PLL_FAILURE) {
-      throw std::runtime_error(pll_errmsg);
-    }
+    if (result == PLL_FAILURE) { throw std::runtime_error(pll_errmsg); }
     pll_update_partials(partition, &op, 1);
-    lh += pll_compute_root_loglikelihood(partition, _tree.root_clv_index(),
+    lh += pll_compute_root_loglikelihood(partition,
+                                         _tree.root_clv_index(),
                                          _tree.root_scaler_index(),
-                                         _param_indicies[i].data(), nullptr);
+                                         _param_indicies[i].data(),
+                                         nullptr);
     //* _partition_weights[i];
   }
   if (std::isnan(lh)) {
-    throw std::runtime_error("lh at root is not a number: " +
-                             std::to_string(lh));
+    throw std::runtime_error("lh at root is not a number: "
+                             + std::to_string(lh));
   }
   return lh;
 }
@@ -463,22 +466,24 @@ double
 model_t::compute_lh_partition(size_t partition_index,
                               const std::vector<pll_operation_t> &ops,
                               const std::vector<unsigned int> &pmatrix_indices,
-                              const std::vector<double> &branch_lengths) {
-
+                              const std::vector<double> &      branch_lengths) {
   bool update_partials = update_eigen_partition(partition_index);
   if (update_partials) {
     update_pmatrix_partition(partition_index, pmatrix_indices, branch_lengths);
-    pll_update_partials(_partitions[partition_index], ops.data(),
+    pll_update_partials(_partitions[partition_index],
+                        ops.data(),
                         static_cast<unsigned int>(ops.size()));
   }
 
-  double lh = pll_compute_root_loglikelihood(
-      _partitions[partition_index], _tree.root_clv_index(),
-      _tree.root_scaler_index(), _param_indicies[partition_index].data(),
-      nullptr);
+  double lh =
+      pll_compute_root_loglikelihood(_partitions[partition_index],
+                                     _tree.root_clv_index(),
+                                     _tree.root_scaler_index(),
+                                     _param_indicies[partition_index].data(),
+                                     nullptr);
   if (std::isnan(lh)) {
-    throw std::runtime_error("lh at root is not a number: " +
-                             std::to_string(lh));
+    throw std::runtime_error("lh at root is not a number: "
+                             + std::to_string(lh));
   }
   return lh;
 }
@@ -487,33 +492,32 @@ model_t::compute_lh_partition(size_t partition_index,
  * Use a secant method to compute the derivative
  */
 dlh_t model_t::compute_dlh(const root_location_t &root) {
-
-  dlh_t ret;
+  dlh_t            ret;
   constexpr double EPSILON = 1e-8;
-  root_location_t root_prime{root};
+  root_location_t  root_prime{root};
   root_prime.brlen_ratio += EPSILON;
   double sign = 1.0;
   if (root_prime.brlen_ratio >= 1.0) {
     root_prime.brlen_ratio = root.brlen_ratio - EPSILON;
-    sign = -1.0;
+    sign                   = -1.0;
   }
 
   double fx = compute_lh_root(root);
-  ret.lh = fx;
+  ret.lh    = fx;
 
   if (std::isnan(fx)) {
-    throw std::runtime_error("fx is not finite when computing derivative: " +
-                             std::to_string(root.edge->length));
+    throw std::runtime_error("fx is not finite when computing derivative: "
+                             + std::to_string(root.edge->length));
   }
   double fxh = compute_lh_root(root_prime);
   if (std::isnan(fxh)) {
-    throw std::runtime_error("fxh is not finite when computing derivative: " +
-                             std::to_string(root_prime.edge->length));
+    throw std::runtime_error("fxh is not finite when computing derivative: "
+                             + std::to_string(root_prime.edge->length));
   }
 
   if (std::isnan(fxh)) {
-    throw std::runtime_error("fxh is not finite when computing derivative: " +
-                             std::to_string(root_prime.edge->length));
+    throw std::runtime_error("fxh is not finite when computing derivative: "
+                             + std::to_string(root_prime.edge->length));
   }
   if (std::isinf(fxh) && std::isinf(fx)) {
     debug_string(EMIT_LEVEL_DEBUG,
@@ -521,8 +525,8 @@ dlh_t model_t::compute_dlh(const root_location_t &root) {
     return {fx, 0};
   }
   double dlh = (fxh - fx) / EPSILON;
-  debug_print(EMIT_LEVEL_DEBUG, "dlh: %f, fx: %f, fxh: %f", dlh * sign, fx,
-              fxh);
+  debug_print(
+      EMIT_LEVEL_DEBUG, "dlh: %f, fx: %f, fxh: %f", dlh * sign, fx, fxh);
   ret.dlh = dlh * sign;
   return ret;
 }
@@ -539,9 +543,10 @@ dlh_t model_t::compute_dlh(const root_location_t &root) {
  * legacy reasons.
  */
 std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
-                                                   dlh_t d_beg,
+                                                   dlh_t                  d_beg,
                                                    const root_location_t &end,
-                                                   dlh_t d_end, double atol,
+                                                   dlh_t                  d_end,
+                                                   double                 atol,
                                                    size_t depth = 0) {
   assert_string(d_beg.dlh * d_end.dlh > 0,
                 "Bisect called with endpoints which don't bracket");
@@ -554,7 +559,8 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
     debug_print(
         EMIT_LEVEL_DEBUG,
         "depth exceeded limit, returning midpoint with ratio: %f, lh: %f",
-        midpoint.brlen_ratio, d_midpoint.lh);
+        midpoint.brlen_ratio,
+        d_midpoint.lh);
     return {midpoint, d_midpoint.lh};
   }
 
@@ -571,79 +577,79 @@ std::pair<root_location_t, double> model_t::bisect(const root_location_t &beg,
    * There are at least 2 roots, so we recurse on both sides, and return the
    * one with the best LH
    */
-  if ((d_beg.dlh > 0.0 && d_end.dlh > 0.0 && d_midpoint.dlh < 0.0) ||
-      (d_beg.dlh < 0.0 && d_end.dlh < 0.0 && d_midpoint.dlh > 0.0)) {
+  if ((d_beg.dlh > 0.0 && d_end.dlh > 0.0 && d_midpoint.dlh < 0.0)
+      || (d_beg.dlh < 0.0 && d_end.dlh < 0.0 && d_midpoint.dlh > 0.0)) {
     debug_string(EMIT_LEVEL_DEBUG, "case 2");
     auto r1 = bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
     auto r2 = bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
-    if (r1.second < r2.second) {
-      return r2;
-    }
+    if (r1.second < r2.second) { return r2; }
     return r1;
   }
   /* case 3: end and midpoint share a sign, while beg has the opposite sign
    * In this case, there is a root between midpoint and beg
    */
-  if ((d_beg.dlh < 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh > 0.0) ||
-      (d_beg.dlh > 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh < 0.0)) {
+  if ((d_beg.dlh < 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh > 0.0)
+      || (d_beg.dlh > 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh < 0.0)) {
     debug_print(
         EMIT_LEVEL_DEBUG,
         "case 3, d_beg.dlh: %f, d_midpoint.dlh: %f, d_end:%f, alpha: %f",
-        d_beg.lh, d_midpoint.dlh, d_end.dlh, midpoint.brlen_ratio);
+        d_beg.lh,
+        d_midpoint.dlh,
+        d_end.dlh,
+        midpoint.brlen_ratio);
     return bisect(beg, d_beg, midpoint, d_midpoint, atol, depth + 1);
   }
 
   /* case 4: beg and midpoint share a sign, while end has the opposite sign
    * In this case, there is a root between midpoint and end
    */
-  if ((d_beg.dlh < 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh > 0.0) ||
-      (d_beg.dlh > 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh < 0.0)) {
+  if ((d_beg.dlh < 0.0 && d_midpoint.dlh < 0.0 && d_end.dlh > 0.0)
+      || (d_beg.dlh > 0.0 && d_midpoint.dlh > 0.0 && d_end.dlh < 0.0)) {
     debug_string(EMIT_LEVEL_DEBUG, "case 4");
     return bisect(midpoint, d_midpoint, end, d_end, atol, depth + 1);
   }
 
   /* case 5: something went wrong */
-  throw std::runtime_error("Bisection failed to converge with interval : " +
-                           std::to_string(d_beg.dlh) + ", " +
-                           std::to_string(d_end.dlh) +
-                           ", midpoint.dlh: " + std::to_string(d_midpoint.dlh));
+  throw std::runtime_error("Bisection failed to converge with interval : "
+                           + std::to_string(d_beg.dlh) + ", "
+                           + std::to_string(d_end.dlh) + ", midpoint.dlh: "
+                           + std::to_string(d_midpoint.dlh));
 }
 
 std::pair<root_location_t, double> model_t::brents(root_location_t beg,
-                                                   dlh_t d_beg,
+                                                   dlh_t           d_beg,
                                                    root_location_t end,
-                                                   dlh_t d_end, double atol) {
-
+                                                   dlh_t           d_end,
+                                                   double          atol) {
   assert_string(d_beg.dlh * d_end.dlh < 0,
                 "Brents called with endpoints which don't bracket");
 
   root_location_t midpoint{end};
-  auto d_midpoint = d_end;
-  double e;
-  double d;
+  auto            d_midpoint = d_end;
+  double          e;
+  double          d;
   d = e = end.brlen_ratio - beg.brlen_ratio;
 
   for (size_t i = 0; i < 64; ++i) {
     if (d_end.dlh * d_midpoint.dlh > 0.0) {
-      midpoint = beg;
+      midpoint   = beg;
       d_midpoint = d_beg;
       d = e = end.brlen_ratio - beg.brlen_ratio;
     }
     if (fabs(d_end.dlh) < fabs(d_midpoint.dlh)) {
-      beg = end;
-      end = midpoint;
-      midpoint = beg;
-      d_beg = d_end;
-      d_end = d_midpoint;
+      beg        = end;
+      end        = midpoint;
+      midpoint   = beg;
+      d_beg      = d_end;
+      d_end      = d_midpoint;
       d_midpoint = d_beg;
     }
 
     double tol =
-        2.0 * fabs(end.brlen_ratio) * std::numeric_limits<double>::epsilon() +
-        0.5 * atol;
+        2.0 * fabs(end.brlen_ratio) * std::numeric_limits<double>::epsilon()
+        + 0.5 * atol;
     double e_tol = 0.5 * (midpoint.brlen_ratio - end.brlen_ratio);
-    if (fabs(e_tol) <= tol || fabs(d_end.dlh) <= 1e-12)
-      return {end, d_end.lh};
+    if (fabs(e_tol) <= tol || fabs(d_end.dlh) <= 1e-12) return {end, d_end.lh};
     if (fabs(e) >= tol && fabs(d_beg.dlh) > fabs(d_end.dlh)) {
       double s = d_end.dlh / d_beg.dlh;
       double p, q;
@@ -651,15 +657,15 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
         p = 2.0 * e_tol * s;
         q = 1.0 - s;
       } else {
-        q = d_beg.dlh / d_midpoint.dlh;
+        q        = d_beg.dlh / d_midpoint.dlh;
         double r = d_end.dlh / d_midpoint.dlh;
-        p = s * (2.0 * e_tol * q * (q - r) -
-                 (end.brlen_ratio - beg.brlen_ratio) * (r - 1.0));
+        p        = s
+            * (2.0 * e_tol * q * (q - r)
+               - (end.brlen_ratio - beg.brlen_ratio) * (r - 1.0));
         q = (q - 1.0) * (r - 1.0) * (s - 1.0);
       }
-      if (p > 0.0)
-        q = -q;
-      p = fabs(p);
+      if (p > 0.0) q = -q;
+      p           = fabs(p);
       double min1 = 3.0 * e_tol * q - fabs(e_tol * q);
       double min2 = fabs(e * q);
       if (2.0 * p < (min1 < min2 ? min1 : min2)) {
@@ -673,10 +679,9 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
       d = e_tol;
       e = d;
     }
-    beg = end;
+    beg   = end;
     d_beg = d_end;
-    if (fabs(d) > tol)
-      end.brlen_ratio += d;
+    if (fabs(d) > tol) end.brlen_ratio += d;
     else {
       end.brlen_ratio += e_tol >= 0.0 ? tol : -tol;
     }
@@ -687,7 +692,7 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
 
 /* Find the optimum for the ratio via brents method */
 root_location_t model_t::optimize_alpha(const root_location_t &root,
-                                        double atol) {
+                                        double                 atol) {
   double lh = compute_lh_root(root);
   if (std::isnan(lh)) {
     throw std::runtime_error("initial likelihood calculation is not finite");
@@ -704,12 +709,12 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
 
   if (std::isnan(d_beg.dlh) || std::isnan(d_end.dlh)) {
     throw std::runtime_error(
-        "Initial derivatives failed when optimizing alpha: " +
-        std::to_string(root.edge->length));
+        "Initial derivatives failed when optimizing alpha: "
+        + std::to_string(root.edge->length));
   }
 
-  root_location_t best_endpoint = d_beg.lh >= d_end.lh ? beg : end;
-  auto lh_best_endpoint = d_beg.lh >= d_end.lh ? d_beg : d_end;
+  root_location_t best_endpoint    = d_beg.lh >= d_end.lh ? beg : end;
+  auto            lh_best_endpoint = d_beg.lh >= d_end.lh ? d_beg : d_end;
   if (d_beg.lh >= d_end.lh) {
     debug_string(EMIT_LEVEL_DEBUG, "beg endpoint is best");
   } else {
@@ -717,18 +722,20 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
   }
 
   debug_print(EMIT_LEVEL_DEBUG, "lh_endpoint.dlh: %f", lh_best_endpoint.dlh);
-  debug_print(EMIT_LEVEL_DEBUG, "d_beg.dlh: %f, d_end.dlh: %f", d_beg.dlh,
-              d_end.dlh);
+  debug_print(
+      EMIT_LEVEL_DEBUG, "d_beg.dlh: %f, d_end.dlh: %f", d_beg.dlh, d_end.dlh);
 
   if (fabs(d_beg.dlh) < atol || fabs(d_end.dlh) < atol) {
     debug_string(EMIT_LEVEL_DEBUG, "one of the endpoints is sufficient");
     return best_endpoint;
   }
 
-  if ((d_beg.dlh < 0.0 && d_end.dlh > 0.0) ||
-      (d_beg.dlh > 0.0 && d_end.dlh < 0.0)) {
+  if ((d_beg.dlh < 0.0 && d_end.dlh > 0.0)
+      || (d_beg.dlh > 0.0 && d_end.dlh < 0.0)) {
     auto mid = brents(beg, d_beg, end, d_end, atol);
-    debug_print(EMIT_LEVEL_DEBUG, "mid lh: %f, end lh: %f", mid.second,
+    debug_print(EMIT_LEVEL_DEBUG,
+                "mid lh: %f, end lh: %f",
+                mid.second,
                 lh_best_endpoint.lh);
     return lh_best_endpoint.lh > mid.second ? best_endpoint : mid.first;
   }
@@ -738,42 +745,41 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
    * to do bisection with
    */
 
-  bool beg_end_pos = d_beg.dlh > 0.0 && d_end.dlh > 0.0;
+  bool  beg_end_pos      = d_beg.dlh > 0.0 && d_end.dlh > 0.0;
   dlh_t best_midpoint_lh = {-std::numeric_limits<double>::infinity(), 0};
   root_location_t best_midpoint;
-  bool found_midpoint = false;
+  bool            found_midpoint = false;
 
   for (size_t midpoints = 2; midpoints <= 32; midpoints *= 2) {
     for (size_t midpoint = 1; midpoint <= midpoints; ++midpoint) {
-      if (midpoint % 2 == 0)
-        continue;
+      if (midpoint % 2 == 0) continue;
 
       double alpha = 1.0 / (double)midpoints * midpoint;
       debug_print(EMIT_LEVEL_DEBUG, "alpha: %f", alpha);
       root_location_t midpoint_root{beg};
       midpoint_root.brlen_ratio = alpha;
-      auto d_midpoint = compute_dlh(midpoint_root);
+      auto d_midpoint           = compute_dlh(midpoint_root);
       debug_print(EMIT_LEVEL_DEBUG, "d_midpoint.dlh: %f", d_midpoint.dlh);
       if (fabs(d_midpoint.dlh) < atol) {
         if (best_midpoint_lh.lh < d_midpoint.lh) {
           best_midpoint_lh = d_midpoint;
-          best_midpoint = midpoint_root;
-          found_midpoint = true;
+          best_midpoint    = midpoint_root;
+          found_midpoint   = true;
         }
       }
-      if ((beg_end_pos && d_midpoint.dlh < 0.0) ||
-          (!beg_end_pos && d_midpoint.dlh > 0.0)) {
+      if ((beg_end_pos && d_midpoint.dlh < 0.0)
+          || (!beg_end_pos && d_midpoint.dlh > 0.0)) {
         /*
          * we have a midpoint, so now we need to figure out if it is a min or
          * a maximum.
          */
         auto r1 = brents(beg, d_beg, midpoint_root, d_midpoint, atol);
         auto r2 = brents(midpoint_root, d_midpoint, end, d_end, atol);
-        debug_print(EMIT_LEVEL_DEBUG, "r1 lh: %f, r2 lh: %f", r1.second,
-                    r2.second);
+        debug_print(
+            EMIT_LEVEL_DEBUG, "r1 lh: %f, r2 lh: %f", r1.second, r2.second);
         if (lh_best_endpoint.lh < best_midpoint_lh.lh) {
           lh_best_endpoint = best_midpoint_lh;
-          best_endpoint = best_midpoint;
+          best_endpoint    = best_midpoint;
         }
         if (r1.second < r2.second) {
           return lh_best_endpoint.lh >= r2.second ? best_endpoint : r2.first;
@@ -783,9 +789,7 @@ root_location_t model_t::optimize_alpha(const root_location_t &root,
     }
   }
 
-  if (found_midpoint) {
-    return best_midpoint;
-  }
+  if (found_midpoint) { return best_midpoint; }
 
   /*
    * If we got here, we can just return the best of beg or end, since it seems
@@ -813,7 +817,6 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
 
   auto sorted_roots = suggest_roots(min_roots, root_ratio);
   for (auto &sr : sorted_roots) {
-
     auto &rl = sr.first;
     debug_print(EMIT_LEVEL_DEBUG, "working rl: %s", rl.label().c_str());
 
@@ -825,7 +828,7 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
     debug_print(EMIT_LEVEL_DEBUG, "rl_lh: %f", rl_lh);
 
     if (rl_lh > best.second) {
-      best.first = rl;
+      best.first  = rl;
       best.second = rl_lh;
     }
   }
@@ -835,32 +838,34 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
 
 void model_t::move_root(const root_location_t &new_root) {
   std::vector<pll_operation_t> ops;
-  std::vector<unsigned int> pmatrix_indices;
-  std::vector<double> branch_lengths;
+  std::vector<unsigned int>    pmatrix_indices;
+  std::vector<double>          branch_lengths;
 
   {
-    auto results = _tree.generate_root_update_operations(new_root);
-    ops = std::move(std::get<0>(results));
+    auto results    = _tree.generate_root_update_operations(new_root);
+    ops             = std::move(std::get<0>(results));
     pmatrix_indices = std::move(std::get<1>(results));
-    branch_lengths = std::move(std::get<2>(results));
+    branch_lengths  = std::move(std::get<2>(results));
   }
   debug_print(EMIT_LEVEL_DEBUG,
-              "ops.size: %lu, pmats.size: %lu, brlens.size: %lu", ops.size(),
-              pmatrix_indices.size(), branch_lengths.size());
+              "ops.size: %lu, pmats.size: %lu, brlens.size: %lu",
+              ops.size(),
+              pmatrix_indices.size(),
+              branch_lengths.size());
 
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    int result = pll_update_prob_matrices(
-        partition, _param_indicies[i].data(), pmatrix_indices.data(),
+    int   result    = pll_update_prob_matrices(
+        partition,
+        _param_indicies[i].data(),
+        pmatrix_indices.data(),
         branch_lengths.data(),
         static_cast<unsigned int>(pmatrix_indices.size()));
 
-    if (result == PLL_FAILURE) {
-      throw std::runtime_error(pll_errmsg);
-    }
+    if (result == PLL_FAILURE) { throw std::runtime_error(pll_errmsg); }
 
-    pll_update_partials(partition, ops.data(),
-                        static_cast<unsigned int>(ops.size()));
+    pll_update_partials(
+        partition, ops.data(), static_cast<unsigned int>(ops.size()));
   }
 }
 
@@ -899,18 +904,14 @@ std::vector<size_t> model_t::shuffle_root_indicies() {
 partition_parameters_t model_t::make_partition_parameters(
     size_t states, rate_category::rate_category_e rc, size_t rate_cat_count) {
   partition_parameters_t pp;
-  size_t subst_size = states * states - states;
+  size_t                 subst_size = states * states - states;
 
   pp.subst_rates.resize(subst_size);
-  for (auto &v : pp.subst_rates) {
-    v = 1.0 / subst_size;
-  }
+  for (auto &v : pp.subst_rates) { v = 1.0 / subst_size; }
 
   pp.freqs.resize(states);
   std::fill(pp.freqs.begin(), pp.freqs.end(), 1.0 / states);
-  for (auto &v : pp.freqs) {
-    v = 1.0 / states;
-  }
+  for (auto &v : pp.freqs) { v = 1.0 / states; }
 
   switch (rc) {
   case rate_category::MEAN:
@@ -920,27 +921,26 @@ partition_parameters_t model_t::make_partition_parameters(
     break;
   case rate_category::FREE:
     pp.gamma_alpha.resize(rate_cat_count);
-    for (auto &v : pp.gamma_alpha) {
-      v = 1.0;
-    }
+    for (auto &v : pp.gamma_alpha) { v = 1.0; }
     pp.gamma_weights.resize(rate_cat_count);
     std::uniform_real_distribution<> dis(0.0, 1.0);
-    for (auto &v : pp.gamma_weights) {
-      v = dis(_random_engine);
-    }
+    for (auto &v : pp.gamma_weights) { v = dis(_random_engine); }
   }
   return pp;
 }
 
 /* Optimize the substitution parameters and root location.*/
-std::pair<root_location_t, double>
-model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
-                double brtol, double factor, checkpoint_t &checkpoint) {
-
+std::pair<root_location_t, double> model_t::search(size_t        min_roots,
+                                                   double        root_ratio,
+                                                   double        atol,
+                                                   double        pgtol,
+                                                   double        brtol,
+                                                   double        factor,
+                                                   checkpoint_t &checkpoint) {
   if (_assigned_idx.size() == 0) {
     debug_string(EMIT_LEVEL_WARNING, "There is no work to be done");
   }
-  double best_lh = -std::numeric_limits<double>::infinity();
+  double          best_lh = -std::numeric_limits<double>::infinity();
   root_location_t best_rl;
 
   set_subst_rates_uniform();
@@ -970,11 +970,10 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
                                                  _partitions[p]->rate_cats));
     }
 
-    auto cur_best_rl = rl;
+    auto   cur_best_rl = rl;
     double cur_best_lh = -std::numeric_limits<double>::infinity();
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
-
       saved_params = params;
 
       optimize_params(params, rl, pgtol, factor, true);
@@ -1001,8 +1000,8 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
       }
 
       if (_early_stop) {
-        if (rl.edge == cur.first.edge &&
-            fabs(rl.brlen_ratio - cur.first.brlen_ratio) < brtol) {
+        if (rl.edge == cur.first.edge
+            && fabs(rl.brlen_ratio - cur.first.brlen_ratio) < brtol) {
           debug_string(EMIT_LEVEL_DEBUG, "breaking due to early stop");
           cur_best_rl = cur.first;
           cur_best_lh = cur.second;
@@ -1024,13 +1023,17 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
     }
 
     ++root_index;
-    debug_print(EMIT_LEVEL_PROGRESS, "Stage %lu/%lu, ETC: %fh", root_index,
-                root_count, progress_macro(root_index, root_count));
+    debug_print(EMIT_LEVEL_PROGRESS,
+                "Stage %lu/%lu, ETC: %fh",
+                root_index,
+                root_count,
+                progress_macro(root_index, root_count));
 
     checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio},
                      params);
 
-    debug_print(EMIT_LEVEL_DEBUG, "finished optimize_all root, cur_best_lh: %f",
+    debug_print(EMIT_LEVEL_DEBUG,
+                "finished optimize_all root, cur_best_lh: %f",
                 cur_best_lh);
   }
 
@@ -1039,17 +1042,18 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
 #endif
 
   if (__MPI_RANK__ == 0) {
-    auto total_progress = checkpoint.read_results();
+    auto total_progress    = checkpoint.read_results();
     auto total_best_result = *std::max_element(
-        total_progress.begin(), total_progress.end(),
+        total_progress.begin(),
+        total_progress.end(),
         [](std::pair<rd_result_t, std::vector<partition_parameters_t>> a,
            std::pair<rd_result_t, std::vector<partition_parameters_t>> b)
             -> bool { return a.first.lh < b.first.lh; });
 
-    best_rl = _tree.root_location(total_best_result.first.root_id);
+    best_rl             = _tree.root_location(total_best_result.first.root_id);
     best_rl.brlen_ratio = total_best_result.first.alpha;
-    best_lh = total_best_result.first.lh;
-    best_params = total_best_result.second;
+    best_lh             = total_best_result.first.lh;
+    best_params         = total_best_result.second;
     set_model_params(best_params);
   }
 
@@ -1058,16 +1062,18 @@ model_t::search(size_t min_roots, double root_ratio, double atol, double pgtol,
 }
 
 std::pair<root_location_t, double>
-model_t::exhaustive_search(double atol, double pgtol, double brtol,
-                           double factor, checkpoint_t &checkpoint) {
-
+model_t::exhaustive_search(double        atol,
+                           double        pgtol,
+                           double        brtol,
+                           double        factor,
+                           checkpoint_t &checkpoint) {
   if (_assigned_idx.size() == 0) {
     debug_string(EMIT_LEVEL_WARNING, "There is no work to be done");
   }
-  size_t root_index = 0;
+  size_t          root_index = 0;
   root_location_t best_rl;
-  double best_lh = -std::numeric_limits<double>::infinity();
-  size_t root_count = _assigned_idx.size();
+  double          best_lh    = -std::numeric_limits<double>::infinity();
+  size_t          root_count = _assigned_idx.size();
   debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
 
   for (auto rl_index : _assigned_idx) {
@@ -1086,29 +1092,28 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
     }
 
     root_location_t cur_best_rl = rl;
-    double cur_best_lh = -std::numeric_limits<double>::infinity();
+    double          cur_best_lh = -std::numeric_limits<double>::infinity();
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
       debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing parameters");
       optimize_params(params, rl, pgtol, factor, (iter % 10 == 0));
 
-      if (fabs(compute_lh(rl) - cur_best_lh) < atol) {
-        break;
-      }
+      if (fabs(compute_lh(rl) - cur_best_lh) < atol) { break; }
 
       debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Root Location");
-      auto cur_rl = optimize_alpha(rl, brtol);
+      auto   cur_rl = optimize_alpha(rl, brtol);
       double cur_lh = compute_lh_root(cur_rl);
 
       debug_print(EMIT_LEVEL_MPROGRESS, "Iteration %lu LH: %.5f", iter, cur_lh);
-      debug_print(EMIT_LEVEL_INFO, "difference in lh: %.5f",
-                  (cur_lh - cur_best_lh));
+      debug_print(
+          EMIT_LEVEL_INFO, "difference in lh: %.5f", (cur_lh - cur_best_lh));
 
       if (_early_stop) {
         if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
           debug_print(EMIT_LEVEL_DEBUG,
                       "Current BRlen ratio tolerances: %.7f, brtol: %.7f",
-                      fabs(rl.brlen_ratio - cur_rl.brlen_ratio), brtol);
+                      fabs(rl.brlen_ratio - cur_rl.brlen_ratio),
+                      brtol);
           cur_best_rl = cur_rl;
           cur_best_lh = cur_lh;
           break;
@@ -1135,8 +1140,11 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
                      params);
     root_index++;
 
-    debug_print(EMIT_LEVEL_PROGRESS, "Step %lu / %lu, ETC: %0.2fh", root_index,
-                root_count, progress_macro(root_index, root_count));
+    debug_print(EMIT_LEVEL_PROGRESS,
+                "Step %lu / %lu, ETC: %0.2fh",
+                root_index,
+                root_count,
+                progress_macro(root_index, root_count));
 
     if (cur_best_lh > best_lh) {
       best_rl = cur_best_rl;
@@ -1151,8 +1159,8 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
 #endif
 
   if (__MPI_RANK__ == 0) {
-    auto total_progress = checkpoint.read_results();
-    double max_lh = -std::numeric_limits<double>::infinity();
+    auto   total_progress = checkpoint.read_results();
+    double max_lh         = -std::numeric_limits<double>::infinity();
 
     for (auto result : total_progress) {
       max_lh = std::max(result.first.lh, max_lh);
@@ -1165,22 +1173,23 @@ model_t::exhaustive_search(double atol, double pgtol, double brtol,
     debug_print(EMIT_LEVEL_DEBUG, "LWR denom: %f, %e", total_lh, total_lh - 1);
 
     for (auto result : total_progress) {
-      double lwr = exp((result.first.lh - max_lh)) / total_lh;
-      auto rl = _tree.root_location(result.first.root_id);
+      double lwr     = exp((result.first.lh - max_lh)) / total_lh;
+      auto   rl      = _tree.root_location(result.first.root_id);
       rl.brlen_ratio = result.first.alpha;
       _tree.annotate_branch(rl, "LWR", std::to_string(lwr));
       _tree.annotate_lh(rl, result.first.lh);
       _tree.annotate_ratio(rl, result.first.alpha);
     }
     auto total_best_result = *std::max_element(
-        total_progress.begin(), total_progress.end(),
+        total_progress.begin(),
+        total_progress.end(),
         [](std::pair<rd_result_t, std::vector<partition_parameters_t>> a,
            std::pair<rd_result_t, std::vector<partition_parameters_t>> b)
             -> bool { return a.first.lh < b.first.lh; });
 
-    best_rl = _tree.root_location(total_best_result.first.root_id);
+    best_rl             = _tree.root_location(total_best_result.first.root_id);
     best_rl.brlen_ratio = total_best_result.first.alpha;
-    best_lh = total_best_result.first.lh;
+    best_lh             = total_best_result.first.lh;
   }
 
   return {best_rl, best_lh};
@@ -1241,47 +1250,44 @@ std::string model_t::subst_string() const {
   for (size_t p_index = 0; p_index < _partitions.size(); ++p_index) {
     auto p = _partitions[p_index];
     oss << "{";
-    size_t params_size = p->states * p->states - p->states;
+    size_t              params_size = p->states * p->states - p->states;
     std::vector<double> params{p->subst_params[0],
                                p->subst_params[0] + params_size};
     for (size_t i = 0; i < params.size(); ++i) {
       oss << std::to_string(params[i]);
-      if (i != params.size() - 1)
-        oss << ",";
+      if (i != params.size() - 1) oss << ",";
     }
     oss << "}";
-    if (p_index != _partitions.size() - 1)
-      oss << ",";
+    if (p_index != _partitions.size() - 1) oss << ",";
   }
   oss << "}";
   return oss.str();
 }
 
 static double
-gd_params(model_params_t &initial_params, size_t partition_index, double p_min,
-          double p_max, double epsilon, std::function<double()> compute_lh,
+gd_params(model_params_t &                                    initial_params,
+          size_t                                              partition_index,
+          double                                              p_min,
+          double                                              p_max,
+          double                                              epsilon,
+          std::function<double()>                             compute_lh,
           std::function<void(size_t, const model_params_t &)> set_func) {
-
-  size_t iters = 0;
-  double atol = 1e-4;
-  size_t n_params = initial_params.size();
+  size_t              iters    = 0;
+  double              atol     = 1e-4;
+  size_t              n_params = initial_params.size();
   std::vector<double> parameters(initial_params);
   std::vector<double> gradient(n_params, 0.0);
   set_func(partition_index, initial_params);
   double initial_score = compute_lh();
-  double last_score = std::numeric_limits<double>::infinity();
+  double last_score    = std::numeric_limits<double>::infinity();
   while (true) {
     set_func(partition_index, parameters);
     double score = compute_lh();
     debug_print(EMIT_LEVEL_INFO, "GD Iter: %lu Score: %.5f", iters, -score);
-    if (fabs(last_score - score) < atol) {
-      break;
-    }
+    if (fabs(last_score - score) < atol) { break; }
     for (size_t i = 0; i < n_params; ++i) {
       double h = epsilon * fabs(parameters[i]);
-      if (h < epsilon) {
-        h = epsilon;
-      }
+      if (h < epsilon) { h = epsilon; }
       double temp = parameters[i];
       parameters[i] += h;
       set_func(partition_index, parameters);
@@ -1307,7 +1313,7 @@ gd_params(model_params_t &initial_params, size_t partition_index, double p_min,
     double alpha = 1.0;
     while (alpha > 1e-12) {
       double q = score + 1e-4 * alpha * pgnorm;
-      auto tmp_params{parameters};
+      auto   tmp_params{parameters};
       for (size_t j = 0; j < n_params; ++j) {
         tmp_params[j] = parameters[j] - alpha * gradient[j];
         if (tmp_params[j] < p_min) {
@@ -1339,47 +1345,67 @@ gd_params(model_params_t &initial_params, size_t partition_index, double p_min,
   } else {
     debug_print(EMIT_LEVEL_WARNING,
                 "Failed to improve the likelihood after GD. Start: %f, End: %f",
-                initial_score, final_score);
+                initial_score,
+                final_score);
   }
   return -final_score;
 }
 
 static double
-bfgs_params(model_params_t &initial_params, size_t partition_index,
-            double p_min, double p_max, double epsilon, double pgtol,
-            double factor, std::function<double()> compute_lh,
+bfgs_params(model_params_t &                                    initial_params,
+            size_t                                              partition_index,
+            double                                              p_min,
+            double                                              p_max,
+            double                                              epsilon,
+            double                                              pgtol,
+            double                                              factor,
+            std::function<double()>                             compute_lh,
             std::function<void(size_t, const model_params_t &)> set_func) {
-  int task = START;
+  int task     = START;
   int n_params = static_cast<int>(initial_params.size());
   set_func(partition_index, initial_params);
-  double score = compute_lh();
-  double initial_score = score;
-  int csave;
+  double              score         = compute_lh();
+  double              initial_score = score;
+  int                 csave;
   std::vector<double> gradient(static_cast<size_t>(n_params), 0.0);
-  size_t max_corrections = 20;
-  std::vector<double> wa((2 * max_corrections + 5) *
-                                 static_cast<size_t>(n_params) +
-                             12 * max_corrections * (max_corrections + 1),
+  size_t              max_corrections = 20;
+  std::vector<double> wa((2 * max_corrections + 5)
+                                 * static_cast<size_t>(n_params)
+                             + 12 * max_corrections * (max_corrections + 1),
                          0.0);
-  std::vector<int> iwa(3 * static_cast<size_t>(n_params), 0);
+  std::vector<int>    iwa(3 * static_cast<size_t>(n_params), 0);
 
   std::vector<double> parameters(initial_params);
   std::vector<double> param_min(static_cast<size_t>(n_params), p_min);
   std::vector<double> param_max(static_cast<size_t>(n_params), p_max);
-  logical lsave[4];
-  int isave[44];
-  double dsave[29];
-  std::vector<int> bound_type(static_cast<size_t>(n_params), 2);
-  int iprint = -1;
-  size_t iters = 0;
+  logical             lsave[4];
+  int                 isave[44];
+  double              dsave[29];
+  std::vector<int>    bound_type(static_cast<size_t>(n_params), 2);
+  int                 iprint = -1;
+  size_t              iters  = 0;
 
   while (iters < 500) {
     debug_string(EMIT_LEVEL_DEBUG, "Running a bfgs iteration");
 
-    setulb(&n_params, (int *)&max_corrections, parameters.data(),
-           param_min.data(), param_max.data(), bound_type.data(), &score,
-           gradient.data(), &factor, &pgtol, wa.data(), iwa.data(), &task,
-           &iprint, &csave, lsave, isave, dsave);
+    setulb(&n_params,
+           (int *)&max_corrections,
+           parameters.data(),
+           param_min.data(),
+           param_max.data(),
+           bound_type.data(),
+           &score,
+           gradient.data(),
+           &factor,
+           &pgtol,
+           wa.data(),
+           iwa.data(),
+           &task,
+           &iprint,
+           &csave,
+           lsave,
+           isave,
+           dsave);
 
     debug_print(EMIT_LEVEL_INFO, "BFGS Iter: %lu Score: %.5f", iters, -score);
 
@@ -1388,9 +1414,7 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
     if (IS_FG(task)) {
       for (size_t i = 0; i < static_cast<size_t>(n_params); ++i) {
         double h = epsilon * fabs(parameters[i]);
-        if (h < epsilon) {
-          h = epsilon;
-        }
+        if (h < epsilon) { h = epsilon; }
         double temp = parameters[i];
         parameters[i] += h;
         set_func(partition_index, parameters);
@@ -1415,67 +1439,85 @@ bfgs_params(model_params_t &initial_params, size_t partition_index,
     debug_print(
         EMIT_LEVEL_WARNING,
         "Failed to improve the likelihood after BFGS. Start: %f, End: %f",
-        initial_score, score);
+        initial_score,
+        score);
   }
   return score;
 }
 
-double model_t::bfgs_rates(model_params_t &initial_rates,
+double model_t::bfgs_rates(model_params_t &                    initial_rates,
                            const std::vector<pll_operation_t> &ops,
-                           const std::vector<unsigned int> pmatrix_indices,
-                           const std::vector<double> branch_lengths,
-                           size_t partition_index, double pgtol,
-                           double factor) {
-
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1e4;
+                           const std::vector<unsigned int>     pmatrix_indices,
+                           const std::vector<double>           branch_lengths,
+                           size_t                              partition_index,
+                           double                              pgtol,
+                           double                              factor) {
+  constexpr double p_min   = 1e-4;
+  constexpr double p_max   = 1e4;
   constexpr double epsilon = 1e-4;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs params");
   return bfgs_params(
-      initial_rates, partition_index, p_min, p_max, epsilon, pgtol, factor,
+      initial_rates,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
+      pgtol,
+      factor,
       [&, this]() -> double {
-        return -this->compute_lh_partition(partition_index, ops,
-                                           pmatrix_indices, branch_lengths);
+        return -this->compute_lh_partition(
+            partition_index, ops, pmatrix_indices, branch_lengths);
       },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_subst_rates(pi, mp);
       });
 }
 
-double model_t::gd_rates(model_params_t &initial_rates,
-                         const root_location_t &rl, size_t partition_index) {
-
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1e4;
+double model_t::gd_rates(model_params_t &       initial_rates,
+                         const root_location_t &rl,
+                         size_t                 partition_index) {
+  constexpr double p_min   = 1e-4;
+  constexpr double p_max   = 1e4;
   constexpr double epsilon = 1e-4;
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs params");
   return gd_params(
-      initial_rates, partition_index, p_min, p_max, epsilon,
+      initial_rates,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_subst_rates(pi, mp);
       });
 }
 
-double model_t::bfgs_freqs(model_params_t &initial_freqs,
+double model_t::bfgs_freqs(model_params_t &                    initial_freqs,
                            const std::vector<pll_operation_t> &ops,
-                           const std::vector<unsigned int> pmatrix_indices,
-                           const std::vector<double> branch_lengths,
-                           size_t partition_index, double pgtol,
-                           double factor) {
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1.0 - 1e-4 * 3;
+                           const std::vector<unsigned int>     pmatrix_indices,
+                           const std::vector<double>           branch_lengths,
+                           size_t                              partition_index,
+                           double                              pgtol,
+                           double                              factor) {
+  constexpr double p_min   = 1e-4;
+  constexpr double p_max   = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
-  model_params_t constrained_freqs(initial_freqs.begin(),
+  model_params_t   constrained_freqs(initial_freqs.begin(),
                                    initial_freqs.end() - 1);
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs freqs");
   double lh = bfgs_params(
-      initial_freqs, partition_index, p_min, p_max, epsilon, pgtol, factor,
+      initial_freqs,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
+      pgtol,
+      factor,
       [&, this]() -> double {
-        return -this->compute_lh_partition(partition_index, ops,
-                                           pmatrix_indices, branch_lengths);
+        return -this->compute_lh_partition(
+            partition_index, ops, pmatrix_indices, branch_lengths);
       },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_freqs_all_free(pi, mp);
@@ -1484,17 +1526,22 @@ double model_t::bfgs_freqs(model_params_t &initial_freqs,
   return lh;
 }
 
-double model_t::gd_freqs(model_params_t &initial_freqs,
-                         const root_location_t &rl, size_t partition_index) {
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1.0 - 1e-4 * 3;
+double model_t::gd_freqs(model_params_t &       initial_freqs,
+                         const root_location_t &rl,
+                         size_t                 partition_index) {
+  constexpr double p_min   = 1e-4;
+  constexpr double p_max   = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
-  model_params_t constrained_freqs(initial_freqs.begin(),
+  model_params_t   constrained_freqs(initial_freqs.begin(),
                                    initial_freqs.end() - 1);
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs freqs");
   double lh = gd_params(
-      initial_freqs, partition_index, p_min, p_max, epsilon,
+      initial_freqs,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_freqs_all_free(pi, mp);
@@ -1504,21 +1551,29 @@ double model_t::gd_freqs(model_params_t &initial_freqs,
 }
 
 double
-model_t::bfgs_gamma_rates(model_params_t &alpha,
+model_t::bfgs_gamma_rates(model_params_t &                    alpha,
                           const std::vector<pll_operation_t> &ops,
-                          const std::vector<unsigned int> pmatrix_indices,
-                          const std::vector<double> branch_lengths,
-                          size_t partition_index, double pgtol, double factor) {
-  constexpr double p_min = 0.2;
-  constexpr double p_max = 10000.0;
+                          const std::vector<unsigned int>     pmatrix_indices,
+                          const std::vector<double>           branch_lengths,
+                          size_t                              partition_index,
+                          double                              pgtol,
+                          double                              factor) {
+  constexpr double p_min   = 0.2;
+  constexpr double p_max   = 10000.0;
   constexpr double epsilon = 1e-4;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = bfgs_params(
-      alpha, partition_index, p_min, p_max, epsilon, pgtol, factor,
+      alpha,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
+      pgtol,
+      factor,
       [&, this]() -> double {
-        return -this->compute_lh_partition(partition_index, ops,
-                                           pmatrix_indices, branch_lengths);
+        return -this->compute_lh_partition(
+            partition_index, ops, pmatrix_indices, branch_lengths);
       },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_gamma_rates(pi, mp);
@@ -1527,15 +1582,20 @@ model_t::bfgs_gamma_rates(model_params_t &alpha,
   return lh;
 }
 
-double model_t::gd_gamma_rates(model_params_t &alpha, const root_location_t &rl,
-                               size_t partition_index) {
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1.0 - 1e-4 * 3;
+double model_t::gd_gamma_rates(model_params_t &       alpha,
+                               const root_location_t &rl,
+                               size_t                 partition_index) {
+  constexpr double p_min   = 1e-4;
+  constexpr double p_max   = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = gd_params(
-      alpha, partition_index, p_min, p_max, epsilon,
+      alpha,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_gamma_rates(pi, mp);
@@ -1544,21 +1604,30 @@ double model_t::gd_gamma_rates(model_params_t &alpha, const root_location_t &rl,
   return lh;
 }
 
-double model_t::bfgs_gamma_weights(
-    model_params_t &alpha, const std::vector<pll_operation_t> &ops,
-    const std::vector<unsigned int> pmatrix_indices,
-    const std::vector<double> branch_lengths, size_t partition_index,
-    double pgtol, double factor) {
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1.0;
+double
+model_t::bfgs_gamma_weights(model_params_t &                    alpha,
+                            const std::vector<pll_operation_t> &ops,
+                            const std::vector<unsigned int>     pmatrix_indices,
+                            const std::vector<double>           branch_lengths,
+                            size_t                              partition_index,
+                            double                              pgtol,
+                            double                              factor) {
+  constexpr double p_min   = 1e-4;
+  constexpr double p_max   = 1.0;
   constexpr double epsilon = 1e-4;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = bfgs_params(
-      alpha, partition_index, p_min, p_max, epsilon, pgtol, factor,
+      alpha,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
+      pgtol,
+      factor,
       [&, this]() -> double {
-        return -this->compute_lh_partition(partition_index, ops,
-                                           pmatrix_indices, branch_lengths);
+        return -this->compute_lh_partition(
+            partition_index, ops, pmatrix_indices, branch_lengths);
       },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_gamma_weights(pi, mp);
@@ -1567,16 +1636,20 @@ double model_t::bfgs_gamma_weights(
   return lh;
 }
 
-double model_t::gd_gamma_weights(model_params_t &alpha,
+double model_t::gd_gamma_weights(model_params_t &       alpha,
                                  const root_location_t &rl,
-                                 size_t partition_index) {
-  constexpr double p_min = 1e-4;
-  constexpr double p_max = 1.0 - 1e-4 * 3;
+                                 size_t                 partition_index) {
+  constexpr double p_min   = 1e-4;
+  constexpr double p_max   = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
 
   debug_string(EMIT_LEVEL_DEBUG, "doing bfgs gamma");
   double lh = gd_params(
-      alpha, partition_index, p_min, p_max, epsilon,
+      alpha,
+      partition_index,
+      p_min,
+      p_max,
+      epsilon,
       [&, this]() -> double { return -this->compute_lh(rl); },
       [&, this](size_t pi, const model_params_t &mp) -> void {
         this->set_gamma_weights(pi, mp);
@@ -1598,17 +1671,15 @@ std::vector<double> model_t::compute_all_root_lh() {
 
 void model_t::set_subst_rates_uniform() {
   for (size_t i = 0; i < _partitions.size(); ++i) {
-    unsigned int states = _partitions[i]->states;
-    unsigned int params = states * states - states;
+    unsigned int   states = _partitions[i]->states;
+    unsigned int   params = states * states - states;
     model_params_t mp(params, 1.0 / params);
     set_subst_rates(i, mp);
   }
 }
 
 void model_t::set_empirical_freqs() {
-  for (size_t i = 0; i < _partitions.size(); ++i) {
-    set_empirical_freqs(i);
-  }
+  for (size_t i = 0; i < _partitions.size(); ++i) { set_empirical_freqs(i); }
 }
 
 void model_t::assign_indicies(const std::vector<size_t> &idx) {
@@ -1631,9 +1702,7 @@ void model_t::assign_indicies() {
 void model_t::assign_indicies(size_t beg, size_t end, std::vector<size_t> idx) {
   _assigned_idx.clear();
   _assigned_idx.reserve(end - beg);
-  for (size_t i = beg; i < end; ++i) {
-    _assigned_idx.push_back(idx[i]);
-  }
+  for (size_t i = beg; i < end; ++i) { _assigned_idx.push_back(idx[i]); }
 }
 
 std::pair<size_t, size_t>
@@ -1644,17 +1713,18 @@ model_t::compute_chunk_size_mod(size_t num_tasks) const {
 std::pair<size_t, size_t>
 model_t::compute_chunk_size_mod(size_t root_count, size_t num_tasks) const {
   size_t chunk_size = root_count / num_tasks;
-  size_t mod = root_count % num_tasks;
+  size_t mod        = root_count % num_tasks;
   return {chunk_size, mod};
 }
 
-void model_t::assign_indicies_by_rank_search(size_t min_roots,
-                                             double root_ratio, size_t rank,
-                                             size_t num_tasks,
+void model_t::assign_indicies_by_rank_search(size_t        min_roots,
+                                             double        root_ratio,
+                                             size_t        rank,
+                                             size_t        num_tasks,
                                              checkpoint_t &checkpoint) {
-  auto completed_work = checkpoint.completed_indicies();
-  auto shuffled_idx = shuffle_root_indicies();
-  size_t root_count = std::min(
+  auto   completed_work = checkpoint.completed_indicies();
+  auto   shuffled_idx   = shuffle_root_indicies();
+  size_t root_count     = std::min(
       std::max(static_cast<size_t>(_tree.root_count() * root_ratio), min_roots),
       _tree.root_count());
 
@@ -1683,9 +1753,9 @@ void model_t::assign_indicies_by_rank_search(size_t min_roots,
 
   size_t chunk_size, mod;
   {
-    auto res = compute_chunk_size_mod(work_left, num_tasks);
+    auto res   = compute_chunk_size_mod(work_left, num_tasks);
     chunk_size = res.first;
-    mod = res.second;
+    mod        = res.second;
   }
 
   size_t beg = chunk_size * rank + std::min(mod, rank);
@@ -1693,7 +1763,8 @@ void model_t::assign_indicies_by_rank_search(size_t min_roots,
   assign_indicies(beg, end, trimmed_idx);
 }
 
-void model_t::assign_indicies_by_rank_exhaustive(size_t rank, size_t num_tasks,
+void model_t::assign_indicies_by_rank_exhaustive(size_t        rank,
+                                                 size_t        num_tasks,
                                                  checkpoint_t &checkpoint) {
   auto completed_work = checkpoint.current_progress();
   if (_tree.root_count() < completed_work.size()) {
@@ -1708,15 +1779,16 @@ void model_t::assign_indicies_by_rank_exhaustive(size_t rank, size_t num_tasks,
                  "Some nodes will do no work");
   }
 
-  std::sort(completed_work.begin(), completed_work.end(),
+  std::sort(completed_work.begin(),
+            completed_work.end(),
             [](rd_result_t a, rd_result_t b) { return a.root_id < b.root_id; });
 
   std::vector<size_t> tmp_idx;
   tmp_idx.reserve(work_left);
   size_t curr_work_idx = 0;
   for (size_t i = 0; i < _tree.root_count(); ++i) {
-    if (curr_work_idx < completed_work.size() &&
-        completed_work[curr_work_idx].root_id == i) {
+    if (curr_work_idx < completed_work.size()
+        && completed_work[curr_work_idx].root_id == i) {
       ++curr_work_idx;
     } else {
       tmp_idx.push_back(i);
@@ -1725,9 +1797,9 @@ void model_t::assign_indicies_by_rank_exhaustive(size_t rank, size_t num_tasks,
 
   size_t chunk_size, mod;
   {
-    auto res = compute_chunk_size_mod(work_left, num_tasks);
+    auto res   = compute_chunk_size_mod(work_left, num_tasks);
     chunk_size = res.first;
-    mod = res.second;
+    mod        = res.second;
   }
   size_t beg = chunk_size * rank + std::min(mod, rank);
   size_t end = chunk_size * (rank + 1) + std::min(mod, (rank + 1));
@@ -1750,11 +1822,13 @@ void model_t::set_model_params(
 }
 
 void model_t::optimize_params(std::vector<partition_parameters_t> &params,
-                              const root_location_t &rl, double pgtol,
-                              double factor, bool optimize_gamma) {
+                              const root_location_t &              rl,
+                              double                               pgtol,
+                              double                               factor,
+                              bool optimize_gamma) {
   std::vector<pll_operation_t> ops;
-  std::vector<unsigned int> pmatrix_indices;
-  std::vector<double> branch_lengths;
+  std::vector<unsigned int>    pmatrix_indices;
+  std::vector<double>          branch_lengths;
 
   GENERATE_AND_UNPACK_OPS(_tree, rl, ops, pmatrix_indices, branch_lengths);
 #pragma omp parallel for schedule(dynamic)
@@ -1768,22 +1842,42 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
     }
 
     debug_string(EMIT_LEVEL_INFO, "Optmizing rates");
-    bfgs_rates(params[i].subst_rates, ops, pmatrix_indices, branch_lengths, i,
-               pgtol, factor);
+    bfgs_rates(params[i].subst_rates,
+               ops,
+               pmatrix_indices,
+               branch_lengths,
+               i,
+               pgtol,
+               factor);
 
     debug_string(EMIT_LEVEL_INFO, "Optimizing freqs");
-    bfgs_freqs(params[i].freqs, ops, pmatrix_indices, branch_lengths, i, pgtol,
+    bfgs_freqs(params[i].freqs,
+               ops,
+               pmatrix_indices,
+               branch_lengths,
+               i,
+               pgtol,
                factor);
 
     if (optimize_gamma) {
       debug_string(EMIT_LEVEL_INFO, "Optimizing gamma rates");
-      bfgs_gamma_rates(params[i].gamma_alpha, ops, pmatrix_indices,
-                       branch_lengths, i, pgtol, factor);
+      bfgs_gamma_rates(params[i].gamma_alpha,
+                       ops,
+                       pmatrix_indices,
+                       branch_lengths,
+                       i,
+                       pgtol,
+                       factor);
 
       if (_rate_category_types[i] == rate_category::FREE) {
         debug_string(EMIT_LEVEL_INFO, "Optimizing gamma weights");
-        bfgs_gamma_weights(params[i].gamma_weights, ops, pmatrix_indices,
-                           branch_lengths, i, pgtol, factor);
+        bfgs_gamma_weights(params[i].gamma_weights,
+                           ops,
+                           pmatrix_indices,
+                           branch_lengths,
+                           i,
+                           pgtol,
+                           factor);
       }
     }
   }

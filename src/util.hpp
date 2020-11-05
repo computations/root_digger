@@ -43,7 +43,7 @@ struct freq_opts_t {
 
 struct invar_opts_t {
   param_type::param_type_e type;
-  float user_prop;
+  float                    user_prop;
 };
 
 namespace rate_category {
@@ -51,11 +51,11 @@ enum rate_category_e { MEDIAN, MEAN, FREE };
 }
 
 struct ratehet_opts_t {
-  param_type::param_type_e type;
+  param_type::param_type_e       type;
   rate_category::rate_category_e rate_category_type;
-  size_t rate_cats = 0;
-  bool alpha_init = false;
-  double alpha;
+  size_t                         rate_cats  = 0;
+  bool                           alpha_init = false;
+  double                         alpha;
 };
 
 namespace asc_bias_type {
@@ -64,24 +64,24 @@ enum asc_bias_type_e { lewis, fels, stam };
 
 struct asc_bias_opts_t {
   asc_bias_type::asc_bias_type_e type;
-  double fels_weight;
-  std::vector<double> stam_weights;
+  double                         fels_weight;
+  std::vector<double>            stam_weights;
 };
 
 struct model_info_t {
-  size_t states;
-  std::string subst_str;
-  freq_opts_t freq_opts;
-  invar_opts_t invar_opts;
-  ratehet_opts_t ratehet_opts;
+  size_t          states;
+  std::string     subst_str;
+  freq_opts_t     freq_opts;
+  invar_opts_t    invar_opts;
+  ratehet_opts_t  ratehet_opts;
   asc_bias_opts_t asc_opts;
 };
 
 struct partition_info_t {
   std::vector<std::pair<size_t, size_t>> parts;
-  std::string model_name;
-  std::string partition_name;
-  model_info_t model;
+  std::string                            model_name;
+  std::string                            partition_name;
+  model_info_t                           model;
 };
 
 struct partition_parameters_t {
@@ -123,8 +123,7 @@ public:
   bool initalized() const { return value != value_t::uninitalized; }
 
   bool convert_with_default(bool default_value) const {
-    if (value == value_t::uninitalized)
-      return default_value;
+    if (value == value_t::uninitalized) return default_value;
     return value == value_t::initialized_true;
   }
 
@@ -133,48 +132,48 @@ private:
 };
 
 struct cli_options_t {
-  std::string msa_filename;
-  std::string tree_filename;
-  std::string prefix;
-  std::string model_filename;
-  std::string freqs_filename;
-  std::string partition_filename;
-  std::string data_type;
-  std::string model_string;
-  std::vector<size_t> rate_cats{1};
+  std::string                                 msa_filename;
+  std::string                                 tree_filename;
+  std::string                                 prefix;
+  std::string                                 model_filename;
+  std::string                                 freqs_filename;
+  std::string                                 partition_filename;
+  std::string                                 data_type;
+  std::string                                 model_string;
+  std::vector<size_t>                         rate_cats{1};
   std::vector<rate_category::rate_category_e> rate_category_types;
-  uint64_t seed = std::random_device()();
-  size_t min_roots = 1;
-  size_t threads = 0;
-  double root_ratio = 0.01;
-  double abs_tolerance = 1e-7;
-  double factor = 1e4;
-  double br_tolerance = 1e-12;
-  double bfgs_tol = 1e-7;
-  unsigned int states = 4;
-  bool silent = false;
-  bool exhaustive = false;
-  bool echo = false;
-  bool invariant_sites = false;
-  bool clean= false;
-  initialized_flag_t early_stop;
+  uint64_t                                    seed = std::random_device()();
+  size_t                                      min_roots       = 1;
+  size_t                                      threads         = 0;
+  double                                      root_ratio      = 0.01;
+  double                                      abs_tolerance   = 1e-7;
+  double                                      factor          = 1e4;
+  double                                      br_tolerance    = 1e-12;
+  double                                      bfgs_tol        = 1e-7;
+  unsigned int                                states          = 4;
+  bool                                        silent          = false;
+  bool                                        exhaustive      = false;
+  bool                                        echo            = false;
+  bool                                        invariant_sites = false;
+  bool                                        clean           = false;
+  initialized_flag_t                          early_stop;
 
   bool operator==(const cli_options_t &other) const {
-    return msa_filename == other.msa_filename &&
-           tree_filename == other.tree_filename && prefix == other.prefix &&
-           model_filename == other.model_filename &&
-           freqs_filename == other.freqs_filename &&
-           partition_filename == other.partition_filename &&
-           data_type == other.data_type && model_string == other.model_string &&
-           rate_cats == other.rate_cats &&
-           rate_category_types == other.rate_category_types &&
-           seed == other.seed && threads == other.threads &&
-           root_ratio == other.root_ratio &&
-           abs_tolerance == other.abs_tolerance && factor == other.factor &&
-           br_tolerance == other.br_tolerance && bfgs_tol == other.bfgs_tol &&
-           states == other.states && exhaustive == other.exhaustive &&
-           echo == other.echo && invariant_sites == other.invariant_sites &&
-           early_stop == other.early_stop;
+    return msa_filename == other.msa_filename
+           && tree_filename == other.tree_filename && prefix == other.prefix
+           && model_filename == other.model_filename
+           && freqs_filename == other.freqs_filename
+           && partition_filename == other.partition_filename
+           && data_type == other.data_type && model_string == other.model_string
+           && rate_cats == other.rate_cats
+           && rate_category_types == other.rate_category_types
+           && seed == other.seed && threads == other.threads
+           && root_ratio == other.root_ratio
+           && abs_tolerance == other.abs_tolerance && factor == other.factor
+           && br_tolerance == other.br_tolerance && bfgs_tol == other.bfgs_tol
+           && states == other.states && exhaustive == other.exhaustive
+           && echo == other.echo && invariant_sites == other.invariant_sites
+           && early_stop == other.early_stop;
   }
   bool operator!=(const cli_options_t &other) const {
     return !(*this == other);

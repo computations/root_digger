@@ -37,9 +37,9 @@ extern int __MPI_NUM_TASKS__;
 #define EMIT_LEVEL_MPI_DEBUG 7
 
 #define progress_macro(i, k)                                                   \
-  (((std::chrono::high_resolution_clock::now() - CLOCK_START).count() /        \
-    static_cast<double>(i)) *                                                  \
-   (static_cast<double>(k - i)) / 1e9 / 3600.0)
+  (((std::chrono::high_resolution_clock::now() - CLOCK_START).count()          \
+    / static_cast<double>(i))                                                  \
+   * (static_cast<double>(k - i)) / 1e9 / 3600.0)
 
 #define print_clock                                                            \
   do {                                                                         \
@@ -51,8 +51,8 @@ extern int __MPI_NUM_TASKS__;
 #define debug_print(level, fmt, ...)                                           \
   do {                                                                         \
     if (DEBUG_IF_FLAG || level < EMIT_LEVEL_DEBUG) {                           \
-      if (__VERBOSE__ >= level &&                                              \
-          (__MPI_RANK__ == 0 || level == EMIT_LEVEL_MPI_DEBUG)) {              \
+      if (__VERBOSE__ >= level                                                 \
+          && (__MPI_RANK__ == 0 || level == EMIT_LEVEL_MPI_DEBUG)) {           \
         print_clock;                                                           \
         if (__VERBOSE__ >= EMIT_LEVEL_DEBUG) {                                 \
           printf("[%s:%d]", __func__, __LINE__);                               \
@@ -61,27 +61,21 @@ extern int __MPI_NUM_TASKS__;
           }                                                                    \
           printf(" : ");                                                       \
         }                                                                      \
-        if (level == EMIT_LEVEL_WARNING) {                                     \
-          printf("[Warning] ");                                                \
-        }                                                                      \
-        if (level == EMIT_LEVEL_ERROR) {                                       \
-          printf("[ERROR] ");                                                  \
-        }                                                                      \
+        if (level == EMIT_LEVEL_WARNING) { printf("[Warning] "); }             \
+        if (level == EMIT_LEVEL_ERROR) { printf("[ERROR] "); }                 \
         printf(fmt "\n", __VA_ARGS__);                                         \
       }                                                                        \
     }                                                                          \
   } while (0)
 
 #define debug_string(level, x)                                                 \
-  do {                                                                         \
-    debug_print(level, "%s", x);                                               \
-  } while (0)
+  do { debug_print(level, "%s", x); } while (0)
 
 #define print_trace()                                                          \
   do {                                                                         \
     if (DEBUG_IF_FLAG) {                                                       \
-      void *callstack[128];                                                    \
-      int frames = backtrace(callstack, 128);                                  \
+      void * callstack[128];                                                   \
+      int    frames     = backtrace(callstack, 128);                           \
       char **bt_symbols = backtrace_symbols(callstack, frames);                \
       print_clock;                                                             \
       printf("BACKTRACE AT %s:%d:%s():\n", __FILE__, __LINE__, __func__);      \
@@ -101,7 +95,10 @@ extern int __MPI_NUM_TASKS__;
           fprintf(                                                             \
               stderr,                                                          \
               "assertion \"%s\" failed: file: %s, line: %d, comment: %s\n",    \
-              #cond, __FILE__, __LINE__, comment);                             \
+              #cond,                                                           \
+              __FILE__,                                                        \
+              __LINE__,                                                        \
+              comment);                                                        \
           abort();                                                             \
         }                                                                      \
       }                                                                        \

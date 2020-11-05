@@ -18,14 +18,14 @@ typedef std::string::const_iterator string_iter_t;
 
 pll_msa_t *parse_msa_file(const std::string &msa_filename) {
 
-  debug_print(EMIT_LEVEL_DEBUG, "attempting to open msa: %s",
-              msa_filename.c_str());
+  debug_print(
+      EMIT_LEVEL_DEBUG, "attempting to open msa: %s", msa_filename.c_str());
   if (pll_phylip_t *fd =
           pll_phylip_open(msa_filename.c_str(), pll_map_generic)) {
     pll_msa_t *pll_msa = nullptr;
-    if ((pll_msa = pll_phylip_parse_interleaved(fd)) ||
-        ((pll_phylip_rewind(fd) == PLL_SUCCESS) &&
-         (pll_msa = pll_phylip_parse_sequential(fd)))) {
+    if ((pll_msa = pll_phylip_parse_interleaved(fd))
+        || ((pll_phylip_rewind(fd) == PLL_SUCCESS)
+            && (pll_msa = pll_phylip_parse_sequential(fd)))) {
       pll_phylip_close(fd);
       return pll_msa;
     } else {
@@ -34,18 +34,18 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
   }
 
   if (pll_fasta_t *fd = pll_fasta_open(msa_filename.c_str(), pll_map_fasta)) {
-    char *label = nullptr;
-    char *sequence = nullptr;
-    long sequence_len = 0;
-    long header_len = 0;
-    long sequence_number = 0;
-    long expected_sequence_length = 0;
+    char *label                    = nullptr;
+    char *sequence                 = nullptr;
+    long  sequence_len             = 0;
+    long  header_len               = 0;
+    long  sequence_number          = 0;
+    long  expected_sequence_length = 0;
 
     std::vector<char *> sequences;
     std::vector<char *> labels;
 
-    while (pll_fasta_getnext(fd, &label, &header_len, &sequence, &sequence_len,
-                             &sequence_number)) {
+    while (pll_fasta_getnext(
+        fd, &label, &header_len, &sequence, &sequence_len, &sequence_number)) {
       if (expected_sequence_length == 0) {
         expected_sequence_length = sequence_len;
       } else if (expected_sequence_length != sequence_len) {
@@ -57,30 +57,30 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
     pll_fasta_close(fd);
     pll_msa_t *pll_msa = (pll_msa_t *)malloc(sizeof(pll_msa_t));
 
-    if (sequences.size() >
-        static_cast<size_t>(std::numeric_limits<int>::max())) {
+    if (sequences.size()
+        > static_cast<size_t>(std::numeric_limits<int>::max())) {
       throw std::runtime_error(
           "The size of the sequence is too large to cast safely");
     }
 
-    if (expected_sequence_length >
-        static_cast<long int>(std::numeric_limits<int>::max())) {
+    if (expected_sequence_length
+        > static_cast<long int>(std::numeric_limits<int>::max())) {
       throw std::runtime_error(
           "The expected size of the sequence is too large to cast safely");
     }
 
-    pll_msa->count = static_cast<int>(sequences.size());
+    pll_msa->count  = static_cast<int>(sequences.size());
     pll_msa->length = static_cast<int>(expected_sequence_length);
     if (pll_msa->count < 0) {
       throw std::runtime_error("The MSA had a negative count (overflow?)");
     }
     pll_msa->sequence = (char **)malloc(
         sizeof(char *) * static_cast<unsigned int>(pll_msa->count));
-    pll_msa->label = (char **)malloc(sizeof(char *) *
-                                     static_cast<unsigned int>(pll_msa->count));
+    pll_msa->label = (char **)malloc(
+        sizeof(char *) * static_cast<unsigned int>(pll_msa->count));
     for (size_t i = 0; i < sequences.size(); ++i) {
       pll_msa->sequence[i] = sequences[i];
-      pll_msa->label[i] = labels[i];
+      pll_msa->label[i]    = labels[i];
     }
     return pll_msa;
   }
@@ -93,26 +93,20 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
  * character that was expected.
  */
 static string_iter_t expect_next(string_iter_t itr, char c) {
-  while (std::isspace(*itr)) {
-    itr++;
-  }
+  while (std::isspace(*itr)) { itr++; }
   if (std::tolower(c) != std::tolower(*itr)) {
     throw std::runtime_error(
-        std::string("Failed to parse partition file, expected '") + c +
-        "' got '" + *itr + "' instead");
+        std::string("Failed to parse partition file, expected '") + c
+        + "' got '" + *itr + "' instead");
   }
   ++itr;
-  while (std::isspace(*itr)) {
-    itr++;
-  }
+  while (std::isspace(*itr)) { itr++; }
   return itr;
 }
 
 static inline string_iter_t scan_word(string_iter_t iter) {
   auto start = iter;
-  while (std::isalnum(*iter) || (*iter == '_') || (*iter == ':')) {
-    ++iter;
-  }
+  while (std::isalnum(*iter) || (*iter == '_') || (*iter == ':')) { ++iter; }
   if (iter == start) {
     throw std::runtime_error("Failed to find a word when scanning");
   }
@@ -137,17 +131,14 @@ static inline string_iter_t scan_float(string_iter_t iter) {
     case '+':
     case '-':
     case 'e':
-      if (*iter == '.') {
-        dot = true;
-      }
+      if (*iter == '.') { dot = true; }
       iter++;
       break;
     default:
       return iter;
     }
     auto cont_start = iter;
-    while (*iter && std::isdigit(*++iter)) {
-    }
+    while (*iter && std::isdigit(*++iter)) {}
     if (!dot && cont_start == iter) {
       throw std::runtime_error("Encountered a malformed floating point number");
     }
@@ -158,8 +149,7 @@ static inline string_iter_t scan_float(string_iter_t iter) {
 
 static inline string_iter_t scan_integer(string_iter_t iter) {
   auto start = iter;
-  while (*iter && std::isdigit(*++iter)) {
-  }
+  while (*iter && std::isdigit(*++iter)) {}
   if (start == iter) {
     throw std::runtime_error("Expected a number, but found something else");
   }
@@ -168,7 +158,7 @@ static inline string_iter_t scan_integer(string_iter_t iter) {
 
 static inline std::string parse_subst_str(string_iter_t &iter) {
   /* the matrix spec is anything before the first plus */
-  auto end = scan_word(iter);
+  auto        end = scan_word(iter);
   std::string subst_string{iter, end};
   iter = end;
   return subst_string;
@@ -189,9 +179,7 @@ skip_to(string_iter_t iter, const std::function<bool(char)> &test_func) {
 }
 
 static inline string_iter_t skip_space(string_iter_t iter) {
-  while (std::isspace(*iter)) {
-    ++iter;
-  }
+  while (std::isspace(*iter)) { ++iter; }
   return iter;
 }
 
@@ -250,12 +238,12 @@ static inline invar_opts_t parse_invar_options(string_iter_t &iter) {
   case 'U':
   case 'u':
     iter++;
-    ii.type = param_type::user;
-    iter = expect_next(iter, '{');
+    ii.type  = param_type::user;
+    iter     = expect_next(iter, '{');
     auto end = scan_float(iter);
     debug_print(EMIT_LEVEL_DEBUG, "ending on %c/%x", *end, *end);
     ii.user_prop = std::stod(std::string{iter, end});
-    iter = expect_next(end, '}');
+    iter         = expect_next(end, '}');
     break;
   }
 
@@ -268,27 +256,27 @@ static inline ratehet_opts_t parse_ratehet_options(string_iter_t &iter) {
   iter++;
   switch (*iter) {
   default:
-    ri.type = param_type::estimate;
+    ri.type               = param_type::estimate;
     ri.rate_category_type = rate_category::MEAN;
     if (std::isdigit(*iter)) {
       auto end = scan_integer(iter);
-      int res = std::stoi(std::string(iter, end));
-      debug_print(EMIT_LEVEL_DEBUG, "res.c_str(): %s",
-                  std::string(iter, end).c_str());
+      int  res = std::stoi(std::string(iter, end));
+      debug_print(
+          EMIT_LEVEL_DEBUG, "res.c_str(): %s", std::string(iter, end).c_str());
       if (res < 0) {
         throw std::runtime_error(
             "Number of rate categories can not be less than zero");
       }
       ri.rate_cats = static_cast<size_t>(res);
-      iter = end;
+      iter         = end;
       debug_print(EMIT_LEVEL_DEBUG, "*iter: %c/%x", *iter, *iter);
       if (*iter == '{') {
         iter++;
-        end = scan_float(iter);
-        ri.alpha = stod(std::string(iter, end));
+        end           = scan_float(iter);
+        ri.alpha      = stod(std::string(iter, end));
         ri.alpha_init = true;
-        iter = expect_next(end, '}');
-        ri.type = param_type::user;
+        iter          = expect_next(end, '}');
+        ri.type       = param_type::user;
         debug_print(EMIT_LEVEL_DEBUG, "*iter: %c/%x", *iter, *iter);
       }
     } else {
@@ -298,8 +286,8 @@ static inline ratehet_opts_t parse_ratehet_options(string_iter_t &iter) {
   case 'A':
   case 'a':
     ri.rate_category_type = rate_category::MEDIAN;
-    ri.type = param_type::estimate;
-    ri.rate_cats = 4;
+    ri.type               = param_type::estimate;
+    ri.rate_cats          = 4;
     iter++;
   }
   debug_print(EMIT_LEVEL_DEBUG, "*iter: %c/%x", *iter, *iter);
@@ -310,9 +298,9 @@ static inline ratehet_opts_t parse_ratehet_options(string_iter_t &iter) {
 static inline ratehet_opts_t parse_ratehet_free_options(string_iter_t &iter) {
   ratehet_opts_t rho;
   iter++;
-  rho.type = param_type::estimate;
+  rho.type               = param_type::estimate;
   rho.rate_category_type = rate_category::FREE;
-  auto end = scan_integer(iter);
+  auto end               = scan_integer(iter);
 
   int res = std::stoi(std::string(iter, end));
   if (res < 0) {
@@ -320,11 +308,12 @@ static inline ratehet_opts_t parse_ratehet_free_options(string_iter_t &iter) {
         "Number of rate categories can not be less than zero");
   }
   rho.rate_cats = static_cast<size_t>(res);
-  iter = end;
+  iter          = end;
   debug_print(EMIT_LEVEL_DEBUG, "iter: %c", *iter);
   if (*iter == '{') {
-    debug_string(EMIT_LEVEL_WARNING, "Ignoring the user provided rate category "
-                                     "weights as they are not supported");
+    debug_string(EMIT_LEVEL_WARNING,
+                 "Ignoring the user provided rate category "
+                 "weights as they are not supported");
     iter = skip_to(iter, [](char c) -> bool { return c == '}'; });
     iter = skip_to(iter, [](char c) -> bool { return c == '}'; });
     ++iter;
@@ -346,16 +335,16 @@ static inline asc_bias_opts_t parse_ascbias_options(string_iter_t &iter) {
     break;
   case 'F':
   case 'f': {
-    abo.type = asc_bias_type::fels;
-    iter = expect_next(iter, '{');
-    auto end = scan_float(iter);
+    abo.type        = asc_bias_type::fels;
+    iter            = expect_next(iter, '{');
+    auto end        = scan_float(iter);
     abo.fels_weight = std::stod(std::string(iter, end));
-    iter = expect_next(end, '}');
+    iter            = expect_next(end, '}');
   } break;
   case 'S':
   case 's': {
     abo.type = asc_bias_type::stam;
-    iter = expect_next(iter, '{');
+    iter     = expect_next(iter, '{');
     while (true) {
       auto end = scan_float(iter);
       abo.stam_weights.push_back(std::stod(std::string(iter, end)));
@@ -380,11 +369,11 @@ model_info_t parse_model_info(const std::string &model_string) {
    * warn that we are just going to ignore that information.
    */
   debug_print(EMIT_LEVEL_DEBUG, "model string: %s", model_string.c_str());
-  auto iter = model_string.begin();
-  auto end = scan_word(iter);
+  auto iter            = model_string.begin();
+  auto end             = scan_word(iter);
   model_info.subst_str = std::string(iter, end);
-  debug_print(EMIT_LEVEL_DEBUG, "subst string: %s",
-              model_info.subst_str.c_str());
+  debug_print(
+      EMIT_LEVEL_DEBUG, "subst string: %s", model_info.subst_str.c_str());
   debug_print(EMIT_LEVEL_DEBUG, "end - iter: %lu", end - iter);
   iter = end;
 
@@ -427,17 +416,15 @@ model_info_t parse_model_info(const std::string &model_string) {
 
 partition_info_t parse_partition_info(const std::string &line) {
   partition_info_t pi;
-  auto itr = line.begin();
+  auto             itr = line.begin();
 
   /* skip spaces */
-  while (std::isspace(*itr)) {
-    itr++;
-  }
+  while (std::isspace(*itr)) { itr++; }
 
   /* parse model name */
   auto start = itr;
-  while (std::isalnum(*itr) || *itr == '+' || *itr == '{' || *itr == '}' ||
-         *itr == '/' || *itr == '.') {
+  while (std::isalnum(*itr) || *itr == '+' || *itr == '{' || *itr == '}'
+         || *itr == '/' || *itr == '.') {
     itr++;
   }
   pi.model_name = std::string(start, itr);
@@ -448,28 +435,21 @@ partition_info_t parse_partition_info(const std::string &line) {
 
   /* parse partition name */
   start = itr;
-  while (std::isalnum(*itr) || *itr == '_') {
-    itr++;
-  }
+  while (std::isalnum(*itr) || *itr == '_') { itr++; }
   pi.partition_name = std::string(start, itr);
 
   /* check for = */
   itr = expect_next(itr, '=');
 
   do {
-    if (*itr == ',')
-      ++itr;
-    while (std::isspace(*itr)) {
-      itr++;
-    }
+    if (*itr == ',') ++itr;
+    while (std::isspace(*itr)) { itr++; }
 
     /* parse begin */
     size_t begin = 0;
-    size_t end = 0;
-    start = itr;
-    while (std::isdigit(*itr)) {
-      itr++;
-    }
+    size_t end   = 0;
+    start        = itr;
+    while (std::isdigit(*itr)) { itr++; }
     try {
       auto tmp = std::stol(std::string(start, itr));
       if (tmp < 0) {
@@ -479,9 +459,9 @@ partition_info_t parse_partition_info(const std::string &line) {
       begin = static_cast<size_t>(tmp);
     } catch (...) {
       throw std::runtime_error(
-          std::string("Failed to parse beginning partition number") +
-          std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr +
-          "'");
+          std::string("Failed to parse beginning partition number")
+          + std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr
+          + "'");
     }
 
     /* check for - */
@@ -489,9 +469,7 @@ partition_info_t parse_partition_info(const std::string &line) {
 
     /* parse begin */
     start = itr;
-    while (std::isdigit(*itr)) {
-      itr++;
-    }
+    while (std::isdigit(*itr)) { itr++; }
     try {
       auto tmp = std::stol(std::string(start, itr));
       if (tmp < 0) {
@@ -501,19 +479,17 @@ partition_info_t parse_partition_info(const std::string &line) {
       end = static_cast<size_t>(tmp);
     } catch (...) {
       throw std::runtime_error(
-          std::string("Failed to parse beginning partition number") +
-          std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr +
-          "'");
+          std::string("Failed to parse beginning partition number")
+          + std::string(start, itr) + " start: '" + *start + "', itr: '" + *itr
+          + "'");
     }
     if (end < begin) {
-      throw std::runtime_error(std::string("The end index of the partition '") +
-                               pi.partition_name +
-                               "' comes before the beginning");
+      throw std::runtime_error(std::string("The end index of the partition '")
+                               + pi.partition_name
+                               + "' comes before the beginning");
     }
     pi.parts.emplace_back(begin, end);
-    while (std::isspace(*itr)) {
-      itr++;
-    }
+    while (std::isspace(*itr)) { itr++; }
   } while (*itr == ',');
 
   if (pi.model_name.empty()) {
@@ -528,7 +504,7 @@ partition_info_t parse_partition_info(const std::string &line) {
  */
 msa_partitions_t parse_partition_file(const std::string &filename) {
   std::ifstream partition_file{filename};
-  if(!partition_file){
+  if (!partition_file) {
     throw std::runtime_error{"Failed to open the partition file"};
   }
   msa_partitions_t parts;
@@ -539,8 +515,8 @@ msa_partitions_t parse_partition_file(const std::string &filename) {
 }
 
 msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
-  _msa = (pll_msa_t *)malloc(sizeof(pll_msa_t));
-  _msa->count = other.count();
+  _msa         = (pll_msa_t *)malloc(sizeof(pll_msa_t));
+  _msa->count  = other.count();
   _msa->length = 0;
   for (auto range : partition.parts) {
     /*
@@ -548,8 +524,8 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
      * include the endpoint
      */
     size_t cur_partition_length = (range.second - range.first) + 1;
-    if (cur_partition_length >
-        static_cast<size_t>(std::numeric_limits<int>::max())) {
+    if (cur_partition_length
+        > static_cast<size_t>(std::numeric_limits<int>::max())) {
       throw std::runtime_error("Partition range is too large to cast safely");
     }
     _msa->length += static_cast<int>(cur_partition_length);
@@ -561,8 +537,8 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
                              "negative count (overflow?)");
   }
 
-  _msa->sequence = (char **)malloc(static_cast<size_t>(sizeof(char *)) *
-                                   static_cast<size_t>(other.count()));
+  _msa->sequence = (char **)malloc(static_cast<size_t>(sizeof(char *))
+                                   * static_cast<size_t>(other.count()));
 
   for (int i = 0; i < other.count(); ++i) {
     if (_msa->length <= 0) {
@@ -571,10 +547,10 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
     }
 
     // We need to make space for the terminating zero
-    _msa->sequence[i] = (char *)malloc(static_cast<size_t>(sizeof(char)) *
-                                       static_cast<size_t>(_msa->length + 1));
-    size_t cur_idx = 0;
-    char *other_sequence = other.sequence(i);
+    _msa->sequence[i]     = (char *)malloc(static_cast<size_t>(sizeof(char))
+                                       * static_cast<size_t>(_msa->length + 1));
+    size_t cur_idx        = 0;
+    char * other_sequence = other.sequence(i);
     for (auto range : partition.parts) {
       if (range.first == 0) {
         throw std::runtime_error(
@@ -594,41 +570,34 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
       (char **)calloc(sizeof(char *), static_cast<size_t>(_msa->count));
   for (int i = 0; i < _msa->count; ++i) {
     size_t label_size = strlen(other.label(i)) + 1;
-    _msa->label[i] = (char *)malloc(sizeof(char) * label_size);
+    _msa->label[i]    = (char *)malloc(sizeof(char) * label_size);
     strncpy(_msa->label[i], other.label(i), label_size);
   }
-  _map = other.map();
-  _states = other.states();
+  _map     = other.map();
+  _states  = other.states();
   _weights = nullptr;
   compress();
 }
 
 char *msa_t::sequence(int index) const {
-  if (index < _msa->count && !(index < 0))
-    return _msa->sequence[index];
+  if (index < _msa->count && !(index < 0)) return _msa->sequence[index];
   throw std::out_of_range("Requested sequence does not exist");
 }
 
 char *msa_t::label(int index) const {
-  if (index < _msa->count && !(index < 0))
-    return _msa->label[index];
+  if (index < _msa->count && !(index < 0)) return _msa->label[index];
   throw std::out_of_range("Requested label does not exist");
 }
 
 unsigned int *msa_t::weights() const {
-  if (_weights)
-    return _weights;
+  if (_weights) return _weights;
   throw std::runtime_error("msa_t has no weights");
 }
 
 unsigned int msa_t::total_weight() const {
-  if (!_weights) {
-    return static_cast<unsigned int>(_msa->length);
-  }
+  if (!_weights) { return static_cast<unsigned int>(_msa->length); }
   unsigned int total = 0;
-  for (int i = 0; i < _msa->length; ++i) {
-    total += _weights[i];
-  }
+  for (int i = 0; i < _msa->length; ++i) { total += _weights[i]; }
   return total;
 }
 
@@ -643,15 +612,13 @@ unsigned int msa_t::length() const {
 }
 
 void msa_t::compress() {
-  if (_weights != nullptr) {
-    free(_weights);
-  }
+  if (_weights != nullptr) { free(_weights); }
   int new_length = _msa->length;
-  _weights = pll_compress_site_patterns(_msa->sequence, _map, _msa->count,
-                                        &new_length);
+  _weights       = pll_compress_site_patterns(
+      _msa->sequence, _map, _msa->count, &new_length);
   if (!_weights) {
-    throw std::runtime_error(std::string("PLL ERR: ") +
-                             std::to_string(pll_errno) + " " + pll_errmsg);
+    throw std::runtime_error(std::string("PLL ERR: ")
+                             + std::to_string(pll_errno) + " " + pll_errmsg);
   }
   _msa->length = new_length;
 }
@@ -659,24 +626,21 @@ void msa_t::compress() {
 std::vector<msa_t> msa_t::partition(const msa_partitions_t &ps) const {
   std::vector<msa_t> parted_msa;
   parted_msa.reserve(ps.size());
-  for (auto p : ps) {
-    parted_msa.emplace_back(*this, p);
-  }
+  for (auto p : ps) { parted_msa.emplace_back(*this, p); }
   return parted_msa;
 }
 
 bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   std::unordered_set<std::string> taxa;
-  for (int i = 0; i < _msa->count; ++i) {
-    taxa.insert(_msa->label[i]);
-  }
+  for (int i = 0; i < _msa->count; ++i) { taxa.insert(_msa->label[i]); }
 
   bool ret = true;
 
   // labels subset taxa
   for (const std::string &k : labels) {
     if (taxa.find(k) == taxa.end()) {
-      debug_print(EMIT_LEVEL_ERROR, "Taxa %s in msa is not present on the tree",
+      debug_print(EMIT_LEVEL_ERROR,
+                  "Taxa %s in msa is not present on the tree",
                   k.c_str());
       ret = false;
     }
@@ -685,7 +649,8 @@ bool msa_t::constiency_check(std::unordered_set<std::string> labels) const {
   // taxa subset labels
   for (const std::string &k : taxa) {
     if (labels.find(k) == labels.end()) {
-      debug_print(EMIT_LEVEL_ERROR, "Taxa %s on tree is not present in the msa",
+      debug_print(EMIT_LEVEL_ERROR,
+                  "Taxa %s on tree is not present in the msa",
                   k.c_str());
       ret = false;
     }
@@ -699,22 +664,20 @@ void msa_t::valid_data() const {
       char c = _msa->sequence[i][j];
       if (c < 0) {
         throw std::runtime_error(
-            std::string("Encountered an invalid character in sequence ") +
-            std::to_string(i) + " at position " + std::to_string(j) + ".");
+            std::string("Encountered an invalid character in sequence ")
+            + std::to_string(i) + " at position " + std::to_string(j) + ".");
       }
       size_t idx = static_cast<size_t>(c);
       if (_map[idx] == 0) {
         throw std::runtime_error(
-            std::string("Found unrecognized character sequence ") +
-            std::to_string(i) + " position " + std::to_string(j) + ".");
+            std::string("Found unrecognized character sequence ")
+            + std::to_string(i) + " position " + std::to_string(j) + ".");
       }
     }
   }
 }
 
 msa_t::~msa_t() {
-  if (_msa)
-    pll_msa_destroy(_msa);
-  if (_weights)
-    free(_weights);
+  if (_msa) pll_msa_destroy(_msa);
+  if (_weights) free(_weights);
 }

@@ -8,9 +8,9 @@
 #include <vector>
 
 template <> size_t write(int fd, const std::string &str) {
-  size_t string_size = str.size();
+  size_t string_size  = str.size();
   size_t total_writen = 0;
-  auto result = write(fd, &string_size, sizeof(string_size));
+  auto   result       = write(fd, &string_size, sizeof(string_size));
   if (result < static_cast<ssize_t>(sizeof(string_size))) {
     throw checkpoint_write_failure{
         "Failed to write a string to the checkpoint file"};
@@ -29,15 +29,11 @@ template <> size_t read(int fd, std::string &str) {
 
   total_read = read(fd, string_size);
 
-  if (string_size == 0) {
-    return total_read;
-  }
+  if (string_size == 0) { return total_read; }
 
   char *tmp_str = (char *)calloc(string_size + 1, sizeof(char));
-  auto result = read(fd, tmp_str, string_size * sizeof(char));
-  if (result < 0) {
-    throw checkpoint_read_failure{"Failed to read a string"};
-  }
+  auto  result  = read(fd, tmp_str, string_size * sizeof(char));
+  if (result < 0) { throw checkpoint_read_failure{"Failed to read a string"}; }
   total_read += static_cast<size_t>(result);
 
   std::string tmp(tmp_str);
@@ -73,8 +69,8 @@ template <> size_t write(int fd, const cli_options_t &options) {
   total_written += write(fd, options.echo);
   total_written += write(fd, options.invariant_sites);
   total_written += write(fd, options.early_stop);
-  debug_print(EMIT_LEVEL_DEBUG, "Wrote %lu bytes for cli_options",
-              total_written);
+  debug_print(
+      EMIT_LEVEL_DEBUG, "Wrote %lu bytes for cli_options", total_written);
   return total_written;
 }
 
@@ -127,16 +123,15 @@ template <> size_t read(int fd, partition_parameters_t &pp) {
 }
 
 template <>
-std::pair<uint32_t, uint32_t>
-compute_checksum_components(const partition_parameters_t &pp, uint32_t a,
-                            uint32_t b) {
-  return compute_checksum_components(a, b, pp.subst_rates, pp.freqs,
-                                     pp.gamma_alpha, pp.gamma_weights);
+std::pair<uint32_t, uint32_t> compute_checksum_components(
+    const partition_parameters_t &pp, uint32_t a, uint32_t b) {
+  return compute_checksum_components(
+      a, b, pp.subst_rates, pp.freqs, pp.gamma_alpha, pp.gamma_weights);
 }
 
 checkpoint_t::checkpoint_t(const std::string &prefix) {
   _checkpoint_filename = prefix + ".ckp";
-  _existing_results = (access(_checkpoint_filename.c_str(), F_OK) != -1);
+  _existing_results    = (access(_checkpoint_filename.c_str(), F_OK) != -1);
   _file_descriptor =
       open(_checkpoint_filename.c_str(), O_RDWR | O_APPEND | O_CREAT, 0640);
   if (_file_descriptor == -1) {
@@ -145,15 +140,13 @@ checkpoint_t::checkpoint_t(const std::string &prefix) {
 }
 
 void checkpoint_t::clean() {
-  if (!_existing_results) {
-    return;
-  }
+  if (!_existing_results) { return; }
   std::string backup_filename = _checkpoint_filename + ".bak";
   if (__MPI_RANK__ == 0) {
     auto lock = write_lock<fcntl_lock_behavior::block>();
     lseek(_file_descriptor, 0, SEEK_SET);
-    auto copy_fd = open(backup_filename.c_str(),
-                        O_RDWR | O_CREAT | O_APPEND | O_EXCL, 0640);
+    auto copy_fd = open(
+        backup_filename.c_str(), O_RDWR | O_CREAT | O_APPEND | O_EXCL, 0640);
     if (copy_fd == -1) {
       throw std::runtime_error(
           "Failed to open the new checkpoint when cleaning the checkpoint");
@@ -172,8 +165,8 @@ void checkpoint_t::clean() {
 }
 
 void checkpoint_t::write(const rd_result_t &result) {
-  debug_print(EMIT_LEVEL_MPI_DEBUG, "Writing result with root id: %lu",
-              result.root_id);
+  debug_print(
+      EMIT_LEVEL_MPI_DEBUG, "Writing result with root id: %lu", result.root_id);
   write_with_checksum(_file_descriptor, result);
 }
 
@@ -183,7 +176,7 @@ void checkpoint_t::write(
 }
 
 void checkpoint_t::write(
-    const rd_result_t &result,
+    const rd_result_t &                        result,
     const std::vector<partition_parameters_t> &parameters) {
   auto lock = write_lock<fcntl_lock_behavior::block>();
   write(result);
@@ -209,16 +202,14 @@ void checkpoint_t::load_options(cli_options_t &options) {
 
 std::vector<rd_result_t> checkpoint_t::current_progress() {
   std::vector<rd_result_t> results;
-  auto progress = read_results();
+  auto                     progress = read_results();
   results.reserve(progress.size());
-  for (auto &pair : progress) {
-    results.push_back(pair.first);
-  }
+  for (auto &pair : progress) { results.push_back(pair.first); }
   return results;
 }
 
 std::vector<size_t> checkpoint_t::completed_indicies() {
-  auto results = current_progress();
+  auto                results = current_progress();
   std::vector<size_t> completed_idx(results.size());
   for (size_t i = 0; i < results.size(); ++i) {
     completed_idx[i] = results[i].root_id;
@@ -263,8 +254,8 @@ void checkpoint_t::reload() {
 std::vector<std::pair<rd_result_t, std::vector<partition_parameters_t>>>
 checkpoint_t::read_results() {
   std::vector<std::pair<rd_result_t, std::vector<partition_parameters_t>>>
-      results;
-  auto lock = write_lock<fcntl_lock_behavior::block>();
+       results;
+  auto lock       = write_lock<fcntl_lock_behavior::block>();
   auto current_fd = fcntl(_file_descriptor, F_DUPFD, 0);
 
   lseek(current_fd, 0, SEEK_SET);
@@ -276,13 +267,13 @@ checkpoint_t::read_results() {
   }
 
   auto current_position = lseek(current_fd, 0, SEEK_CUR);
-  auto end_position = lseek(current_fd, 0, SEEK_END);
+  auto end_position     = lseek(current_fd, 0, SEEK_END);
   lseek(current_fd, current_position, SEEK_SET);
 
   while (current_position < end_position) {
     try {
       rd_result_t rdr;
-      size_t bytes_read = read_with_checksum(current_fd, rdr);
+      size_t      bytes_read = read_with_checksum(current_fd, rdr);
       if (bytes_read == expected_read_size<rd_result_t>()) {
       } else if (bytes_read == 0) {
         break;
@@ -306,7 +297,7 @@ checkpoint_t::read_results() {
 }
 
 bool checkpoint_t::needs_cleaning() {
-  auto lock = write_lock<fcntl_lock_behavior::block>();
+  auto lock       = write_lock<fcntl_lock_behavior::block>();
   auto current_fd = fcntl(_file_descriptor, F_DUPFD, 0);
 
   lseek(current_fd, 0, SEEK_SET);
@@ -317,12 +308,12 @@ bool checkpoint_t::needs_cleaning() {
   }
 
   auto current_position = lseek(current_fd, 0, SEEK_CUR);
-  auto end_position = lseek(current_fd, 0, SEEK_END);
+  auto end_position     = lseek(current_fd, 0, SEEK_END);
   lseek(current_fd, current_position, SEEK_SET);
   while (current_position < end_position) {
     try {
       rd_result_t rdr;
-      size_t bytes_read = read_with_checksum(current_fd, rdr);
+      size_t      bytes_read = read_with_checksum(current_fd, rdr);
       if (bytes_read == expected_read_size<rd_result_t>()) {
       } else if (bytes_read == 0) {
         break;
