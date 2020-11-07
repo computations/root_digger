@@ -104,8 +104,12 @@ public:
   std::string subst_string() const;
 
   std::vector<std::pair<root_location_t, double>> suggest_roots();
-  std::vector<std::pair<root_location_t, double>> suggest_roots(size_t min,
-                                                                double ratio);
+
+  std::vector<std::pair<root_location_t, double>>
+  suggest_roots_random(size_t min, double ratio);
+
+  std::vector<std::pair<root_location_t, double>>
+  suggest_roots_midpoint(size_t min, double ratio);
 
   std::vector<size_t> shuffle_root_indicies();
   std::vector<double> compute_all_root_lh();

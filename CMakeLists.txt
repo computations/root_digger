@@ -3,9 +3,9 @@ project(root_digger)
 
 option(MPI_BUILD "Build with MPI" OFF)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -fno-omit-frame-pointer" CACHE INTERNAL "")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer " CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-Og -g -fno-omit-frame-pointer " CACHE INTERNAL "")
 set(CMAKE_C_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 
 find_package(Git)

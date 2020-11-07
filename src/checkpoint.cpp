@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
+#include <functional>
 
 template <> size_t write(int fd, const std::string &str) {
   size_t string_size  = str.size();

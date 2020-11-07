@@ -5,6 +5,7 @@ extern "C" {
 #include <libpll/pll.h>
 }
 #include "debug.h"
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -74,6 +75,10 @@ public:
   root_location_t root_location(const std::string &) const;
   root_location_t root_location() const;
 
+  root_location_t midpoint() const;
+
+  std::vector<root_location_t> rank_midpoints() const;
+
   size_t       root_count() const;
   unsigned int tip_count() const;
   unsigned int inner_count() const;
@@ -139,11 +144,18 @@ public:
   void annotate_ratio(size_t node_id, double ratio);
   void annotate_ratio(const root_location_t &node_index, double ratio);
 
+  std::vector<double> get_children_distance(pll_unode_t *rl);
+
+  std::vector<std::pair<root_location_t, double>> apply_foreach_branch(
+      const std::function<double(double, double, double)> &eval_func) const;
+
 private:
   void sort_root_locations();
   void generate_root_locations();
   void copy_root_locations(const rooted_tree_t &);
   void add_root_space();
+
+  root_location_t midpoint_recurse() const;
 
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;
@@ -162,6 +174,10 @@ private:
 
   std::unordered_map<pll_unode_t *, pll_unode_t *>
   make_node_bijection(const rooted_tree_t &other);
+
+  std::vector<double> get_forward_children_distance(pll_unode_t *rl) const;
+  std::vector<double> get_backward_children_distance(pll_unode_t *rl) const;
+
 
   pll_utree_t *                _tree;
   root_location_t              _current_rl;

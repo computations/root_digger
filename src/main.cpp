@@ -12,6 +12,7 @@ extern "C" {
 #include <iostream>
 #include <omp.h>
 #include <sstream>
+#include <functional>
 #ifdef MPI_BUILD
 #include <mpi.h>
 #endif
@@ -116,7 +117,7 @@ static void print_usage() {
       << "  --bfgstol [NUMBER]\n"
       << "         Tolerance for the BFGS steps. Default is 1e-7\n"
       << "  --factor [NUMBER]\n"
-      << "         Factor for the BFGS steps. Default is 1e4\n"
+      << "         Factor for the BFGS steps. Default is 1e2\n"
       << "  --threads [NUMBER]\n"
       << "         Number of threads to use\n"
       << "  --silent\n"

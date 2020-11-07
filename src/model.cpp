@@ -815,7 +815,7 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
 
   /* start by making a list of "good" roots, with the current model*/
 
-  auto sorted_roots = suggest_roots(min_roots, root_ratio);
+  auto sorted_roots = suggest_roots_random(min_roots, root_ratio);
   for (auto &sr : sorted_roots) {
     auto &rl = sr.first;
     debug_print(EMIT_LEVEL_DEBUG, "working rl: %s", rl.label().c_str());
@@ -870,11 +870,11 @@ void model_t::move_root(const root_location_t &new_root) {
 }
 
 std::vector<std::pair<root_location_t, double>> model_t::suggest_roots() {
-  return suggest_roots(1, 0.0);
+  return suggest_roots_random(1, 0.0);
 }
 
 std::vector<std::pair<root_location_t, double>>
-model_t::suggest_roots(size_t min, double ratio) {
+model_t::suggest_roots_random(size_t min, double ratio) {
   std::vector<std::pair<root_location_t, double>> rl_lhs;
   using fucking_difference_type =
       std::vector<std::pair<root_location_t, double>>::difference_type;
@@ -892,6 +892,19 @@ model_t::suggest_roots(size_t min, double ratio) {
          std::pair<root_location_t, double> b) { return a.second > b.second; });
   rl_lhs.resize(final_size);
   return rl_lhs;
+}
+
+std::vector<std::pair<root_location_t, double>>
+model_t::suggest_roots_midpoint(size_t min, double ratio) {
+  auto midpoints = _tree.rank_midpoints();
+  auto final_size =
+      std::max(static_cast<size_t>(midpoints.size() * ratio), min);
+  std::vector<std::pair<root_location_t, double>> ret;
+  ret.reserve(final_size);
+  for (size_t i = 0; i < final_size; i++) {
+    ret.push_back(std::make_pair(midpoints[i], compute_lh(midpoints[i])));
+  }
+  return ret;
 }
 
 std::vector<size_t> model_t::shuffle_root_indicies() {

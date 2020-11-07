@@ -147,7 +147,7 @@ struct cli_options_t {
   size_t                                      threads         = 0;
   double                                      root_ratio      = 0.01;
   double                                      abs_tolerance   = 1e-7;
-  double                                      factor          = 1e4;
+  double                                      factor          = 1e1;
   double                                      br_tolerance    = 1e-12;
   double                                      bfgs_tol        = 1e-7;
   unsigned int                                states          = 4;

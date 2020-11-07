@@ -1,12 +1,12 @@
+#include "libpll/pll.h"
 #include "tree.hpp"
-#include <stdexcept>
-extern "C" {
-#include <libpll/pll_tree.h>
-}
 #include <algorithm>
+#include <functional>
 #include <limits>
 #include <numeric>
+#include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 pll_utree_t *parse_tree_file(const std::string &tree_filename) {
   return pll_utree_parse_newick_unroot(tree_filename.c_str());
@@ -775,4 +775,100 @@ void rooted_tree_t::copy_annotations(const rooted_tree_t &other) {
     auto &annotation                      = kv.second;
     _root_annotations[bijection.at(node)] = annotation;
   }
+}
+
+void get_children_distance_recurse(pll_unode_t *        cur,
+                                   double               depth,
+                                   std::vector<double> &dists) {
+  depth += cur->length;
+  if (cur->next == nullptr) {
+    dists.push_back(depth);
+    return;
+  }
+
+  cur = cur->next;
+  get_children_distance_recurse(cur->back, depth, dists);
+  cur = cur->next;
+  get_children_distance_recurse(cur->back, depth, dists);
+}
+
+std::vector<double>
+rooted_tree_t::get_forward_children_distance(pll_unode_t *rl) const {
+
+  if (rl->next == nullptr) { return {0.0}; }
+
+  std::vector<double> dists;
+  rl = rl->next;
+  get_children_distance_recurse(rl->back, 0.0, dists);
+  rl = rl->next;
+  get_children_distance_recurse(rl->back, 0.0, dists);
+
+  return dists;
+}
+
+std::vector<double>
+rooted_tree_t::get_backward_children_distance(pll_unode_t *rl) const {
+
+  std::vector<double> dists;
+  get_children_distance_recurse(rl->back, -rl->length, dists);
+
+  return dists;
+}
+
+std::vector<std::pair<root_location_t, double>>
+rooted_tree_t::apply_foreach_branch(
+    const std::function<double(double, double, double)> &eval_func) const {
+  std::vector<std::pair<root_location_t, double>> ret;
+  for (auto &rl : _roots) {
+    auto forward_dists   = get_forward_children_distance(rl.edge);
+    auto backwards_dists = get_backward_children_distance(rl.edge);
+    std::pair<root_location_t, double> best =
+        std::make_pair<root_location_t, double>(
+            {}, -std::numeric_limits<double>::infinity());
+    for (auto &fd : forward_dists) {
+      for (auto &bd : backwards_dists) {
+        double eval = eval_func(fd, bd, rl.saved_brlen);
+        if (eval > best.second) { best = std::make_pair(rl, eval); }
+      }
+    }
+    ret.push_back(best);
+  }
+  return ret;
+}
+
+std::vector<root_location_t> rooted_tree_t::rank_midpoints() const {
+  auto midpoint_eval = [](double l_len, double r_len, double brlen) -> double {
+    if (l_len < r_len) { std::swap(l_len, r_len); }
+    double diff = l_len - r_len;
+    if (diff < brlen) {
+      r_len += diff;
+      double adj = (brlen - diff) / 2.0;
+      r_len += adj;
+      l_len += adj;
+    } else {
+      r_len += brlen;
+    }
+
+    double d_tot = r_len + l_len;
+
+    return (1 - (diff * diff) / d_tot) * d_tot;
+  };
+
+  auto midpoint_ranks = apply_foreach_branch(midpoint_eval);
+  std::sort(midpoint_ranks.begin(),
+            midpoint_ranks.end(),
+            [](std::pair<root_location_t, double> a,
+               std::pair<root_location_t, double> b) -> bool {
+              return a.second > b.second;
+            });
+
+  std::vector<root_location_t> ret;
+  ret.reserve(midpoint_ranks.size());
+  for (auto m : midpoint_ranks) { ret.push_back(m.first); }
+
+  return ret;
+}
+
+root_location_t rooted_tree_t::midpoint() const {
+  return *rank_midpoints().begin();
 }
