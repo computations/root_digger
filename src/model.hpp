@@ -103,8 +103,6 @@ public:
 
   std::string subst_string() const;
 
-  std::vector<std::pair<root_location_t, double>> suggest_roots();
-
   std::vector<std::pair<root_location_t, double>>
   suggest_roots_random(size_t min, double ratio);
 

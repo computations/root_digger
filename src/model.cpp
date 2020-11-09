@@ -869,10 +869,6 @@ void model_t::move_root(const root_location_t &new_root) {
   }
 }
 
-std::vector<std::pair<root_location_t, double>> model_t::suggest_roots() {
-  return suggest_roots_random(1, 0.0);
-}
-
 std::vector<std::pair<root_location_t, double>>
 model_t::suggest_roots_random(size_t min, double ratio) {
   std::vector<std::pair<root_location_t, double>> rl_lhs;
