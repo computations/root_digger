@@ -22,17 +22,25 @@ extern "C" {
   }
 
 struct root_location_t {
-  pll_unode_t *           edge;
-  size_t                  id;
-  double                  saved_brlen;
-  double                  brlen_ratio;
+  pll_unode_t *edge;
+  size_t       id;
+  double       saved_brlen;
+  double       brlen_ratio;
+
   constexpr inline double brlen() const { return saved_brlen * brlen_ratio; }
   constexpr inline double brlen_compliment() const {
     return saved_brlen * (1 - brlen_ratio);
   }
+
   std::string label() const {
     return edge->label != nullptr ? edge->label : "(null)";
   }
+
+  bool is_internal() const {
+    return edge->next != nullptr && edge->back->next != nullptr;
+  }
+  bool is_external() const { return !is_internal(); }
+
   bool operator==(const root_location_t &other) const {
     return edge == other.edge && brlen_ratio == other.brlen_ratio;
   }
@@ -78,6 +86,7 @@ public:
   root_location_t midpoint() const;
 
   std::vector<root_location_t> rank_midpoints() const;
+  std::vector<root_location_t> rank_modified_mad() const;
 
   size_t       root_count() const;
   unsigned int tip_count() const;
@@ -89,6 +98,9 @@ public:
 
   root_location_t                     current_root() const;
   const std::vector<root_location_t> &roots() const;
+
+  std::vector<root_location_t> internal_root_locations() const;
+  std::vector<root_location_t> external_root_locations() const;
 
   std::unordered_map<std::string, unsigned int> label_map() const;
   std::unordered_set<std::string>               label_set() const;
@@ -146,16 +158,17 @@ public:
 
   std::vector<double> get_children_distance(pll_unode_t *rl);
 
-  std::vector<std::pair<root_location_t, double>> apply_foreach_branch(
-      const std::function<double(double, double, double)> &eval_func) const;
+  std::vector<std::pair<root_location_t, double>>
+  apply_foreach_branch_map_reduce(
+      const std::function<double(double, double, double)> &     map_func,
+      const std::function<double(const std::vector<double> &)> &reduce_func)
+      const;
 
 private:
   void sort_root_locations();
   void generate_root_locations();
   void copy_root_locations(const rooted_tree_t &);
   void add_root_space();
-
-  root_location_t midpoint_recurse() const;
 
   std::vector<pll_unode_t *> full_traverse() const;
   std::vector<pll_unode_t *> edge_traverse() const;
@@ -177,7 +190,6 @@ private:
 
   std::vector<double> get_forward_children_distance(pll_unode_t *rl) const;
   std::vector<double> get_backward_children_distance(pll_unode_t *rl) const;
-
 
   pll_utree_t *                _tree;
   root_location_t              _current_rl;

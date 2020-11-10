@@ -1,6 +1,7 @@
 #include "libpll/pll.h"
 #include "tree.hpp"
 #include <algorithm>
+#include <bits/c++config.h>
 #include <functional>
 #include <limits>
 #include <numeric>
@@ -186,6 +187,28 @@ void rooted_tree_t::generate_root_locations() {
       _roots.push_back({edge, id++, edge->length, 0.5});
     }
   }
+}
+
+std::vector<root_location_t> rooted_tree_t::internal_root_locations() const {
+  std::vector<root_location_t> ret;
+  ret.reserve(inner_count());
+
+  for (auto &rl : roots()) {
+    if (rl.is_internal()) { ret.push_back(rl); }
+  }
+
+  return ret;
+}
+
+std::vector<root_location_t> rooted_tree_t::external_root_locations() const {
+  std::vector<root_location_t> ret;
+  ret.reserve(tip_count());
+
+  for (auto &rl : roots()) {
+    if (rl.is_external()) { ret.push_back(rl); }
+  }
+
+  return ret;
 }
 
 void rooted_tree_t::add_root_space() {
@@ -816,28 +839,29 @@ rooted_tree_t::get_backward_children_distance(pll_unode_t *rl) const {
 }
 
 std::vector<std::pair<root_location_t, double>>
-rooted_tree_t::apply_foreach_branch(
-    const std::function<double(double, double, double)> &eval_func) const {
+rooted_tree_t::apply_foreach_branch_map_reduce(
+    const std::function<double(double, double, double)> &     map_func,
+    const std::function<double(const std::vector<double> &)> &reduce_func)
+    const {
   std::vector<std::pair<root_location_t, double>> ret;
   for (auto &rl : _roots) {
     auto forward_dists   = get_forward_children_distance(rl.edge);
     auto backwards_dists = get_backward_children_distance(rl.edge);
-    std::pair<root_location_t, double> best =
-        std::make_pair<root_location_t, double>(
-            {}, -std::numeric_limits<double>::infinity());
+    std::vector<double> branch_vals;
+    branch_vals.reserve(forward_dists.size() * backwards_dists.size());
     for (auto &fd : forward_dists) {
       for (auto &bd : backwards_dists) {
-        double eval = eval_func(fd, bd, rl.saved_brlen);
-        if (eval > best.second) { best = std::make_pair(rl, eval); }
+        branch_vals.push_back(map_func(fd, bd, rl.saved_brlen));
       }
     }
-    ret.push_back(best);
+    ret.push_back(std::make_pair(rl, reduce_func(branch_vals)));
   }
   return ret;
 }
 
 std::vector<root_location_t> rooted_tree_t::rank_midpoints() const {
-  auto midpoint_eval = [](double l_len, double r_len, double brlen) -> double {
+  auto midpoint_map_func =
+      [](double l_len, double r_len, double brlen) -> double {
     if (l_len < r_len) { std::swap(l_len, r_len); }
     double diff = l_len - r_len;
     if (diff < brlen) {
@@ -854,7 +878,13 @@ std::vector<root_location_t> rooted_tree_t::rank_midpoints() const {
     return (1 - (diff * diff) / d_tot) * d_tot;
   };
 
-  auto midpoint_ranks = apply_foreach_branch(midpoint_eval);
+  auto midpoint_reduce_func = [](const std::vector<double> &vals) -> double {
+    return *std::max_element(vals.begin(), vals.end());
+  };
+
+  auto midpoint_ranks =
+      apply_foreach_branch_map_reduce(midpoint_map_func, midpoint_reduce_func);
+
   std::sort(midpoint_ranks.begin(),
             midpoint_ranks.end(),
             [](std::pair<root_location_t, double> a,
@@ -871,4 +901,39 @@ std::vector<root_location_t> rooted_tree_t::rank_midpoints() const {
 
 root_location_t rooted_tree_t::midpoint() const {
   return *rank_midpoints().begin();
+}
+
+std::vector<root_location_t> rooted_tree_t::rank_modified_mad() const {
+  auto mad_map = [](double l_len, double r_len, double brlen) -> double {
+    double dt  = l_len + r_len + brlen;
+    double rho = std::min(std::max((dt - 2 * l_len) / (2 * brlen), 0.0), 1.0);
+
+    l_len    = l_len + rho * brlen;
+    double r = (l_len / dt - 1);
+
+    return r;
+  };
+  auto mad_reduce = [](const std::vector<double> &vals) -> double {
+    double acc = 0.0;
+    for (auto v : vals) { acc += v * v; }
+    acc /= static_cast<double>(vals.size());
+
+    acc = std::sqrt(acc);
+    return acc;
+  };
+
+  auto mad_ranks = apply_foreach_branch_map_reduce(mad_map, mad_reduce);
+
+  std::sort(mad_ranks.begin(),
+            mad_ranks.end(),
+            [](std::pair<root_location_t, double> a,
+               std::pair<root_location_t, double> b) -> bool {
+              return a.second > b.second;
+            });
+
+  std::vector<root_location_t> ret;
+  ret.reserve(mad_ranks.size());
+  for (auto m : mad_ranks) { ret.push_back(m.first); }
+
+  return ret;
 }

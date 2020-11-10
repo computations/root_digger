@@ -815,9 +815,8 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
 
   /* start by making a list of "good" roots, with the current model*/
 
-  auto sorted_roots = suggest_roots_random(min_roots, root_ratio);
-  for (auto &sr : sorted_roots) {
-    auto &rl = sr.first;
+  auto sorted_roots = suggest_roots_lh(min_roots, root_ratio);
+  for (auto &rl : sorted_roots) {
     debug_print(EMIT_LEVEL_DEBUG, "working rl: %s", rl.label().c_str());
 
     move_root(rl);
@@ -869,8 +868,18 @@ void model_t::move_root(const root_location_t &new_root) {
   }
 }
 
-std::vector<std::pair<root_location_t, double>>
-model_t::suggest_roots_random(size_t min, double ratio) {
+std::vector<root_location_t> model_t::suggest_roots_random(size_t min,
+                                                           double ratio) {
+  auto roots = _tree.roots();
+  std::shuffle(roots.begin(), roots.end(), _random_engine);
+  auto final_size = std::max(static_cast<size_t>(roots.size() * ratio), min);
+  roots.resize(final_size);
+
+  return roots;
+}
+
+std::vector<root_location_t> model_t::suggest_roots_lh(size_t min,
+                                                       double ratio) {
   std::vector<std::pair<root_location_t, double>> rl_lhs;
   using fucking_difference_type =
       std::vector<std::pair<root_location_t, double>>::difference_type;
@@ -887,20 +896,54 @@ model_t::suggest_roots_random(size_t min, double ratio) {
       [](std::pair<root_location_t, double> a,
          std::pair<root_location_t, double> b) { return a.second > b.second; });
   rl_lhs.resize(final_size);
-  return rl_lhs;
+
+  std::vector<root_location_t> ret;
+  ret.reserve(final_size);
+  for (size_t i = 0; i < final_size; i++) { ret.push_back(rl_lhs[i].first); }
+
+  return ret;
 }
 
-std::vector<std::pair<root_location_t, double>>
-model_t::suggest_roots_midpoint(size_t min, double ratio) {
+std::vector<root_location_t> model_t::suggest_roots_midpoint(size_t min,
+                                                             double ratio) {
   auto midpoints = _tree.rank_midpoints();
   auto final_size =
       std::max(static_cast<size_t>(midpoints.size() * ratio), min);
-  std::vector<std::pair<root_location_t, double>> ret;
-  ret.reserve(final_size);
-  for (size_t i = 0; i < final_size; i++) {
-    ret.push_back(std::make_pair(midpoints[i], compute_lh(midpoints[i])));
-  }
-  return ret;
+  midpoints.resize(final_size);
+
+  return midpoints;
+}
+
+std::vector<root_location_t>
+model_t::suggest_roots_external_branches(size_t min, double ratio) const {
+  auto external_rls = _tree.external_root_locations();
+  std::sort(external_rls.begin(),
+            external_rls.end(),
+            [](const root_location_t &a, const root_location_t &b) {
+              return a.edge->length < b.edge->length;
+            });
+
+  auto final_size =
+      std::max(static_cast<size_t>(external_rls.size() * ratio), min);
+  external_rls.resize(final_size);
+
+  return external_rls;
+}
+
+std::vector<root_location_t>
+model_t::suggest_roots_internal_branches(size_t min, double ratio) const {
+  auto internal_rls = _tree.external_root_locations();
+  std::sort(internal_rls.begin(),
+            internal_rls.end(),
+            [](const root_location_t &a, const root_location_t &b) {
+              return a.edge->length < b.edge->length;
+            });
+
+  auto final_size =
+      std::max(static_cast<size_t>(internal_rls.size() * ratio), min);
+  internal_rls.resize(final_size);
+
+  return internal_rls;
 }
 
 std::vector<size_t> model_t::shuffle_root_indicies() {
@@ -908,6 +951,29 @@ std::vector<size_t> model_t::shuffle_root_indicies() {
   std::iota(idx.begin(), idx.end(), 0);
   std::shuffle(idx.begin(), idx.end(), _random_engine);
   return idx;
+}
+
+std::vector<size_t> model_t::suggest_root_indicies_midpoint() {
+  auto                rls = suggest_roots_midpoint(1, 1.0);
+  std::vector<size_t> ret;
+  ret.resize(rls.size());
+  for (auto &rl : rls) { ret.push_back(rl.id); }
+  return ret;
+}
+
+std::vector<size_t> model_t::suggest_root_indicies_length() {
+  auto                internal_rls = suggest_roots_internal_branches(1, 1.0);
+  auto                external_rls = suggest_roots_external_branches(1, 1.0);
+  std::vector<size_t> ret;
+  ret.resize(internal_rls.size() + external_rls.size());
+  for (size_t i = 0; i < ret.size(); i++) {
+    if (i % 2 == 0) {
+      ret[i] = internal_rls[i / 2].id;
+    } else {
+      ret[i] = external_rls[i / 2].id;
+    }
+  }
+  return ret;
 }
 
 partition_parameters_t model_t::make_partition_parameters(
@@ -1731,9 +1797,10 @@ void model_t::assign_indicies_by_rank_search(size_t        min_roots,
                                              size_t        rank,
                                              size_t        num_tasks,
                                              checkpoint_t &checkpoint) {
-  auto   completed_work = checkpoint.completed_indicies();
-  auto   shuffled_idx   = shuffle_root_indicies();
-  size_t root_count     = std::min(
+  auto completed_work = checkpoint.completed_indicies();
+  // auto   shuffled_idx   = shuffle_root_indicies();
+  auto   shuffled_idx = suggest_root_indicies_midpoint();
+  size_t root_count   = std::min(
       std::max(static_cast<size_t>(_tree.root_count() * root_ratio), min_roots),
       _tree.root_count());
 
