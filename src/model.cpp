@@ -94,6 +94,10 @@ model_params_t random_params(size_t size, uint64_t seed) {
   return mp;
 }
 
+inline size_t compute_final_size(size_t vector_size, double ratio, size_t min) {
+  return std::max(static_cast<size_t>(vector_size * ratio), min);
+}
+
 model_t::model_t(
     rooted_tree_t                                      tree,
     const std::vector<msa_t> &                         msas,
@@ -872,8 +876,7 @@ std::vector<root_location_t> model_t::suggest_roots_random(size_t min,
                                                            double ratio) {
   auto roots = _tree.roots();
   std::shuffle(roots.begin(), roots.end(), _random_engine);
-  auto final_size = std::max(static_cast<size_t>(roots.size() * ratio), min);
-  roots.resize(final_size);
+  roots.resize(compute_final_size(roots.size(), ratio, min));
 
   return roots;
 }
@@ -888,7 +891,7 @@ std::vector<root_location_t> model_t::suggest_roots_lh(size_t min,
     move_root(rl);
     rl_lhs.push_back(std::make_pair(rl, compute_lh_root(rl)));
   }
-  auto final_size = std::max(static_cast<size_t>(rl_lhs.size() * ratio), min);
+  auto final_size = compute_final_size(rl_lhs.size(), ratio, min);
   std::partial_sort(
       rl_lhs.begin(),
       rl_lhs.begin() + static_cast<fucking_difference_type>(final_size),
@@ -906,12 +909,20 @@ std::vector<root_location_t> model_t::suggest_roots_lh(size_t min,
 
 std::vector<root_location_t> model_t::suggest_roots_midpoint(size_t min,
                                                              double ratio) {
-  auto midpoints = _tree.rank_midpoints();
-  auto final_size =
-      std::max(static_cast<size_t>(midpoints.size() * ratio), min);
+  auto midpoints  = _tree.rank_midpoints();
+  auto final_size = compute_final_size(midpoints.size(), ratio, min);
   midpoints.resize(final_size);
 
+  midpoints.resize(final_size);
   return midpoints;
+}
+
+std::vector<root_location_t> model_t::suggest_roots_modified_mad(size_t min,
+                                                                 double ratio) {
+  auto madpoints  = _tree.rank_modified_mad();
+  auto final_size = compute_final_size(madpoints.size(), ratio, min);
+  madpoints.resize(final_size);
+  return madpoints;
 }
 
 std::vector<root_location_t>
@@ -956,7 +967,15 @@ std::vector<size_t> model_t::shuffle_root_indicies() {
 std::vector<size_t> model_t::suggest_root_indicies_midpoint() {
   auto                rls = suggest_roots_midpoint(1, 1.0);
   std::vector<size_t> ret;
-  ret.resize(rls.size());
+  ret.reserve(rls.size());
+  for (auto &rl : rls) { ret.push_back(rl.id); }
+  return ret;
+}
+
+std::vector<size_t> model_t::suggest_root_indicies_modified_mad() {
+  auto                rls = suggest_roots_modified_mad(1, 1.0);
+  std::vector<size_t> ret;
+  ret.reserve(rls.size());
   for (auto &rl : rls) { ret.push_back(rl.id); }
   return ret;
 }
@@ -1798,8 +1817,10 @@ void model_t::assign_indicies_by_rank_search(size_t        min_roots,
                                              size_t        num_tasks,
                                              checkpoint_t &checkpoint) {
   auto completed_work = checkpoint.completed_indicies();
-  // auto   shuffled_idx   = shuffle_root_indicies();
-  auto   shuffled_idx = suggest_root_indicies_midpoint();
+  // auto shuffled_idx   = shuffle_root_indicies();
+  // auto shuffled_idx = suggest_root_indicies_midpoint();
+  // auto   shuffled_idx = suggest_root_indicies_length();
+  auto   shuffled_idx = suggest_root_indicies_modified_mad();
   size_t root_count   = std::min(
       std::max(static_cast<size_t>(_tree.root_count() * root_ratio), min_roots),
       _tree.root_count());

@@ -106,7 +106,8 @@ public:
   std::vector<root_location_t> suggest_roots_random(size_t min, double ratio);
   std::vector<root_location_t> suggest_roots_lh(size_t min, double ratio);
   std::vector<root_location_t> suggest_roots_midpoint(size_t min, double ratio);
-  std::vector<root_location_t> suggest_roots_mad(size_t min, double ratio);
+  std::vector<root_location_t> suggest_roots_modified_mad(size_t min,
+                                                          double ratio);
 
   std::vector<root_location_t>
   suggest_roots_external_branches(size_t min, double ratio) const;
@@ -117,6 +118,7 @@ public:
   std::vector<size_t> shuffle_root_indicies();
   std::vector<size_t> suggest_root_indicies_midpoint();
   std::vector<size_t> suggest_root_indicies_length();
+  std::vector<size_t> suggest_root_indicies_modified_mad();
 
   std::vector<double> compute_all_root_lh();
 
