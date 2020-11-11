@@ -2,11 +2,11 @@
 #include "debug.h"
 #include "util.hpp"
 #include <fcntl.h>
+#include <functional>
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
-#include <functional>
 
 template <> size_t write(int fd, const std::string &str) {
   size_t string_size  = str.size();
@@ -70,6 +70,7 @@ template <> size_t write(int fd, const cli_options_t &options) {
   total_written += write(fd, options.echo);
   total_written += write(fd, options.invariant_sites);
   total_written += write(fd, options.early_stop);
+  total_written += write(fd, options.initial_root_strategy);
   debug_print(
       EMIT_LEVEL_DEBUG, "Wrote %lu bytes for cli_options", total_written);
   return total_written;
@@ -101,6 +102,7 @@ template <> size_t read(int fd, cli_options_t &options) {
   total_read += read(fd, options.echo);
   total_read += read(fd, options.invariant_sites);
   total_read += read(fd, options.early_stop);
+  total_read += read(fd, options.initial_root_strategy);
   debug_print(EMIT_LEVEL_DEBUG, "Read %lu bytes for cli_options", total_read);
   return total_read;
 }

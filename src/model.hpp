@@ -130,10 +130,16 @@ public:
   void assign_indicies(size_t beg, size_t end, std::vector<size_t> idx);
   void assign_indicies();
 
-  void assign_indicies_by_rank_search(size_t min_roots,
-                                      double root_ratio,
-                                      size_t rank,
-                                      size_t num_tasks,
+  void assign_indicies_by_rank_search(size_t        min_roots,
+                                      double        root_ratio,
+                                      size_t        rank,
+                                      size_t        num_tasks,
+                                      checkpoint_t &checkpoint);
+  void assign_indicies_by_rank_search(size_t                  min_roots,
+                                      double                  root_ratio,
+                                      size_t                  rank,
+                                      size_t                  num_tasks,
+                                      initial_root_strategy_t init_root,
                                       checkpoint_t &);
   void assign_indicies_by_rank_exhaustive(size_t rank,
                                           size_t num_tasks,

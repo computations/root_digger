@@ -1816,12 +1816,34 @@ void model_t::assign_indicies_by_rank_search(size_t        min_roots,
                                              size_t        rank,
                                              size_t        num_tasks,
                                              checkpoint_t &checkpoint) {
-  auto completed_work = checkpoint.completed_indicies();
-  // auto shuffled_idx   = shuffle_root_indicies();
-  // auto shuffled_idx = suggest_root_indicies_midpoint();
-  // auto   shuffled_idx = suggest_root_indicies_length();
-  auto   shuffled_idx = suggest_root_indicies_modified_mad();
-  size_t root_count   = std::min(
+  assign_indicies_by_rank_search(min_roots,
+                                 root_ratio,
+                                 rank,
+                                 num_tasks,
+                                 initial_root_strategy_t::random,
+                                 checkpoint);
+}
+
+void model_t::assign_indicies_by_rank_search(size_t                  min_roots,
+                                             double                  root_ratio,
+                                             size_t                  rank,
+                                             size_t                  num_tasks,
+                                             initial_root_strategy_t init_root,
+                                             checkpoint_t &checkpoint) {
+  auto                completed_work = checkpoint.completed_indicies();
+  std::vector<size_t> shuffled_idx;
+
+  if (init_root == initial_root_strategy_t::random) {
+    shuffled_idx = shuffle_root_indicies();
+  } else if (init_root == initial_root_strategy_t::midpoint) {
+    shuffled_idx = suggest_root_indicies_midpoint();
+  } else if (init_root == initial_root_strategy_t::modified_mad) {
+    shuffled_idx = suggest_root_indicies_modified_mad();
+  } else {
+    throw std::runtime_error{"The initial root strategy was not recognized"};
+  }
+
+  size_t root_count = std::min(
       std::max(static_cast<size_t>(_tree.root_count() * root_ratio), min_roots),
       _tree.root_count());
 

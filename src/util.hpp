@@ -62,6 +62,27 @@ namespace asc_bias_type {
 enum asc_bias_type_e { lewis, fels, stam };
 }
 
+struct initial_root_strategy_t {
+  enum initial_root_strategy_e { random, midpoint, modified_mad };
+  initial_root_strategy_e strategy;
+
+  initial_root_strategy_t(initial_root_strategy_e s) : strategy{s} {}
+
+  bool operator==(const initial_root_strategy_t &other) const {
+    return strategy == other.strategy;
+  }
+
+  bool operator==(const initial_root_strategy_e &other) const {
+    return strategy == other;
+  }
+};
+
+/*
+namespace initial_root_strategy_t {
+enum initial_root_strategy_e { random, midpoint, modified_mad };
+}
+*/
+
 struct asc_bias_opts_t {
   asc_bias_type::asc_bias_type_e type;
   double                         fels_weight;
@@ -158,6 +179,9 @@ struct cli_options_t {
   bool                                        clean           = false;
   initialized_flag_t                          early_stop;
 
+  initial_root_strategy_t initial_root_strategy = {
+      initial_root_strategy_t::random};
+
   bool operator==(const cli_options_t &other) const {
     return msa_filename == other.msa_filename
            && tree_filename == other.tree_filename && prefix == other.prefix
@@ -173,7 +197,8 @@ struct cli_options_t {
            && br_tolerance == other.br_tolerance && bfgs_tol == other.bfgs_tol
            && states == other.states && exhaustive == other.exhaustive
            && echo == other.echo && invariant_sites == other.invariant_sites
-           && early_stop == other.early_stop;
+           && early_stop == other.early_stop
+           && initial_root_strategy == other.initial_root_strategy;
   }
   bool operator!=(const cli_options_t &other) const {
     return !(*this == other);

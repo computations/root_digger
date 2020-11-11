@@ -7,12 +7,12 @@ extern "C" {
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <functional>
 #include <getopt.h>
 #include <iomanip>
 #include <iostream>
 #include <omp.h>
 #include <sstream>
-#include <functional>
 #ifdef MPI_BUILD
 #include <mpi.h>
 #endif
@@ -118,6 +118,14 @@ static void print_usage() {
       << "         Tolerance for the BFGS steps. Default is 1e-7\n"
       << "  --factor [NUMBER]\n"
       << "         Factor for the BFGS steps. Default is 1e2\n"
+      << "  --initial-root-strategy {random, midpoint, modified-mad}\n"
+      << "         The strategy to pick the initial branches for rooting.\n"
+      << "         Random is the default, and simply picks the branches at\n"
+      << "         random. Midpoint uses the midpoint and similar branches to\n"
+      << "         start. Modified MAD will use a modified version of mad to\n"
+      << "         pick the starting branches. This can actually drive the\n"
+      << "         so care should be taken when selecting this option.\n"
+      << "         Default is random\n"
       << "  --threads [NUMBER]\n"
       << "         Number of threads to use\n"
       << "  --silent\n"
@@ -137,33 +145,34 @@ static void print_usage() {
 
 cli_options_t parse_options(int argv, char **argc) {
   static struct option long_opts[] = {
-      {"msa", required_argument, 0, 0},            /* 0 */
-      {"tree", required_argument, 0, 0},           /* 1 */
-      {"model", required_argument, 0, 0},          /* 2 */
-      {"seed", required_argument, 0, 0},           /* 3 */
-      {"verbose", no_argument, 0, 0},              /* 4 */
-      {"silent", no_argument, 0, 0},               /* 5 */
-      {"min-roots", required_argument, 0, 0},      /* 6 */
-      {"root-ratio", required_argument, 0, 0},     /* 7 */
-      {"atol", required_argument, 0, 0},           /* 8 */
-      {"brtol", required_argument, 0, 0},          /* 9 */
-      {"bfgstol", required_argument, 0, 0},        /* 10 */
-      {"factor", required_argument, 0, 0},         /* 11 */
-      {"partition", required_argument, 0, 0},      /* 12 */
-      {"prefix", required_argument, 0, 0},         /* 13 */
-      {"exhaustive", no_argument, 0, 0},           /* 14 */
-      {"early-stop", no_argument, 0, 0},           /* 15 */
-      {"no-early-stop", no_argument, 0, 0},        /* 16 */
-      {"rate-cats", required_argument, 0, 0},      /* 17 */
-      {"rate-cats-type", required_argument, 0, 0}, /* 18 */
-      {"invariant-sites", no_argument, 0, 0},      /* 19 */
-      {"threads", required_argument, 0, 0},        /* 20 */
-      {"version", no_argument, 0, 0},              /* 21 */
-      {"debug", no_argument, 0, 0},                /* 22 */
-      {"mpi-debug", no_argument, 0, 0},            /* 23 */
-      {"clean", no_argument, 0, 0},                /* 24 */
-      {"echo", no_argument, 0, 0},                 /* 25 */
-      {"help", no_argument, 0, 0},                 /* 26 */
+      {"msa", required_argument, 0, 0},                   /* 0 */
+      {"tree", required_argument, 0, 0},                  /* 1 */
+      {"model", required_argument, 0, 0},                 /* 2 */
+      {"seed", required_argument, 0, 0},                  /* 3 */
+      {"verbose", no_argument, 0, 0},                     /* 4 */
+      {"silent", no_argument, 0, 0},                      /* 5 */
+      {"min-roots", required_argument, 0, 0},             /* 6 */
+      {"root-ratio", required_argument, 0, 0},            /* 7 */
+      {"atol", required_argument, 0, 0},                  /* 8 */
+      {"brtol", required_argument, 0, 0},                 /* 9 */
+      {"bfgstol", required_argument, 0, 0},               /* 10 */
+      {"factor", required_argument, 0, 0},                /* 11 */
+      {"partition", required_argument, 0, 0},             /* 12 */
+      {"prefix", required_argument, 0, 0},                /* 13 */
+      {"exhaustive", no_argument, 0, 0},                  /* 14 */
+      {"early-stop", no_argument, 0, 0},                  /* 15 */
+      {"no-early-stop", no_argument, 0, 0},               /* 16 */
+      {"rate-cats", required_argument, 0, 0},             /* 17 */
+      {"rate-cats-type", required_argument, 0, 0},        /* 18 */
+      {"invariant-sites", no_argument, 0, 0},             /* 19 */
+      {"initial-root-strategy", required_argument, 0, 0}, /* 20 */
+      {"threads", required_argument, 0, 0},               /* 21 */
+      {"version", no_argument, 0, 0},                     /* 22 */
+      {"debug", no_argument, 0, 0},                       /* 23 */
+      {"mpi-debug", no_argument, 0, 0},                   /* 24 */
+      {"clean", no_argument, 0, 0},                       /* 25 */
+      {"echo", no_argument, 0, 0},                        /* 26 */
+      {"help", no_argument, 0, 0},                        /* 27 */
       {0, 0, 0, 0},
   };
 
@@ -241,25 +250,36 @@ cli_options_t parse_options(int argv, char **argc) {
     case 19: // invariant-sites
       cli_options.invariant_sites = true;
       break;
-    case 20: // threads
+    case 20: // initial-root-strategy
+      if (strcmp(optarg, "random") == 0) {
+        cli_options.initial_root_strategy = {initial_root_strategy_t::random};
+      } else if (strcmp(optarg, "midpoint") == 0) {
+        cli_options.initial_root_strategy = {initial_root_strategy_t::midpoint};
+      } else if (strcmp(optarg, "modified-mad") == 0) {
+        cli_options.initial_root_strategy = {
+            initial_root_strategy_t::modified_mad};
+      }
+
+      break;
+    case 21: // threads
       cli_options.threads = {(size_t)atol(optarg)};
       break;
-    case 21: // version
+    case 22: // version
       print_version();
       std::exit(0);
-    case 22: // debug
+    case 23: // debug
       __VERBOSE__ = EMIT_LEVEL_DEBUG;
       break;
-    case 23: // mpi-debug
+    case 24: // mpi-debug
       __VERBOSE__ = EMIT_LEVEL_MPI_DEBUG;
       break;
-    case 24: // clean
+    case 25: // clean
       cli_options.clean = true;
       break;
-    case 25: // echo
+    case 26: // echo
       cli_options.echo = true;
       break;
-    case 26: // help
+    case 27: // help
       print_usage();
       std::exit(0);
       break;
@@ -526,6 +546,7 @@ int wrapped_main(int argv, char **argc) {
           cli_options.root_ratio,
           static_cast<size_t>(__MPI_RANK__),
           static_cast<size_t>(__MPI_NUM_TASKS__),
+          cli_options.initial_root_strategy,
           checkpoint);
 #ifdef MPI_VERSION
       MPI_Barrier(MPI_COMM_WORLD);
