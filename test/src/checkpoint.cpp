@@ -53,7 +53,7 @@ TEST_CASE("checkpoint_t writing and reading cli_options") {
   SECTION("non-default options") {
     cli_options_t cli_options;
     cli_options.msa_filename = "red roses really like to smell good";
-    cli_options.rate_cats = {1, 1, 3};
+    cli_options.rate_cats = {{1}, {1}, {3}};
     ckp1.save_options(cli_options);
 
     checkpoint_t ckp2(checkpoint_filename);

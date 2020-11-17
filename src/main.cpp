@@ -236,22 +236,15 @@ cli_options_t parse_options(int argv, char **argc) {
       cli_options.early_stop = initialized_flag_t::initialized_false;
       break;
     case 17: // rate-cats
-    {
-      ratehet_opts_t tmp;
-      tmp.type               = param_type::estimate;
-      tmp.rate_category_type = rate_category::MEAN;
-      tmp.rate_cats          = (size_t)atol(optarg);
-      tmp.alpha_init         = false;
-      tmp.alpha              = 1.0;
-      cli_options.rate_cats.push_back(tmp);
-    } break;
+      cli_options.rate_cats[0] = {(size_t)atol(optarg)};
+      break;
     case 18: // rate-cats-type
       if (strcmp(optarg, "mean") == 0) {
-        cli_options.rate_category_types.push_back(rate_category::MEAN);
+        cli_options.rate_cats[0].rate_category_type = rate_category::MEAN;
       } else if (strcmp(optarg, "median") == 0) {
-        cli_options.rate_category_types.push_back(rate_category::MEDIAN);
+        cli_options.rate_cats[0].rate_category_type = rate_category::MEDIAN;
       } else if (strcmp(optarg, "free") == 0) {
-        cli_options.rate_category_types.push_back(rate_category::FREE);
+        cli_options.rate_cats[0].rate_category_type = rate_category::FREE;
       }
       break;
     case 19: // invariant-sites
@@ -438,12 +431,9 @@ int wrapped_main(int argv, char **argc) {
     if (!cli_options.model_string.empty()) {
       auto mi = parse_model_info(cli_options.model_string);
       cli_options.rate_cats.clear();
-      cli_options.rate_category_types.clear();
 
       cli_options.rate_cats.push_back(mi.ratehet_opts);
-      cli_options.rate_category_types.push_back(
 
-          mi.ratehet_opts.rate_category_type);
       if (mi.ratehet_opts.alpha_init) {
         debug_string(EMIT_LEVEL_WARNING,
                      "Ignoring alpha in model string as it currently "
@@ -504,14 +494,6 @@ int wrapped_main(int argv, char **argc) {
       }
     }
 
-    /* Set some defaults for rates */
-    if (cli_options.rate_category_types.size() == 0) {
-      cli_options.rate_category_types.resize(cli_options.rate_cats.size());
-      for (auto &i : cli_options.rate_category_types) {
-        i = rate_category::MEAN;
-      }
-    }
-
     if (cli_options.rate_cats.size() == 1
         && cli_options.rate_cats[0].rate_cats == 0) {
       throw std::runtime_error("Rate categories cannot be zero");
@@ -532,7 +514,6 @@ int wrapped_main(int argv, char **argc) {
         tree,
         msa,
         cli_options.rate_cats,
-        cli_options.rate_category_types,
         cli_options.invariant_sites,
         cli_options.seed,
         cli_options.early_stop.convert_with_default(!cli_options.exhaustive)};

@@ -55,7 +55,6 @@ template <> size_t write(int fd, const cli_options_t &options) {
   total_written += write(fd, options.data_type);
   total_written += write(fd, options.model_string);
   total_written += write(fd, options.rate_cats);
-  total_written += write(fd, options.rate_category_types);
   total_written += write(fd, options.seed);
   total_written += write(fd, options.min_roots);
   total_written += write(fd, options.threads);
@@ -87,7 +86,6 @@ template <> size_t read(int fd, cli_options_t &options) {
   total_read += read(fd, options.data_type);
   total_read += read(fd, options.model_string);
   total_read += read(fd, options.rate_cats);
-  total_read += read(fd, options.rate_category_types);
   total_read += read(fd, options.seed);
   total_read += read(fd, options.min_roots);
   total_read += read(fd, options.threads);

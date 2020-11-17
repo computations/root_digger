@@ -98,18 +98,13 @@ inline size_t compute_final_size(size_t vector_size, double ratio, size_t min) {
   return std::max(static_cast<size_t>(vector_size * ratio), min);
 }
 
-model_t::model_t(
-    rooted_tree_t                                      tree,
-    const std::vector<msa_t> &                         msas,
-    const std::vector<ratehet_opts_t> &                rate_cats,
-    const std::vector<rate_category::rate_category_e> &rate_category_types,
-    bool                                               invariant_sites,
-    uint64_t                                           seed,
-    bool                                               early_stop) :
-    _rate_category_types{rate_category_types},
-    _invariant_sites{invariant_sites},
-    _seed{seed},
-    _early_stop{early_stop} {
+model_t::model_t(rooted_tree_t                      tree,
+                 const std::vector<msa_t> &         msas,
+                 const std::vector<ratehet_opts_t> &rate_cats,
+                 bool                               invariant_sites,
+                 uint64_t                           seed,
+                 bool                               early_stop) :
+    _invariant_sites{invariant_sites}, _seed{seed}, _early_stop{early_stop} {
   if (_early_stop) {
     debug_string(EMIT_LEVEL_IMPORTANT, "INFO: Early stop is enabled");
   }
@@ -119,6 +114,7 @@ model_t::model_t(
   for (auto rc : rate_cats) {
     _rate_rates.emplace_back(rc.rate_cats, rc.alpha);
     _rate_weights.emplace_back(rc.rate_cats, 1.0 / rc.rate_cats);
+    _rate_category_types.emplace_back(rc.rate_category_type);
     _rate_user_init.emplace_back(rc.alpha_init);
     _param_indicies.emplace_back(rc.rate_cats, 0);
   }
