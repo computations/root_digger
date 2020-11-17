@@ -101,7 +101,7 @@ inline size_t compute_final_size(size_t vector_size, double ratio, size_t min) {
 model_t::model_t(
     rooted_tree_t                                      tree,
     const std::vector<msa_t> &                         msas,
-    const std::vector<size_t> &                        rate_cats,
+    const std::vector<ratehet_opts_t> &                rate_cats,
     const std::vector<rate_category::rate_category_e> &rate_category_types,
     bool                                               invariant_sites,
     uint64_t                                           seed,
@@ -117,9 +117,10 @@ model_t::model_t(
   _random_engine = std::minstd_rand(_seed);
   _tree          = std::move(tree);
   for (auto rc : rate_cats) {
-    _rate_rates.emplace_back(rc, 1.0);
-    _rate_weights.emplace_back(rc, 1.0 / rc);
-    _param_indicies.emplace_back(rc, 0);
+    _rate_rates.emplace_back(rc.rate_cats, rc.alpha);
+    _rate_weights.emplace_back(rc.rate_cats, 1.0 / rc.rate_cats);
+    _rate_user_init.emplace_back(rc.alpha_init);
+    _param_indicies.emplace_back(rc.rate_cats, 0);
   }
 
   for (auto &msa : msas) {
@@ -1960,7 +1961,6 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
       set_gamma_weights(i, params[i].gamma_weights);
     }
 
-    debug_string(EMIT_LEVEL_INFO, "Optmizing rates");
     bfgs_rates(params[i].subst_rates,
                ops,
                pmatrix_indices,
@@ -1978,7 +1978,7 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
                pgtol,
                factor);
 
-    if (optimize_gamma) {
+    if (optimize_gamma && !_rate_user_init[i]) {
       debug_string(EMIT_LEVEL_INFO, "Optimizing gamma rates");
       bfgs_gamma_rates(params[i].gamma_alpha,
                        ops,

@@ -51,11 +51,25 @@ enum rate_category_e { MEDIAN, MEAN, FREE };
 }
 
 struct ratehet_opts_t {
+  ratehet_opts_t() = default;
+  ratehet_opts_t(size_t rc) :
+      type{param_type::estimate},
+      rate_category_type{rate_category::MEAN},
+      rate_cats{rc},
+      alpha_init{false},
+      alpha{1.0} {}
+
   param_type::param_type_e       type;
   rate_category::rate_category_e rate_category_type;
   size_t                         rate_cats  = 0;
   bool                           alpha_init = false;
   double                         alpha;
+
+  bool operator==(const ratehet_opts_t &other) const {
+    return type == other.type && rate_category_type == other.rate_category_type
+           && rate_cats == other.rate_cats && alpha_init == other.alpha_init
+           && alpha == other.alpha;
+  }
 };
 
 namespace asc_bias_type {
@@ -161,7 +175,7 @@ struct cli_options_t {
   std::string                                 partition_filename;
   std::string                                 data_type;
   std::string                                 model_string;
-  std::vector<size_t>                         rate_cats{1};
+  std::vector<ratehet_opts_t>                 rate_cats;
   std::vector<rate_category::rate_category_e> rate_category_types;
   uint64_t                                    seed = std::random_device()();
   size_t                                      min_roots       = 1;

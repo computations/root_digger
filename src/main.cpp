@@ -236,8 +236,15 @@ cli_options_t parse_options(int argv, char **argc) {
       cli_options.early_stop = initialized_flag_t::initialized_false;
       break;
     case 17: // rate-cats
-      cli_options.rate_cats = {(size_t)atol(optarg)};
-      break;
+    {
+      ratehet_opts_t tmp;
+      tmp.type               = param_type::estimate;
+      tmp.rate_category_type = rate_category::MEAN;
+      tmp.rate_cats          = (size_t)atol(optarg);
+      tmp.alpha_init         = false;
+      tmp.alpha              = 1.0;
+      cli_options.rate_cats.push_back(tmp);
+    } break;
     case 18: // rate-cats-type
       if (strcmp(optarg, "mean") == 0) {
         cli_options.rate_category_types.push_back(rate_category::MEAN);
@@ -349,7 +356,6 @@ int wrapped_main(int argv, char **argc) {
   if (__MPI_NUM_TASKS__ == 1) {
     debug_string(EMIT_LEVEL_WARNING,
                  "Running MPI version with only 1 process, "
-                 "is this really what you meant?");
   }
 #endif
 
@@ -433,8 +439,10 @@ int wrapped_main(int argv, char **argc) {
       auto mi = parse_model_info(cli_options.model_string);
       cli_options.rate_cats.clear();
       cli_options.rate_category_types.clear();
-      cli_options.rate_cats.push_back(mi.ratehet_opts.rate_cats);
+
+      cli_options.rate_cats.push_back(mi.ratehet_opts);
       cli_options.rate_category_types.push_back(
+
           mi.ratehet_opts.rate_category_type);
       if (mi.ratehet_opts.alpha_init) {
         debug_string(EMIT_LEVEL_WARNING,
@@ -473,9 +481,8 @@ int wrapped_main(int argv, char **argc) {
       }
       cli_options.rate_cats.clear();
       for (auto &p : part_infos) {
-
-        size_t rate_cats = p.model.ratehet_opts.rate_cats;
-        if (rate_cats == 0) { rate_cats = 1; }
+        auto rate_cats = p.model.ratehet_opts;
+        if (rate_cats.rate_cats == 0) { rate_cats.rate_cats = 1; }
         cli_options.rate_cats.push_back(rate_cats);
         if (p.model.ratehet_opts.alpha_init) {
           debug_print(EMIT_LEVEL_WARNING,
@@ -505,7 +512,8 @@ int wrapped_main(int argv, char **argc) {
       }
     }
 
-    if (cli_options.rate_cats.size() == 1 && cli_options.rate_cats[0] == 0) {
+    if (cli_options.rate_cats.size() == 1
+        && cli_options.rate_cats[0].rate_cats == 0) {
       throw std::runtime_error("Rate categories cannot be zero");
     }
 

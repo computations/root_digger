@@ -48,19 +48,34 @@ public:
   model_t(
       rooted_tree_t                                      t,
       const std::vector<msa_t> &                         msa,
-      const std::vector<size_t> &                        rate_cats,
+      const std::vector<ratehet_opts_t> &                rate_cats,
       const std::vector<rate_category::rate_category_e> &rate_category_types,
       bool                                               invariant_sites,
       uint64_t                                           seed,
       bool                                               early_stop);
 
-  model_t(rooted_tree_t              t,
-          const std::vector<msa_t> & msa,
-          const std::vector<size_t> &rate_cats,
-          bool                       invariant_sites,
-          uint64_t                   seed,
-          bool                       early_stop) :
+  model_t(rooted_tree_t             t,
+          const std::vector<msa_t> &msa,
+          size_t                    rate_cats,
+          bool                      invariant_sites,
+          uint64_t                  seed,
+          bool                      early_stop) :
 
+      model_t(
+          t,
+          msa,
+          std::vector<ratehet_opts_t>{rate_cats, ratehet_opts_t{}},
+          std::vector<rate_category::rate_category_e>(1, rate_category::MEAN),
+          invariant_sites,
+          seed,
+          early_stop){};
+
+  model_t(rooted_tree_t                      t,
+          const std::vector<msa_t> &         msa,
+          const std::vector<ratehet_opts_t> &rate_cats,
+          bool                               invariant_sites,
+          uint64_t                           seed,
+          bool                               early_stop) :
       model_t(t,
               msa,
               rate_cats,
@@ -265,6 +280,7 @@ private:
   std::vector<double>                         _partition_weights;
   std::vector<model_params_t>                 _rate_rates;
   std::vector<model_params_t>                 _rate_weights;
+  std::vector<bool>                           _rate_user_init;
   std::vector<std::vector<unsigned int>>      _param_indicies;
   std::vector<size_t>                         _assigned_idx;
   std::minstd_rand                            _random_engine;
