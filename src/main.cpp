@@ -258,6 +258,9 @@ cli_options_t parse_options(int argv, char **argc) {
       } else if (strcmp(optarg, "modified-mad") == 0) {
         cli_options.initial_root_strategy = {
             initial_root_strategy_t::modified_mad};
+      } else {
+        throw std::runtime_error{
+            "An argument is required for --initial-root-strategy"};
       }
 
       break;
