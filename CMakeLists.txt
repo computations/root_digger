@@ -45,7 +45,7 @@ if(STATIC_BUILD)
 endif()
 
 if(NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
-    set(RD_BUILD_VERSION "1.4.1")
+    set(RD_BUILD_VERSION "1.7.0")
     set(RD_BUILD_COMMIT "From Release")
 endif()
 
