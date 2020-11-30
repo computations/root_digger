@@ -193,7 +193,7 @@ struct cli_options_t {
   initialized_flag_t          early_stop;
 
   initial_root_strategy_t initial_root_strategy = {
-      initial_root_strategy_t::random};
+      initial_root_strategy_t::modified_mad};
 
   bool operator==(const cli_options_t &other) const {
     return msa_filename == other.msa_filename
