@@ -1031,7 +1031,7 @@ std::pair<root_location_t, double> model_t::search(size_t        min_roots,
   if (_assigned_idx.size() == 0) {
     debug_string(EMIT_LEVEL_WARNING, "There is no work to be done");
   }
-  double          best_lh = -std::numeric_limits<double>::infinity();
+  double          best_llh = -std::numeric_limits<double>::infinity();
   root_location_t best_rl;
 
   set_subst_rates_uniform();
@@ -1139,17 +1139,17 @@ std::pair<root_location_t, double> model_t::search(size_t        min_roots,
         total_progress.end(),
         [](std::pair<rd_result_t, std::vector<partition_parameters_t>> a,
            std::pair<rd_result_t, std::vector<partition_parameters_t>> b)
-            -> bool { return a.first.lh < b.first.lh; });
+            -> bool { return a.first.llh < b.first.llh; });
 
     best_rl             = _tree.root_location(total_best_result.first.root_id);
     best_rl.brlen_ratio = total_best_result.first.alpha;
-    best_lh             = total_best_result.first.lh;
+    best_llh            = total_best_result.first.llh;
     best_params         = total_best_result.second;
     set_model_params(best_params);
   }
 
   move_root(best_rl);
-  return {best_rl, best_lh};
+  return {best_rl, best_llh};
 }
 
 std::pair<root_location_t, double>
@@ -1163,7 +1163,7 @@ model_t::exhaustive_search(double        atol,
   }
   size_t          root_index = 0;
   root_location_t best_rl;
-  double          best_lh    = -std::numeric_limits<double>::infinity();
+  double          best_llh   = -std::numeric_limits<double>::infinity();
   size_t          root_count = _assigned_idx.size();
   debug_string(EMIT_LEVEL_PROGRESS, "Starting exhaustive search");
 
@@ -1182,22 +1182,23 @@ model_t::exhaustive_search(double        atol,
                                                  _partitions[p]->rate_cats));
     }
 
-    root_location_t cur_best_rl = rl;
-    double          cur_best_lh = -std::numeric_limits<double>::infinity();
+    root_location_t cur_best_rl  = rl;
+    double          cur_best_llh = -std::numeric_limits<double>::infinity();
 
     for (size_t iter = 0; iter < 1e3; ++iter) {
       debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing parameters");
       optimize_params(params, rl, pgtol, factor, (iter % 10 == 0));
 
-      if (fabs(compute_lh(rl) - cur_best_lh) < atol) { break; }
+      if (fabs(compute_lh(rl) - cur_best_llh) < atol) { break; }
 
       debug_string(EMIT_LEVEL_MPROGRESS, "Optimizing Root Location");
-      auto   cur_rl = optimize_alpha(rl, brtol);
-      double cur_lh = compute_lh_root(cur_rl);
+      auto   cur_rl  = optimize_alpha(rl, brtol);
+      double cur_llh = compute_lh_root(cur_rl);
 
-      debug_print(EMIT_LEVEL_MPROGRESS, "Iteration %lu LH: %.5f", iter, cur_lh);
       debug_print(
-          EMIT_LEVEL_INFO, "difference in lh: %.5f", (cur_lh - cur_best_lh));
+          EMIT_LEVEL_MPROGRESS, "Iteration %lu LLH: %.5f", iter, cur_llh);
+      debug_print(
+          EMIT_LEVEL_INFO, "difference in llh: %.5f", (cur_llh - cur_best_llh));
 
       if (_early_stop) {
         if (fabs(rl.brlen_ratio - cur_rl.brlen_ratio) < brtol) {
@@ -1205,29 +1206,29 @@ model_t::exhaustive_search(double        atol,
                       "Current BRlen ratio tolerances: %.7f, brtol: %.7f",
                       fabs(rl.brlen_ratio - cur_rl.brlen_ratio),
                       brtol);
-          cur_best_rl = cur_rl;
-          cur_best_lh = cur_lh;
+          cur_best_rl  = cur_rl;
+          cur_best_llh = cur_llh;
           break;
         }
       }
 
-      if ((cur_lh - cur_best_lh) < atol) {
-        if (cur_lh > cur_best_lh) {
-          cur_best_rl = cur_rl;
-          cur_best_lh = cur_lh;
+      if ((cur_llh - cur_best_llh) < atol) {
+        if (cur_llh > cur_best_llh) {
+          cur_best_rl  = cur_rl;
+          cur_best_llh = cur_llh;
         }
         break;
       }
 
-      if (cur_lh > cur_best_lh) {
-        cur_best_rl = cur_rl;
-        cur_best_lh = cur_lh;
+      if (cur_llh > cur_best_llh) {
+        cur_best_rl  = cur_rl;
+        cur_best_llh = cur_llh;
       }
 
       rl = cur_rl;
     }
 
-    checkpoint.write({cur_best_rl.id, cur_best_lh, cur_best_rl.brlen_ratio},
+    checkpoint.write({cur_best_rl.id, cur_best_llh, cur_best_rl.brlen_ratio},
                      params);
     root_index++;
 
@@ -1237,9 +1238,9 @@ model_t::exhaustive_search(double        atol,
                 root_count,
                 progress_macro(root_index, root_count));
 
-    if (cur_best_lh > best_lh) {
-      best_rl = cur_best_rl;
-      best_lh = cur_best_lh;
+    if (cur_best_llh > best_llh) {
+      best_rl  = cur_best_rl;
+      best_llh = cur_best_llh;
     }
   }
 
@@ -1251,24 +1252,24 @@ model_t::exhaustive_search(double        atol,
 
   if (__MPI_RANK__ == 0) {
     auto   total_progress = checkpoint.read_results();
-    double max_lh         = -std::numeric_limits<double>::infinity();
+    double max_llh        = -std::numeric_limits<double>::infinity();
 
     for (auto result : total_progress) {
-      max_lh = std::max(result.first.lh, max_lh);
+      max_llh = std::max(result.first.llh, max_llh);
     }
 
     double total_lh = 0;
     for (auto result : total_progress) {
-      total_lh += exp(result.first.lh - max_lh);
+      total_lh += exp(result.first.llh - max_llh);
     }
     debug_print(EMIT_LEVEL_DEBUG, "LWR denom: %f, %e", total_lh, total_lh - 1);
 
     for (auto result : total_progress) {
-      double lwr     = exp((result.first.lh - max_lh)) / total_lh;
+      double lwr     = exp((result.first.llh - max_llh)) / total_lh;
       auto   rl      = _tree.root_location(result.first.root_id);
       rl.brlen_ratio = result.first.alpha;
       _tree.annotate_branch(rl, "LWR", std::to_string(lwr));
-      _tree.annotate_lh(rl, result.first.lh);
+      _tree.annotate_lh(rl, result.first.llh);
       _tree.annotate_ratio(rl, result.first.alpha);
     }
     auto total_best_result = *std::max_element(
@@ -1276,14 +1277,14 @@ model_t::exhaustive_search(double        atol,
         total_progress.end(),
         [](std::pair<rd_result_t, std::vector<partition_parameters_t>> a,
            std::pair<rd_result_t, std::vector<partition_parameters_t>> b)
-            -> bool { return a.first.lh < b.first.lh; });
+            -> bool { return a.first.llh < b.first.llh; });
 
     best_rl             = _tree.root_location(total_best_result.first.root_id);
     best_rl.brlen_ratio = total_best_result.first.alpha;
-    best_lh             = total_best_result.first.lh;
+    best_llh            = total_best_result.first.llh;
   }
 
-  return {best_rl, best_lh};
+  return {best_rl, best_llh};
 }
 
 void model_t::initialize() { compute_lh(_tree.root_location(0)); }

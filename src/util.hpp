@@ -128,7 +128,7 @@ struct partition_parameters_t {
 
 struct rd_result_t {
   size_t root_id;
-  double lh;
+  double llh;
   double alpha;
 };
 

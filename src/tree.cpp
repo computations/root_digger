@@ -716,7 +716,7 @@ void rooted_tree_t::annotate_ratio(const root_location_t &node_index,
 }
 
 void rooted_tree_t::annotate_lh(size_t node_index, double lh) {
-  annotate_ratio(_roots[node_index], lh);
+  annotate_lh(_roots[node_index], lh);
 }
 
 void rooted_tree_t::annotate_lh(const root_location_t &node_index, double lh) {
