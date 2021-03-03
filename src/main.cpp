@@ -230,10 +230,12 @@ cli_options_t parse_options(int argv, char **argc) {
       cli_options.exhaustive = true;
       break;
     case 15: // early-stop
-      cli_options.early_stop = initialized_flag_t::initialized_true;
+      cli_options.early_stop =
+          initialized_flag_t::initial_behavior::initialized_true;
       break;
     case 16: // no-early-stop
-      cli_options.early_stop = initialized_flag_t::initialized_false;
+      cli_options.early_stop =
+          initialized_flag_t::initial_behavior::initialized_false;
       break;
     case 17: // rate-cats
       cli_options.rate_cats[0] = {(size_t)atol(optarg)};

@@ -33,22 +33,18 @@ std::string combine_argv_argc(int argv, char **argc);
 
 typedef std::vector<double> model_params_t;
 
-namespace param_type {
-enum param_type_e { emperical, estimate, equal, user };
-}
+enum class param_type { emperical, estimate, equal, user };
 
 struct freq_opts_t {
-  param_type::param_type_e type;
+  param_type type;
 };
 
 struct invar_opts_t {
-  param_type::param_type_e type;
-  float                    user_prop;
+  param_type type;
+  float      user_prop;
 };
 
-namespace rate_category {
-enum rate_category_e { MEDIAN, MEAN, FREE };
-}
+enum class rate_category { MEDIAN, MEAN, FREE };
 
 struct ratehet_opts_t {
   ratehet_opts_t() = default;
@@ -59,11 +55,11 @@ struct ratehet_opts_t {
       alpha_init{false},
       alpha{1.0} {}
 
-  param_type::param_type_e       type;
-  rate_category::rate_category_e rate_category_type;
-  size_t                         rate_cats  = 0;
-  bool                           alpha_init = false;
-  double                         alpha;
+  param_type    type;
+  rate_category rate_category_type;
+  size_t        rate_cats  = 0;
+  bool          alpha_init = false;
+  double        alpha;
 
   bool operator==(const ratehet_opts_t &other) const {
     return type == other.type && rate_category_type == other.rate_category_type
@@ -72,35 +68,18 @@ struct ratehet_opts_t {
   }
 };
 
-namespace asc_bias_type {
-enum asc_bias_type_e { lewis, fels, stam };
-}
+enum class asc_bias_type { lewis, fels, stam };
 
-struct initial_root_strategy_t {
-  enum initial_root_strategy_e { random, midpoint, modified_mad };
-  initial_root_strategy_e strategy;
-
-  initial_root_strategy_t(initial_root_strategy_e s) : strategy{s} {}
-
-  bool operator==(const initial_root_strategy_t &other) const {
-    return strategy == other.strategy;
-  }
-
-  bool operator==(const initial_root_strategy_e &other) const {
-    return strategy == other;
-  }
+enum class initial_root_strategy_t {
+  random,
+  midpoint,
+  modified_mad,
 };
 
-/*
-namespace initial_root_strategy_t {
-enum initial_root_strategy_e { random, midpoint, modified_mad };
-}
-*/
-
 struct asc_bias_opts_t {
-  asc_bias_type::asc_bias_type_e type;
-  double                         fels_weight;
-  std::vector<double>            stam_weights;
+  asc_bias_type       type;
+  double              fels_weight;
+  std::vector<double> stam_weights;
 };
 
 struct model_info_t {
@@ -134,14 +113,14 @@ struct rd_result_t {
 
 class initialized_flag_t {
 public:
-  enum value_t {
+  enum class initial_behavior {
     uninitalized,
     initialized_true,
     initialized_false,
   };
-  initialized_flag_t() : value(value_t::uninitalized){};
+  initialized_flag_t() : value(initial_behavior::uninitalized){};
 
-  initialized_flag_t(const value_t &v) : value(v) {}
+  initialized_flag_t(const initial_behavior &v) : value(v) {}
   /*
   initialized_flag_t &operator=(const initialized_flag_t &rhs) {
     value = rhs.value;
@@ -155,15 +134,15 @@ public:
   bool operator!=(const initialized_flag_t &rhs) const {
     return rhs.value != value;
   }
-  bool initalized() const { return value != value_t::uninitalized; }
+  bool initalized() const { return value != initial_behavior::uninitalized; }
 
   bool convert_with_default(bool default_value) const {
-    if (value == value_t::uninitalized) return default_value;
-    return value == value_t::initialized_true;
+    if (value == initial_behavior::uninitalized) return default_value;
+    return value == initial_behavior::initialized_true;
   }
 
 private:
-  value_t value;
+  initial_behavior value;
 };
 
 struct cli_options_t {

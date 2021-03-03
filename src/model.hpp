@@ -45,13 +45,12 @@ constexpr const int rd_mpi_results_t_nitems = 3;
 
 class model_t {
 public:
-  model_t(
-      rooted_tree_t                                      t,
-      const std::vector<msa_t> &                         msa,
-      const std::vector<ratehet_opts_t> &                rate_cats,
-      bool                                               invariant_sites,
-      uint64_t                                           seed,
-      bool                                               early_stop);
+  model_t(rooted_tree_t                      t,
+          const std::vector<msa_t> &         msa,
+          const std::vector<ratehet_opts_t> &rate_cats,
+          bool                               invariant_sites,
+          uint64_t                           seed,
+          bool                               early_stop);
 
   model_t(rooted_tree_t             t,
           const std::vector<msa_t> &msa,
@@ -60,13 +59,12 @@ public:
           uint64_t                  seed,
           bool                      early_stop) :
 
-      model_t(
-          t,
-          msa,
-          std::vector<ratehet_opts_t>{rate_cats, ratehet_opts_t{}},
-          invariant_sites,
-          seed,
-          early_stop){};
+      model_t(t,
+              msa,
+              std::vector<ratehet_opts_t>{rate_cats, ratehet_opts_t{}},
+              invariant_sites,
+              seed,
+              early_stop){};
 
   ~model_t();
 
@@ -254,22 +252,23 @@ private:
 
   std::pair<size_t, size_t> compute_chunk_size_mod(size_t num_tasks) const;
 
-  partition_parameters_t make_partition_parameters(
-      size_t states, rate_category::rate_category_e rc, size_t rate_cat_count);
+  partition_parameters_t make_partition_parameters(size_t        states,
+                                                   rate_category rc,
+                                                   size_t rate_cat_count);
 
-  rooted_tree_t                               _tree;
-  std::vector<pll_partition_t *>              _partitions;
-  std::vector<rate_category::rate_category_e> _rate_category_types;
-  std::vector<double>                         _partition_weights;
-  std::vector<model_params_t>                 _rate_rates;
-  std::vector<model_params_t>                 _rate_weights;
-  std::vector<bool>                           _rate_user_init;
-  std::vector<std::vector<unsigned int>>      _param_indicies;
-  std::vector<size_t>                         _assigned_idx;
-  std::minstd_rand                            _random_engine;
-  bool                                        _invariant_sites;
-  uint64_t                                    _seed;
-  bool                                        _early_stop;
+  rooted_tree_t                          _tree;
+  std::vector<pll_partition_t *>         _partitions;
+  std::vector<rate_category>             _rate_category_types;
+  std::vector<double>                    _partition_weights;
+  std::vector<model_params_t>            _rate_rates;
+  std::vector<model_params_t>            _rate_weights;
+  std::vector<bool>                      _rate_user_init;
+  std::vector<std::vector<unsigned int>> _param_indicies;
+  std::vector<size_t>                    _assigned_idx;
+  std::minstd_rand                       _random_engine;
+  bool                                   _invariant_sites;
+  uint64_t                               _seed;
+  bool                                   _early_stop;
   /*
    * Only one submodel will be used for the time being. If there is desire for
    * more, we can add support for more models..

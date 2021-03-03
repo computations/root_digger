@@ -209,14 +209,12 @@ template <> constexpr size_t expected_read_size<rd_result_t>() {
   return sizeof(rd_result_t) + sizeof(uint32_t);
 }
 
-namespace fcntl_lock_behavior {
-enum fcntl_lock_block_t {
+enum class fcntl_lock_behavior {
   block,
   noblock,
 };
-}
 
-template <fcntl_lock_behavior::fcntl_lock_block_t W> class fcntl_lock_t {
+template <fcntl_lock_behavior W> class fcntl_lock_t {
 public:
   fcntl_lock_t(int file_descriptor, int lock_type) :
       _file_descriptor{fcntl(file_descriptor, F_DUPFD, 0)}, _file_lock{} {
@@ -290,8 +288,7 @@ public:
   std::string get_filename() const { return _checkpoint_filename; }
 
 private:
-  template <fcntl_lock_behavior::fcntl_lock_block_t W>
-  fcntl_lock_t<W> write_lock() {
+  template <fcntl_lock_behavior W> fcntl_lock_t<W> write_lock() {
     return fcntl_lock_t<W>(_file_descriptor, F_WRLCK);
   }
 

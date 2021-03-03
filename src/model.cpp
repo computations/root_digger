@@ -993,7 +993,7 @@ std::vector<size_t> model_t::suggest_root_indicies_length() {
 }
 
 partition_parameters_t model_t::make_partition_parameters(
-    size_t states, rate_category::rate_category_e rc, size_t rate_cat_count) {
+    size_t states, rate_category rc, size_t rate_cat_count) {
   partition_parameters_t pp;
   size_t                 subst_size = states * states - states;
 
