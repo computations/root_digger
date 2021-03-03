@@ -1,5 +1,6 @@
 #include "data.hpp"
 #include "test_util.hpp"
+#include "util.hpp"
 #include <algorithm>
 #include <catch2/catch.hpp>
 #include <cmath>
@@ -468,24 +469,70 @@ TEST_CASE("assign indicies test", "[model_t]") {
   model.initialize_partitions_uniform_freqs(msa);
 
   SECTION("search") {
-    auto root_assignment = GENERATE(1lu, 2lu, 3lu, 4lu, 5lu);
-    int  expected_size   = std::max(static_cast<int>(root_assignment)
-                                     - static_cast<int>(dummy_results_count),
-                                 0);
-    if (static_cast<int>(root_assignment)
-            - static_cast<int>(dummy_results_count)
-        >= 0) {
-      REQUIRE_NOTHROW(model.assign_indicies_by_rank_search(
-          root_assignment, 0.0, 0, 1, ckp));
-      auto assigned_idx = model.assigned_indicies();
-      REQUIRE(assigned_idx.size() == expected_size);
-      for (size_t j = 0; j < assigned_idx.size(); ++j) {
-        for (size_t i = 0; i < dummy_results_count; ++i) {
-          CHECK(assigned_idx[j] != possible_idx[i]);
+    SECTION("random") {
+      auto root_assignment = GENERATE(1lu, 2lu, 3lu, 4lu, 5lu);
+      int  expected_size   = std::max(static_cast<int>(root_assignment)
+                                       - static_cast<int>(dummy_results_count),
+                                   0);
+      if (static_cast<int>(root_assignment)
+              - static_cast<int>(dummy_results_count)
+          >= 0) {
+        REQUIRE_NOTHROW(model.assign_indicies_by_rank_search(
+            root_assignment, 0.0, 0, 1, ckp));
+        auto assigned_idx = model.assigned_indicies();
+        REQUIRE(assigned_idx.size() == expected_size);
+        for (size_t j = 0; j < assigned_idx.size(); ++j) {
+          for (size_t i = 0; i < dummy_results_count; ++i) {
+            CHECK(assigned_idx[j] != possible_idx[i]);
+          }
         }
+      } else {
+        REQUIRE_THROWS(model.assign_indicies_by_rank_search(1, 0.0, 0, 1, ckp));
       }
-    } else {
-      REQUIRE_THROWS(model.assign_indicies_by_rank_search(1, 0.0, 0, 1, ckp));
+    }
+    SECTION("midpoint") {
+      auto root_assignment = GENERATE(1lu, 2lu, 3lu, 4lu, 5lu);
+      int  expected_size   = std::max(static_cast<int>(root_assignment)
+                                       - static_cast<int>(dummy_results_count),
+                                   0);
+      if (static_cast<int>(root_assignment)
+              - static_cast<int>(dummy_results_count)
+          >= 0) {
+        REQUIRE_NOTHROW(model.assign_indicies_by_rank_search(
+            root_assignment, 0.0, 0, 1, ckp));
+        auto assigned_idx = model.assigned_indicies();
+        REQUIRE(assigned_idx.size() == expected_size);
+        for (size_t j = 0; j < assigned_idx.size(); ++j) {
+          for (size_t i = 0; i < dummy_results_count; ++i) {
+            CHECK(assigned_idx[j] != possible_idx[i]);
+          }
+        }
+      } else {
+        REQUIRE_THROWS(model.assign_indicies_by_rank_search(
+            1, 0.0, 0, 1, initial_root_strategy_t::midpoint, ckp));
+      }
+    }
+    SECTION("modmad") {
+      auto root_assignment = GENERATE(1lu, 2lu, 3lu, 4lu, 5lu);
+      int  expected_size   = std::max(static_cast<int>(root_assignment)
+                                       - static_cast<int>(dummy_results_count),
+                                   0);
+      if (static_cast<int>(root_assignment)
+              - static_cast<int>(dummy_results_count)
+          >= 0) {
+        REQUIRE_NOTHROW(model.assign_indicies_by_rank_search(
+            root_assignment, 0.0, 0, 1, ckp));
+        auto assigned_idx = model.assigned_indicies();
+        REQUIRE(assigned_idx.size() == expected_size);
+        for (size_t j = 0; j < assigned_idx.size(); ++j) {
+          for (size_t i = 0; i < dummy_results_count; ++i) {
+            CHECK(assigned_idx[j] != possible_idx[i]);
+          }
+        }
+      } else {
+        REQUIRE_THROWS(model.assign_indicies_by_rank_search(
+            1, 0.0, 0, 1, initial_root_strategy_t::modified_mad, ckp));
+      }
     }
   }
   SECTION("exhaustive") {
