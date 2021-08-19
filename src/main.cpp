@@ -353,7 +353,7 @@ int wrapped_main(int argv, char **argc) {
 #ifdef MPI_VERSION
   if (__MPI_NUM_TASKS__ == 1) {
     debug_string(EMIT_LEVEL_WARNING,
-                 "Running MPI version with only 1 process, "
+                 "Running MPI version with only 1 process, ");
   }
 #endif
 
