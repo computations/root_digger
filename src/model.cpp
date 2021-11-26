@@ -99,7 +99,7 @@ inline size_t compute_final_size(size_t vector_size, double ratio, size_t min) {
 }
 
 model_t::model_t(rooted_tree_t                      tree,
-                 const std::vector<msa_t> &         msas,
+                 const std::vector<msa_t>          &msas,
                  const std::vector<ratehet_opts_t> &rate_cats,
                  bool                               invariant_sites,
                  uint64_t                           seed,
@@ -319,7 +319,7 @@ void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
 
 void model_t::set_empirical_freqs(size_t p_index) {
   pll_partition_t *partition = _partitions[p_index];
-  double *         emp_freqs = pllmod_msa_empirical_frequencies(partition);
+  double          *emp_freqs = pllmod_msa_empirical_frequencies(partition);
   for (size_t i = 0; i < partition->states; ++i) {
     if (emp_freqs[i] <= 0) {
       throw invalid_empirical_frequencies_exception(
@@ -365,7 +365,7 @@ bool model_t::update_eigen_partition(size_t partition_index) {
 void model_t::update_pmatrix_partition(
     size_t                           partition_index,
     const std::vector<unsigned int> &pmatrix_indices,
-    const std::vector<double> &      branch_lengths) {
+    const std::vector<double>       &branch_lengths) {
   auto part = _partitions[partition_index];
 #pragma omp parallel for collapse(1) schedule(static)
   for (size_t branch = 0; branch < branch_lengths.size(); ++branch) {
@@ -379,7 +379,7 @@ void model_t::update_pmatrix_partition(
 
 std::vector<bool>
 model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
-                          const std::vector<double> &      branch_lengths) {
+                          const std::vector<double>       &branch_lengths) {
   /* Update the eigen decompositions first */
   std::vector<bool> updated(_partitions.size(), false);
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
@@ -467,7 +467,7 @@ double
 model_t::compute_lh_partition(size_t partition_index,
                               const std::vector<pll_operation_t> &ops,
                               const std::vector<unsigned int> &pmatrix_indices,
-                              const std::vector<double> &      branch_lengths) {
+                              const std::vector<double>       &branch_lengths) {
   bool update_partials = update_eigen_partition(partition_index);
   if (update_partials) {
     update_pmatrix_partition(partition_index, pmatrix_indices, branch_lengths);
@@ -1148,7 +1148,7 @@ std::pair<root_location_t, double> model_t::search(size_t        min_roots,
     set_model_params(best_params);
   }
 
-  move_root(best_rl);
+  if (!_assigned_idx.empty()) { move_root(best_rl); }
   return {best_rl, best_llh};
 }
 
@@ -1357,7 +1357,7 @@ std::string model_t::subst_string() const {
 }
 
 static double
-gd_params(model_params_t &                                    initial_params,
+gd_params(model_params_t                                     &initial_params,
           size_t                                              partition_index,
           double                                              p_min,
           double                                              p_max,
@@ -1444,7 +1444,7 @@ gd_params(model_params_t &                                    initial_params,
 }
 
 static double
-bfgs_params(model_params_t &                                    initial_params,
+bfgs_params(model_params_t                                     &initial_params,
             size_t                                              partition_index,
             double                                              p_min,
             double                                              p_max,
@@ -1537,7 +1537,7 @@ bfgs_params(model_params_t &                                    initial_params,
   return score;
 }
 
-double model_t::bfgs_rates(model_params_t &                    initial_rates,
+double model_t::bfgs_rates(model_params_t                     &initial_rates,
                            const std::vector<pll_operation_t> &ops,
                            const std::vector<unsigned int>     pmatrix_indices,
                            const std::vector<double>           branch_lengths,
@@ -1566,7 +1566,7 @@ double model_t::bfgs_rates(model_params_t &                    initial_rates,
       });
 }
 
-double model_t::gd_rates(model_params_t &       initial_rates,
+double model_t::gd_rates(model_params_t        &initial_rates,
                          const root_location_t &rl,
                          size_t                 partition_index) {
   constexpr double p_min   = 1e-4;
@@ -1585,7 +1585,7 @@ double model_t::gd_rates(model_params_t &       initial_rates,
       });
 }
 
-double model_t::bfgs_freqs(model_params_t &                    initial_freqs,
+double model_t::bfgs_freqs(model_params_t                     &initial_freqs,
                            const std::vector<pll_operation_t> &ops,
                            const std::vector<unsigned int>     pmatrix_indices,
                            const std::vector<double>           branch_lengths,
@@ -1618,7 +1618,7 @@ double model_t::bfgs_freqs(model_params_t &                    initial_freqs,
   return lh;
 }
 
-double model_t::gd_freqs(model_params_t &       initial_freqs,
+double model_t::gd_freqs(model_params_t        &initial_freqs,
                          const root_location_t &rl,
                          size_t                 partition_index) {
   constexpr double p_min   = 1e-4;
@@ -1643,7 +1643,7 @@ double model_t::gd_freqs(model_params_t &       initial_freqs,
 }
 
 double
-model_t::bfgs_gamma_rates(model_params_t &                    alpha,
+model_t::bfgs_gamma_rates(model_params_t                     &alpha,
                           const std::vector<pll_operation_t> &ops,
                           const std::vector<unsigned int>     pmatrix_indices,
                           const std::vector<double>           branch_lengths,
@@ -1674,7 +1674,7 @@ model_t::bfgs_gamma_rates(model_params_t &                    alpha,
   return lh;
 }
 
-double model_t::gd_gamma_rates(model_params_t &       alpha,
+double model_t::gd_gamma_rates(model_params_t        &alpha,
                                const root_location_t &rl,
                                size_t                 partition_index) {
   constexpr double p_min   = 1e-4;
@@ -1697,7 +1697,7 @@ double model_t::gd_gamma_rates(model_params_t &       alpha,
 }
 
 double
-model_t::bfgs_gamma_weights(model_params_t &                    alpha,
+model_t::bfgs_gamma_weights(model_params_t                     &alpha,
                             const std::vector<pll_operation_t> &ops,
                             const std::vector<unsigned int>     pmatrix_indices,
                             const std::vector<double>           branch_lengths,
@@ -1728,7 +1728,7 @@ model_t::bfgs_gamma_weights(model_params_t &                    alpha,
   return lh;
 }
 
-double model_t::gd_gamma_weights(model_params_t &       alpha,
+double model_t::gd_gamma_weights(model_params_t        &alpha,
                                  const root_location_t &rl,
                                  size_t                 partition_index) {
   constexpr double p_min   = 1e-4;
@@ -1939,7 +1939,7 @@ void model_t::set_model_params(
 }
 
 void model_t::optimize_params(std::vector<partition_parameters_t> &params,
-                              const root_location_t &              rl,
+                              const root_location_t               &rl,
                               double                               pgtol,
                               double                               factor,
                               bool optimize_gamma) {
