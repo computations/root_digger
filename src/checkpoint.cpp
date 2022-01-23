@@ -133,6 +133,7 @@ std::pair<uint32_t, uint32_t> compute_checksum_components(
 checkpoint_t::checkpoint_t(const std::string &prefix) {
   _checkpoint_filename = prefix + ".ckp";
   _existing_results    = (access(_checkpoint_filename.c_str(), F_OK) != -1);
+  debug_print(EMIT_LEVEL_MPI_DEBUG, "existing results: %i", _existing_results);
   _file_descriptor =
       open(_checkpoint_filename.c_str(), O_RDWR | O_APPEND | O_CREAT, 0640);
   if (_file_descriptor == -1) {
@@ -177,7 +178,7 @@ void checkpoint_t::write(
 }
 
 void checkpoint_t::write(
-    const rd_result_t &                        result,
+    const rd_result_t                         &result,
     const std::vector<partition_parameters_t> &parameters) {
   auto lock = write_lock<fcntl_lock_behavior::block>();
   write(result);
@@ -234,11 +235,13 @@ int checkpoint_t::get_inode() {
 checkpoint_t::~checkpoint_t() { close(_file_descriptor); }
 
 checkpoint_t::checkpoint_t(checkpoint_t &&other) {
-  _file_descriptor = other._file_descriptor;
+  _file_descriptor     = other._file_descriptor;
+  _checkpoint_filename = std::move(other._checkpoint_filename);
 }
 
 checkpoint_t &checkpoint_t::operator=(checkpoint_t &&other) {
-  _file_descriptor = other._file_descriptor;
+  _file_descriptor     = other._file_descriptor;
+  _checkpoint_filename = std::move(other._checkpoint_filename);
   return *this;
 }
 
@@ -247,6 +250,9 @@ void checkpoint_t::reload() {
   _file_descriptor =
       open(_checkpoint_filename.c_str(), O_RDWR | O_APPEND | O_CREAT, 0640);
   if (_file_descriptor == -1) {
+    debug_print(EMIT_LEVEL_MPI_DEBUG,
+                "Failed to reload the checkpoint file: %lu",
+                _checkpoint_filename.size());
 
     throw std::runtime_error{"Failed to reload the checkpoint file"};
   }

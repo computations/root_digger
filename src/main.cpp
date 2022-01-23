@@ -49,7 +49,7 @@ static void print_run_header(
     uint64_t                                                  seed,
     size_t                                                    threads,
     int                                                       argv,
-    char **                                                   argc) {
+    char                                                    **argc) {
   time_t st = std::chrono::system_clock::to_time_t(start_time);
   char   time_string[256];
   std::strftime(time_string, sizeof(time_string), "%F %T", std::localtime(&st));
@@ -319,7 +319,7 @@ cli_options_t parse_options(int argv, char **argc) {
  * change. So this function handles that
  */
 void merge_options_checkpoint(cli_options_t &cli_options,
-                              checkpoint_t & checkpoint) {
+                              checkpoint_t  &checkpoint) {
   if (!checkpoint.existing_checkpoint()) { return; }
 
   cli_options_t checkpoint_options;
@@ -341,6 +341,51 @@ void verify_options(const cli_options_t &cli_options) {
     std::cout << "No tree was given, please supply an tree" << std::endl;
     print_usage();
     std::exit(1);
+  }
+}
+
+checkpoint_t mpi_create_checkpoint(cli_options_t &cli_options) {
+#ifdef MPI_VERSION
+  MPI_Barrier(MPI_COMM_WORLD);
+#endif // MPI_VERSION
+
+  if (__MPI_RANK__ == 0) {
+    checkpoint_t checkpoint(cli_options.prefix);
+    merge_options_checkpoint(cli_options, checkpoint);
+    debug_print(EMIT_LEVEL_MPI_DEBUG,
+                "Finished making the checkpoint: %s",
+                checkpoint.get_filename().c_str());
+
+    if (cli_options.clean) {
+      debug_print(EMIT_LEVEL_IMPORTANT,
+                  "Cleaning the checkpoint file %s",
+                  checkpoint.get_filename().c_str());
+      checkpoint.clean();
+    }
+
+    checkpoint.save_options(cli_options);
+    if (checkpoint.needs_cleaning()) { checkpoint.clean(); }
+
+#ifdef MPI_VERSION
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    debug_print(EMIT_LEVEL_MPI_DEBUG,
+                "checkpoint filename: %s",
+                checkpoint.get_filename().c_str());
+#endif // MPI_VERSION
+
+    return checkpoint;
+  } else {
+#ifdef MPI_VERSION
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif // MPI_VERSION
+
+    debug_string(EMIT_LEVEL_MPI_DEBUG, "Reading the created checkpoint");
+
+    checkpoint_t checkpoint(cli_options.prefix);
+    merge_options_checkpoint(cli_options, checkpoint);
+
+    return checkpoint;
   }
 }
 
@@ -374,32 +419,19 @@ int wrapped_main(int argv, char **argc) {
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-    /* Use the tree path for the prefix */
     if (cli_options.prefix.empty()) {
       cli_options.prefix = cli_options.tree_filename;
     }
 
-    checkpoint_t checkpoint(cli_options.prefix);
-    merge_options_checkpoint(cli_options, checkpoint);
-    if (__MPI_RANK__ == 0) {
-      if (cli_options.clean) {
-        debug_print(EMIT_LEVEL_IMPORTANT,
-                    "Cleaning the checkpoint file %s",
-                    checkpoint.get_filename().c_str());
-        checkpoint.clean();
-#ifdef MPI_VERSION
-        MPI_Barrier(MPI_COMM_WORLD);
-#endif
-        return 0;
-      }
-      checkpoint.save_options(cli_options);
-      if (checkpoint.needs_cleaning()) { checkpoint.clean(); }
-    } else if (cli_options.clean) {
-#ifdef MPI_VERSION
-      MPI_Barrier(MPI_COMM_WORLD);
-#endif
-      return 0;
-    }
+    // checkpoint_t checkpoint(cli_options.prefix);
+    // merge_options_checkpoint(cli_options, checkpoint);
+    checkpoint_t checkpoint = mpi_create_checkpoint(cli_options);
+    /* Use the tree path for the prefix */
+
+    debug_print(EMIT_LEVEL_MPI_DEBUG,
+                "checkpoint filename: %s",
+                checkpoint.get_filename().c_str());
+
 #ifdef MPI_VERSION
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
