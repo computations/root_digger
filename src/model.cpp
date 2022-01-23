@@ -12,15 +12,12 @@
 
 #include "checkpoint.hpp"
 #include "debug.h"
-#include "libpll/pll.h"
 #include "model.hpp"
 #include "msa.hpp"
-#include "pll.h"
 #include "tree.hpp"
 #include "util.hpp"
 extern "C" {
 #include <lbfgsb.h>
-#include <libpll/pll_msa.h>
 }
 
 std::string read_file_contents(std::ifstream &infile) {
@@ -127,16 +124,16 @@ model_t::model_t(rooted_tree_t                      tree,
   }
 
   unsigned int attributes = 0;
-  if (PLL_STAT(avx2_present)) {
-    attributes |= PLL_ATTRIB_ARCH_AVX2;
-  } else if (PLL_STAT(avx_present)) {
-    attributes |= PLL_ATTRIB_ARCH_AVX;
-  } else if (PLL_STAT(sse42_present)) {
-    attributes |= PLL_ATTRIB_ARCH_SSE;
+  if (CORAX_STAT(avx2_present)) {
+    attributes |= CORAX_ATTRIB_ARCH_AVX2;
+  } else if (CORAX_STAT(avx_present)) {
+    attributes |= CORAX_ATTRIB_ARCH_AVX;
+  } else if (CORAX_STAT(sse42_present)) {
+    attributes |= CORAX_ATTRIB_ARCH_SSE;
   }
 
-  attributes |= PLL_ATTRIB_NONREV;
-  attributes |= PLL_ATTRIB_SITE_REPEATS;
+  attributes |= CORAX_ATTRIB_NONREV;
+  attributes |= CORAX_ATTRIB_SITE_REPEATS;
 
   size_t total_weight = 0;
   for (size_t partition_index = 0; partition_index < msas.size();
@@ -154,7 +151,7 @@ model_t::model_t(rooted_tree_t                      tree,
           "The length of the MSA is too large to safely cast");
     }
 
-    _partitions.push_back(pll_partition_create(
+    _partitions.push_back(corax_partition_create(
         _tree.tip_count(),
         _tree.branch_count(),
         msa.states(),
@@ -175,12 +172,12 @@ model_t::model_t(rooted_tree_t                      tree,
 
 model_t::~model_t() {
   for (auto p : _partitions) {
-    if (p) pll_partition_destroy(p);
+    if (p) corax_partition_destroy(p);
   }
 }
 
 void model_t::set_subst_rates(size_t p_index, const model_params_t &mp) {
-  pll_set_subst_params(_partitions[p_index], 0, mp.data());
+  corax_set_subst_params(_partitions[p_index], 0, mp.data());
 }
 
 void model_t::set_subst_rates_random(size_t p_index, const msa_t &msa) {
@@ -200,11 +197,12 @@ void model_t::set_gamma_weights(size_t p_index, model_params_t w) {
   for (auto &f : w) { sum += f; }
   for (auto &f : w) { f /= sum; }
   debug_print(EMIT_LEVEL_DEBUG, "setting weights to %s", to_string(w).c_str());
-  pll_set_category_weights(_partitions[p_index], w.data());
+  corax_set_category_weights(_partitions[p_index], w.data());
 }
 
 void model_t::set_gamma_rates(size_t p_index) {
-  pll_set_category_weights(_partitions[p_index], _rate_weights[p_index].data());
+  corax_set_category_weights(_partitions[p_index],
+                             _rate_weights[p_index].data());
   switch (_rate_category_types[p_index]) {
   case rate_category::MEAN:
     set_gamma_rates_mean(p_index);
@@ -233,40 +231,44 @@ void model_t::set_gamma_rates(size_t p_index, const model_params_t &alpha) {
 }
 
 void model_t::set_gamma_rates_mean(size_t p_index) {
-  pll_compute_gamma_cats(1.0,
-                         static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(),
-                         PLL_GAMMA_RATES_MEAN);
-  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+  corax_compute_gamma_cats(
+      1.0,
+      static_cast<unsigned int>(_rate_rates[p_index].size()),
+      _rate_rates[p_index].data(),
+      CORAX_GAMMA_RATES_MEAN);
+  corax_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_mean(size_t p_index, double alpha) {
-  pll_compute_gamma_cats(alpha,
-                         static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(),
-                         PLL_GAMMA_RATES_MEDIAN);
-  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+  corax_compute_gamma_cats(
+      alpha,
+      static_cast<unsigned int>(_rate_rates[p_index].size()),
+      _rate_rates[p_index].data(),
+      CORAX_GAMMA_RATES_MEDIAN);
+  corax_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_median(size_t p_index) {
-  pll_compute_gamma_cats(1.0,
-                         static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(),
-                         PLL_GAMMA_RATES_MEAN);
-  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+  corax_compute_gamma_cats(
+      1.0,
+      static_cast<unsigned int>(_rate_rates[p_index].size()),
+      _rate_rates[p_index].data(),
+      CORAX_GAMMA_RATES_MEAN);
+  corax_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_median(size_t p_index, double alpha) {
-  pll_compute_gamma_cats(alpha,
-                         static_cast<unsigned int>(_rate_rates[p_index].size()),
-                         _rate_rates[p_index].data(),
-                         PLL_GAMMA_RATES_MEDIAN);
-  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+  corax_compute_gamma_cats(
+      alpha,
+      static_cast<unsigned int>(_rate_rates[p_index].size()),
+      _rate_rates[p_index].data(),
+      CORAX_GAMMA_RATES_MEDIAN);
+  corax_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_free(size_t p_index) {
   for (auto &r : _rate_rates[p_index]) { r = 1.0; }
-  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+  corax_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::set_gamma_rates_free(size_t p_index, model_params_t free_rates) {
@@ -279,15 +281,15 @@ void model_t::set_gamma_rates_free(size_t p_index, model_params_t free_rates) {
   for (auto &f : free_rates) { f /= sum; }
   debug_print(
       EMIT_LEVEL_DEBUG, "setting rates to %s", to_string(free_rates).c_str());
-  pll_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
+  corax_set_category_rates(_partitions[p_index], _rate_rates[p_index].data());
 }
 
 void model_t::update_invariant_sites(size_t p_index) {
   if (_invariant_sites) {
-    pll_update_invariant_sites(_partitions[p_index]);
+    corax_update_invariant_sites(_partitions[p_index]);
   } else {
     for (unsigned int i = 0; i < _submodels; ++i) {
-      pll_update_invariant_sites_proportion(_partitions[p_index], i, 0.0);
+      corax_update_invariant_sites_proportion(_partitions[p_index], i, 0.0);
     }
   }
 }
@@ -300,11 +302,11 @@ void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
 
   for (int i = 0; i < msa.count(); ++i) {
     try {
-      auto result = pll_set_tip_states(_partitions[p_index],
-                                       label_map.at(msa.label(i)),
-                                       msa.map(),
-                                       msa.sequence(i));
-      if (result == PLL_FAILURE) {
+      auto result = corax_set_tip_states(_partitions[p_index],
+                                         label_map.at(msa.label(i)),
+                                         msa.map(),
+                                         msa.sequence(i));
+      if (result == CORAX_FAILURE) {
         throw std::runtime_error("failed to set tip " + std::to_string(i));
       }
     } catch (const std::exception &e) {
@@ -314,12 +316,12 @@ void model_t::set_tip_states(size_t p_index, const msa_t &msa) {
   }
 
   /* set pattern weights */
-  pll_set_pattern_weights(_partitions[p_index], msa.weights());
+  corax_set_pattern_weights(_partitions[p_index], msa.weights());
 }
 
 void model_t::set_empirical_freqs(size_t p_index) {
-  pll_partition_t *partition = _partitions[p_index];
-  double          *emp_freqs = pllmod_msa_empirical_frequencies(partition);
+  corax_partition_t *partition = _partitions[p_index];
+  double            *emp_freqs = corax_msa_empirical_frequencies(partition);
   for (size_t i = 0; i < partition->states; ++i) {
     if (emp_freqs[i] <= 0) {
       throw invalid_empirical_frequencies_exception(
@@ -327,7 +329,7 @@ void model_t::set_empirical_freqs(size_t p_index) {
           "frequencies");
     }
   }
-  pll_set_frequencies(partition, 0, emp_freqs);
+  corax_set_frequencies(partition, 0, emp_freqs);
   free(emp_freqs);
 }
 
@@ -337,7 +339,7 @@ void model_t::set_freqs(size_t p_index, const model_params_t &freqs) {
       throw std::runtime_error("Frequencies with 0 entries are not allowed");
     }
   }
-  pll_set_frequencies(_partitions[p_index], 0, freqs.data());
+  corax_set_frequencies(_partitions[p_index], 0, freqs.data());
 }
 
 void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
@@ -352,9 +354,10 @@ bool model_t::update_eigen_partition(size_t partition_index) {
   auto part    = _partitions[partition_index];
   for (size_t i = 0; i < part->rate_cats; ++i) {
     if (!part->eigen_decomp_valid[i]) {
-      int result = pll_update_eigen(part, _param_indicies[partition_index][i]);
-      updated    = true;
-      if (result == PLL_FAILURE) {
+      int result =
+          corax_update_eigen(part, _param_indicies[partition_index][i]);
+      updated = true;
+      if (result == CORAX_FAILURE) {
         throw std::runtime_error{"Failed to update the eigen decomposition"};
       }
     }
@@ -372,7 +375,7 @@ void model_t::update_pmatrix_partition(
     auto param_index   = _param_indicies[partition_index];
     auto matrix_index  = pmatrix_indices[branch];
     auto branch_length = branch_lengths[branch];
-    pll_update_prob_matrices(
+    corax_update_prob_matrices(
         part, param_index.data(), &matrix_index, &branch_length, 1);
   }
 }
@@ -393,9 +396,9 @@ model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
 }
 
 double model_t::compute_lh(const root_location_t &root_location) {
-  std::vector<pll_operation_t> ops;
-  std::vector<unsigned int>    pmatrix_indices;
-  std::vector<double>          branch_lengths;
+  std::vector<corax_operation_t> ops;
+  std::vector<unsigned int>      pmatrix_indices;
+  std::vector<double>            branch_lengths;
   bool new_root = root_location != _tree.root_location();
 
   GENERATE_AND_UNPACK_OPS(
@@ -410,21 +413,21 @@ double model_t::compute_lh(const root_location_t &root_location) {
     auto &partition = _partitions[i];
 
     if (new_root || updated_partitions[i]) {
-      pll_update_partials(
+      corax_update_clvs(
           partition, ops.data(), static_cast<unsigned int>(ops.size()));
     }
 
-    lh += pll_compute_root_loglikelihood(partition,
-                                         _tree.root_clv_index(),
-                                         _tree.root_scaler_index(),
-                                         _param_indicies[i].data(),
-                                         nullptr);
+    lh += corax_compute_root_loglikelihood(partition,
+                                           _tree.root_clv_index(),
+                                           _tree.root_scaler_index(),
+                                           _param_indicies[i].data(),
+                                           nullptr);
   }
   return lh;
 }
 
 double model_t::compute_lh_root(const root_location_t &root) {
-  pll_operation_t           op;
+  corax_operation_t         op;
   std::vector<unsigned int> matrix_indices;
   std::vector<double>       branch_lengths;
 
@@ -440,20 +443,20 @@ double model_t::compute_lh_root(const root_location_t &root) {
 #pragma omp parallel for reduction(+ : lh)
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    int   result    = pll_update_prob_matrices(
+    int   result    = corax_update_prob_matrices(
         partition,
         _param_indicies[i].data(),
         matrix_indices.data(),
         branch_lengths.data(),
         static_cast<unsigned int>(matrix_indices.size()));
 
-    if (result == PLL_FAILURE) { throw std::runtime_error(pll_errmsg); }
-    pll_update_partials(partition, &op, 1);
-    lh += pll_compute_root_loglikelihood(partition,
-                                         _tree.root_clv_index(),
-                                         _tree.root_scaler_index(),
-                                         _param_indicies[i].data(),
-                                         nullptr);
+    if (result == CORAX_FAILURE) { throw std::runtime_error(corax_errmsg); }
+    corax_update_clvs(partition, &op, 1);
+    lh += corax_compute_root_loglikelihood(partition,
+                                           _tree.root_clv_index(),
+                                           _tree.root_scaler_index(),
+                                           _param_indicies[i].data(),
+                                           nullptr);
     //* _partition_weights[i];
   }
   if (std::isnan(lh)) {
@@ -465,23 +468,23 @@ double model_t::compute_lh_root(const root_location_t &root) {
 
 double
 model_t::compute_lh_partition(size_t partition_index,
-                              const std::vector<pll_operation_t> &ops,
+                              const std::vector<corax_operation_t> &ops,
                               const std::vector<unsigned int> &pmatrix_indices,
                               const std::vector<double>       &branch_lengths) {
   bool update_partials = update_eigen_partition(partition_index);
   if (update_partials) {
     update_pmatrix_partition(partition_index, pmatrix_indices, branch_lengths);
-    pll_update_partials(_partitions[partition_index],
-                        ops.data(),
-                        static_cast<unsigned int>(ops.size()));
+    corax_update_clvs(_partitions[partition_index],
+                      ops.data(),
+                      static_cast<unsigned int>(ops.size()));
   }
 
   double lh =
-      pll_compute_root_loglikelihood(_partitions[partition_index],
-                                     _tree.root_clv_index(),
-                                     _tree.root_scaler_index(),
-                                     _param_indicies[partition_index].data(),
-                                     nullptr);
+      corax_compute_root_loglikelihood(_partitions[partition_index],
+                                       _tree.root_clv_index(),
+                                       _tree.root_scaler_index(),
+                                       _param_indicies[partition_index].data(),
+                                       nullptr);
   if (std::isnan(lh)) {
     throw std::runtime_error("lh at root is not a number: "
                              + std::to_string(lh));
@@ -837,9 +840,9 @@ model_t::optimize_root_location(size_t min_roots, double root_ratio) {
 }
 
 void model_t::move_root(const root_location_t &new_root) {
-  std::vector<pll_operation_t> ops;
-  std::vector<unsigned int>    pmatrix_indices;
-  std::vector<double>          branch_lengths;
+  std::vector<corax_operation_t> ops;
+  std::vector<unsigned int>      pmatrix_indices;
+  std::vector<double>            branch_lengths;
 
   {
     auto results    = _tree.generate_root_update_operations(new_root);
@@ -855,16 +858,16 @@ void model_t::move_root(const root_location_t &new_root) {
 
   for (size_t i = 0; i < _partitions.size(); ++i) {
     auto &partition = _partitions[i];
-    int   result    = pll_update_prob_matrices(
+    int   result    = corax_update_prob_matrices(
         partition,
         _param_indicies[i].data(),
         pmatrix_indices.data(),
         branch_lengths.data(),
         static_cast<unsigned int>(pmatrix_indices.size()));
 
-    if (result == PLL_FAILURE) { throw std::runtime_error(pll_errmsg); }
+    if (result == CORAX_FAILURE) { throw std::runtime_error(corax_errmsg); }
 
-    pll_update_partials(
+    corax_update_clvs(
         partition, ops.data(), static_cast<unsigned int>(ops.size()));
   }
 }
@@ -1537,13 +1540,13 @@ bfgs_params(model_params_t                                     &initial_params,
   return score;
 }
 
-double model_t::bfgs_rates(model_params_t                     &initial_rates,
-                           const std::vector<pll_operation_t> &ops,
-                           const std::vector<unsigned int>     pmatrix_indices,
-                           const std::vector<double>           branch_lengths,
-                           size_t                              partition_index,
-                           double                              pgtol,
-                           double                              factor) {
+double model_t::bfgs_rates(model_params_t                       &initial_rates,
+                           const std::vector<corax_operation_t> &ops,
+                           const std::vector<unsigned int> pmatrix_indices,
+                           const std::vector<double>       branch_lengths,
+                           size_t                          partition_index,
+                           double                          pgtol,
+                           double                          factor) {
   constexpr double p_min   = 1e-4;
   constexpr double p_max   = 1e4;
   constexpr double epsilon = 1e-4;
@@ -1585,13 +1588,13 @@ double model_t::gd_rates(model_params_t        &initial_rates,
       });
 }
 
-double model_t::bfgs_freqs(model_params_t                     &initial_freqs,
-                           const std::vector<pll_operation_t> &ops,
-                           const std::vector<unsigned int>     pmatrix_indices,
-                           const std::vector<double>           branch_lengths,
-                           size_t                              partition_index,
-                           double                              pgtol,
-                           double                              factor) {
+double model_t::bfgs_freqs(model_params_t                       &initial_freqs,
+                           const std::vector<corax_operation_t> &ops,
+                           const std::vector<unsigned int> pmatrix_indices,
+                           const std::vector<double>       branch_lengths,
+                           size_t                          partition_index,
+                           double                          pgtol,
+                           double                          factor) {
   constexpr double p_min   = 1e-4;
   constexpr double p_max   = 1.0 - 1e-4 * 3;
   constexpr double epsilon = 1e-4;
@@ -1643,13 +1646,13 @@ double model_t::gd_freqs(model_params_t        &initial_freqs,
 }
 
 double
-model_t::bfgs_gamma_rates(model_params_t                     &alpha,
-                          const std::vector<pll_operation_t> &ops,
-                          const std::vector<unsigned int>     pmatrix_indices,
-                          const std::vector<double>           branch_lengths,
-                          size_t                              partition_index,
-                          double                              pgtol,
-                          double                              factor) {
+model_t::bfgs_gamma_rates(model_params_t                       &alpha,
+                          const std::vector<corax_operation_t> &ops,
+                          const std::vector<unsigned int>       pmatrix_indices,
+                          const std::vector<double>             branch_lengths,
+                          size_t                                partition_index,
+                          double                                pgtol,
+                          double                                factor) {
   constexpr double p_min   = 0.2;
   constexpr double p_max   = 10000.0;
   constexpr double epsilon = 1e-4;
@@ -1697,13 +1700,13 @@ double model_t::gd_gamma_rates(model_params_t        &alpha,
 }
 
 double
-model_t::bfgs_gamma_weights(model_params_t                     &alpha,
-                            const std::vector<pll_operation_t> &ops,
-                            const std::vector<unsigned int>     pmatrix_indices,
-                            const std::vector<double>           branch_lengths,
-                            size_t                              partition_index,
-                            double                              pgtol,
-                            double                              factor) {
+model_t::bfgs_gamma_weights(model_params_t                       &alpha,
+                            const std::vector<corax_operation_t> &ops,
+                            const std::vector<unsigned int> pmatrix_indices,
+                            const std::vector<double>       branch_lengths,
+                            size_t                          partition_index,
+                            double                          pgtol,
+                            double                          factor) {
   constexpr double p_min   = 1e-4;
   constexpr double p_max   = 1.0;
   constexpr double epsilon = 1e-4;
@@ -1943,9 +1946,9 @@ void model_t::optimize_params(std::vector<partition_parameters_t> &params,
                               double                               pgtol,
                               double                               factor,
                               bool optimize_gamma) {
-  std::vector<pll_operation_t> ops;
-  std::vector<unsigned int>    pmatrix_indices;
-  std::vector<double>          branch_lengths;
+  std::vector<corax_operation_t> ops;
+  std::vector<unsigned int>      pmatrix_indices;
+  std::vector<double>            branch_lengths;
 
   GENERATE_AND_UNPACK_OPS(_tree, rl, ops, pmatrix_indices, branch_lengths);
 #pragma omp parallel for schedule(dynamic)

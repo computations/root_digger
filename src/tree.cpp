@@ -1,4 +1,3 @@
-#include "libpll/pll.h"
 #include "tree.hpp"
 #include <algorithm>
 #include <bits/c++config.h>
@@ -9,11 +8,11 @@
 #include <unordered_set>
 #include <utility>
 
-pll_utree_t *parse_tree_file(const std::string &tree_filename) {
-  return pll_utree_parse_newick_unroot(tree_filename.c_str());
+corax_utree_t *parse_tree_file(const std::string &tree_filename) {
+  return corax_utree_parse_newick_unroot(tree_filename.c_str());
 }
 
-static void clean_root_unode(pll_unode_t *node) {
+static void clean_root_unode(corax_unode_t *node) {
   assert(!node->data);
 
   node->length = -1;
@@ -28,7 +27,7 @@ rooted_tree_t::rooted_tree_t(const rooted_tree_t &other) {
   if (other.rooted()) {
     throw std::runtime_error{"Attempted to copy a tree that is rooted"};
   }
-  _tree   = pll_utree_clone(other._tree);
+  _tree   = corax_utree_clone(other._tree);
   _rooted = other._rooted;
 
   copy_root_locations(other);
@@ -43,11 +42,11 @@ rooted_tree_t::~rooted_tree_t() {
     if (n != nullptr) free(n);
   };
   if (_tree != nullptr) {
-    // pll_utree_destroy works by traversing the tree. We just need to make sure
-    // that the extra roots are actually part of the tree in order to not leak
-    // memory.
+    // corax_utree_destroy works by traversing the tree. We just need to make
+    // sure that the extra roots are actually part of the tree in order to not
+    // leak memory.
     root_by(_roots[0]);
-    pll_utree_destroy(_tree, deallocate_data);
+    corax_utree_destroy(_tree, deallocate_data);
   }
 }
 
@@ -64,7 +63,7 @@ rooted_tree_t &rooted_tree_t::operator=(const rooted_tree_t &other) {
   if (other.rooted()) {
     throw std::runtime_error{"Attempted to copy a tree that is rooted"};
   }
-  _tree   = pll_utree_clone(other._tree);
+  _tree   = corax_utree_clone(other._tree);
   _rooted = other._rooted;
 
   copy_root_locations(other);
@@ -131,7 +130,7 @@ std::unordered_set<std::string> rooted_tree_t::label_set() const {
 
 void rooted_tree_t::copy_root_locations(const rooted_tree_t &other) {
   _roots.clear();
-  std::unordered_map<pll_unode_t *, size_t> id_map;
+  std::unordered_map<corax_unode_t *, size_t> id_map;
   id_map.reserve(other.root_count() * 2);
   for (const auto &r : other.roots()) {
     debug_print(EMIT_LEVEL_DEBUG, "mapping %p to %lu", (void *)r.edge, r.id);
@@ -176,7 +175,7 @@ void rooted_tree_t::generate_root_locations() {
   debug_string(EMIT_LEVEL_DEBUG, "generating root locations");
   auto edges = full_traverse();
 
-  std::unordered_set<pll_unode_t *> node_set;
+  std::unordered_set<corax_unode_t *> node_set;
   _roots.reserve(_tree->inner_count + _tree->tip_count);
   node_set.reserve(_tree->inner_count + _tree->tip_count);
   size_t id = 0;
@@ -214,13 +213,15 @@ std::vector<root_location_t> rooted_tree_t::external_root_locations() const {
 void rooted_tree_t::add_root_space() {
   unsigned int new_size     = _tree->inner_count + _tree->tip_count + 1;
   unsigned int total_unodes = _tree->inner_count * 3 + _tree->tip_count;
-  _tree->nodes =
-      (pll_unode_t **)realloc(_tree->nodes, sizeof(pll_unode_t *) * new_size);
+  _tree->nodes              = (corax_unode_t **)realloc(_tree->nodes,
+                                           sizeof(corax_unode_t *) * new_size);
   assert(new_size > 0);
-  pll_unode_t *new_root_left  = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
-  pll_unode_t *new_root_right = (pll_unode_t *)calloc(1, sizeof(pll_unode_t));
-  new_root_left->next         = new_root_right;
-  new_root_right->next        = new_root_left;
+  corax_unode_t *new_root_left =
+      (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
+  corax_unode_t *new_root_right =
+      (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
+  new_root_left->next  = new_root_right;
+  new_root_right->next = new_root_left;
 
   new_root_left->clv_index = new_root_right->clv_index = new_size;
   new_root_left->scaler_index = new_root_right->scaler_index =
@@ -234,35 +235,35 @@ void rooted_tree_t::add_root_space() {
   _tree->nodes[new_size - 1] = new_root_left;
 }
 
-std::vector<pll_unode_t *> rooted_tree_t::edge_traverse() const {
-  std::vector<pll_unode_t *> trav_buf(inner_count());
-  unsigned int               trav_size = 0;
+std::vector<corax_unode_t *> rooted_tree_t::edge_traverse() const {
+  std::vector<corax_unode_t *> trav_buf(inner_count());
+  unsigned int                 trav_size = 0;
 
-  auto edge_trav_cb = [](pll_unode_t *node) -> int {
-    if (node->next != nullptr) { return PLL_SUCCESS; }
-    return PLL_FAILURE;
+  auto edge_trav_cb = [](corax_unode_t *node) -> int {
+    if (node->next != nullptr) { return CORAX_SUCCESS; }
+    return CORAX_FAILURE;
   };
 
-  pll_utree_traverse(_tree->vroot,
-                     PLL_TREE_TRAVERSE_POSTORDER,
-                     edge_trav_cb,
-                     trav_buf.data(),
-                     &trav_size);
+  corax_utree_traverse(_tree->vroot,
+                       CORAX_TREE_TRAVERSE_POSTORDER,
+                       edge_trav_cb,
+                       trav_buf.data(),
+                       &trav_size);
   trav_buf.resize(trav_size);
   return trav_buf;
 }
 
-std::vector<pll_unode_t *> rooted_tree_t::full_traverse() const {
-  std::vector<pll_unode_t *> trav_buf(tip_count() + inner_count());
-  unsigned int               trav_size = 0;
+std::vector<corax_unode_t *> rooted_tree_t::full_traverse() const {
+  std::vector<corax_unode_t *> trav_buf(tip_count() + inner_count());
+  unsigned int                 trav_size = 0;
 
-  auto full_trav_cb = [](pll_unode_t *) -> int { return PLL_SUCCESS; };
+  auto full_trav_cb = [](corax_unode_t *) -> int { return CORAX_SUCCESS; };
 
-  pll_utree_traverse(_tree->vroot,
-                     PLL_TREE_TRAVERSE_POSTORDER,
-                     full_trav_cb,
-                     trav_buf.data(),
-                     &trav_size);
+  corax_utree_traverse(_tree->vroot,
+                       CORAX_TREE_TRAVERSE_POSTORDER,
+                       full_trav_cb,
+                       trav_buf.data(),
+                       &trav_size);
   trav_buf.resize(trav_size);
   return trav_buf;
 }
@@ -278,15 +279,15 @@ void rooted_tree_t::root_by(const root_location_t &root_location) {
     return;
   }
   if (rooted()) { unroot(); }
-  unsigned int tree_size      = _tree->inner_count + _tree->tip_count + 1;
-  pll_unode_t *new_root_left  = _tree->nodes[tree_size - 1];
-  pll_unode_t *new_root_right = new_root_left->next;
+  unsigned int   tree_size      = _tree->inner_count + _tree->tip_count + 1;
+  corax_unode_t *new_root_left  = _tree->nodes[tree_size - 1];
+  corax_unode_t *new_root_right = new_root_left->next;
 
   new_root_left->next  = new_root_right;
   new_root_right->next = new_root_left;
 
-  pll_unode_t *left_child  = root_location.edge;
-  pll_unode_t *right_child = left_child->back;
+  corax_unode_t *left_child  = root_location.edge;
+  corax_unode_t *right_child = left_child->back;
 
   left_child->back    = new_root_left;
   new_root_left->back = left_child;
@@ -323,18 +324,18 @@ void rooted_tree_t::update_root(root_location_t root) {
     throw std::runtime_error("Provided root doesn't match the current tree");
   }
 
-  pll_unode_t *right_root = root.edge;
-  pll_unode_t *left_root  = root.edge->next;
+  corax_unode_t *right_root = root.edge;
+  corax_unode_t *left_root  = root.edge->next;
 
   right_root->length = right_root->back->length = root.brlen();
   left_root->length = left_root->back->length = root.brlen_compliment();
 }
 
 void rooted_tree_t::unroot() {
-  pll_unode_t *left_child  = _tree->vroot->back;
-  pll_unode_t *right_child = _tree->vroot->next->back;
-  pll_unode_t *root_left   = _tree->vroot;
-  pll_unode_t *root_right  = _tree->vroot->next;
+  corax_unode_t *left_child  = _tree->vroot->back;
+  corax_unode_t *right_child = _tree->vroot->next->back;
+  corax_unode_t *root_left   = _tree->vroot;
+  corax_unode_t *root_right  = _tree->vroot->next;
 
   right_child->back = left_child;
   left_child->back  = right_child;
@@ -360,7 +361,7 @@ bool rooted_tree_t::rooted() const {
   return _tree->vroot->next->next == _tree->vroot;
 }
 
-std::tuple<std::vector<pll_operation_t>,
+std::tuple<std::vector<corax_operation_t>,
            std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_operations(const root_location_t &new_root) {
@@ -376,27 +377,27 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
                 node->clv_index);
   }
 
-  std::vector<pll_operation_t> ops(trav_buf.size());
-  std::vector<unsigned int>    pmatrix_indices(trav_buf.size());
-  std::vector<double>          branch_lengths(trav_buf.size());
+  std::vector<corax_operation_t> ops(trav_buf.size());
+  std::vector<unsigned int>      pmatrix_indices(trav_buf.size());
+  std::vector<double>            branch_lengths(trav_buf.size());
 
   unsigned int op_count     = 0;
   unsigned int matrix_count = 0;
 
-  pll_utree_create_operations(trav_buf.data(),
-                              static_cast<unsigned int>(trav_buf.size() - 1),
-                              branch_lengths.data(),
-                              pmatrix_indices.data(),
-                              ops.data(),
-                              &matrix_count,
-                              &op_count);
+  corax_utree_create_operations(trav_buf.data(),
+                                static_cast<unsigned int>(trav_buf.size() - 1),
+                                branch_lengths.data(),
+                                pmatrix_indices.data(),
+                                ops.data(),
+                                &matrix_count,
+                                &op_count);
 
   ops.resize(op_count + 1);
   pmatrix_indices.resize(matrix_count);
   branch_lengths.resize(matrix_count);
 
-  auto         root_op_it         = ops.end() - 1;
-  pll_unode_t *root_node          = *(trav_buf.end() - 1);
+  auto           root_op_it       = ops.end() - 1;
+  corax_unode_t *root_node        = *(trav_buf.end() - 1);
   root_op_it->parent_clv_index    = root_node->clv_index;
   root_op_it->parent_scaler_index = root_node->scaler_index;
 
@@ -411,15 +412,15 @@ rooted_tree_t::generate_operations(const root_location_t &new_root) {
   return std::make_tuple(ops, pmatrix_indices, branch_lengths);
 }
 
-std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
+std::tuple<corax_operation_t, std::vector<unsigned int>, std::vector<double>>
 rooted_tree_t::generate_derivative_operations(const root_location_t &root) {
   root_by(root);
 
-  pll_operation_t           op;
+  corax_operation_t         op;
   std::vector<unsigned int> pmatrix_indices(2);
   std::vector<double>       branch_lengths(2);
 
-  pll_unode_t *vroot = _tree->vroot;
+  corax_unode_t *vroot = _tree->vroot;
 
   op.parent_clv_index    = root_clv_index();
   op.parent_scaler_index = root_scaler_index();
@@ -476,7 +477,7 @@ std::string rooted_tree_t::newick(bool annotations) const {
       root_location->data = new_label;
     }
   }
-  auto serialize_node = [](const pll_unode_t *n) {
+  auto serialize_node = [](const corax_unode_t *n) {
     auto tmp = (n->label ? std::string(n->label) : std::string()) + ':'
                + std::to_string(n->length)
                + (n->data ? std::string((char *)n->data) : std::string());
@@ -484,21 +485,21 @@ std::string rooted_tree_t::newick(bool annotations) const {
     memcpy(node_string, tmp.data(), tmp.size());
     return node_string;
   };
-  char *newick_string = pll_utree_export_newick(_tree->vroot, serialize_node);
+  char *newick_string = corax_utree_export_newick(_tree->vroot, serialize_node);
   std::string ret{newick_string};
   free(newick_string);
   return ret;
 }
 
 void rooted_tree_t::show_tree() const {
-  pll_utree_show_ascii(_tree->vroot,
-                       PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH);
+  corax_utree_show_ascii(
+      _tree->vroot, CORAX_UTREE_SHOW_LABEL | CORAX_UTREE_SHOW_BRANCH_LENGTH);
 }
 
 bool rooted_tree_t::branch_length_sanity_check() const {
   auto nodes = full_traverse();
   nodes.pop_back();
-  std::sort(nodes.begin(), nodes.end(), [](pll_unode_t *a, pll_unode_t *b) {
+  std::sort(nodes.begin(), nodes.end(), [](corax_unode_t *a, corax_unode_t *b) {
     return a->length < b->length;
   });
 
@@ -518,39 +519,39 @@ bool rooted_tree_t::sanity_check() const {
   return branch_length_sanity_check();
 }
 
-static void tag_nodes(pll_unode_t *n) {
-  pll_unode_t *start = n;
+static void tag_nodes(corax_unode_t *n) {
+  corax_unode_t *start = n;
   do {
     n->data = (void *)0xdeadbeef;
     n       = n->next;
   } while (n != nullptr && n != start);
 }
 
-static void untag_nodes(pll_unode_t *n) {
-  pll_unode_t *start = n;
+static void untag_nodes(corax_unode_t *n) {
+  corax_unode_t *start = n;
   do {
     n->data = (void *)nullptr;
     n       = n->next;
   } while (n != nullptr && n != start);
 }
 
-void rooted_tree_t::find_path(pll_unode_t *n1, pll_unode_t *n2) {
-  pll_unode_t *start   = n1;
-  pll_unode_t *current = n1;
+void rooted_tree_t::find_path(corax_unode_t *n1, corax_unode_t *n2) {
+  corax_unode_t *start   = n1;
+  corax_unode_t *current = n1;
   do {
     if (find_path_recurse(current->back, n2)) break;
     current = current->next;
   } while (current != nullptr && current != start);
 }
 
-bool rooted_tree_t::find_path_recurse(pll_unode_t *n1, pll_unode_t *n2) {
+bool rooted_tree_t::find_path_recurse(corax_unode_t *n1, corax_unode_t *n2) {
   if (n1 == n2) {
     tag_nodes(n1);
     return true;
   }
   if (n1->next) {
-    pll_unode_t *start = n1;
-    n1                 = n1->next;
+    corax_unode_t *start = n1;
+    n1                   = n1->next;
     while (start != n1) {
       if (n1 == n2) {
         tag_nodes(n1);
@@ -568,7 +569,7 @@ bool rooted_tree_t::find_path_recurse(pll_unode_t *n1, pll_unode_t *n2) {
   return false;
 }
 
-std::tuple<std::vector<pll_operation_t>,
+std::tuple<std::vector<corax_operation_t>,
            std::vector<unsigned int>,
            std::vector<double>>
 rooted_tree_t::generate_root_update_operations(
@@ -588,27 +589,27 @@ rooted_tree_t::generate_root_update_operations(
 
   tag_nodes(_tree->vroot->back);
   tag_nodes(_tree->vroot->next->back);
-  std::vector<pll_unode_t *> trav_buf(inner_count() + tip_count());
-  unsigned int               trav_size = 0;
+  std::vector<corax_unode_t *> trav_buf(inner_count() + tip_count());
+  unsigned int                 trav_size = 0;
 
-  auto update_root_callback = [](pll_unode_t *n) -> int {
+  auto update_root_callback = [](corax_unode_t *n) -> int {
     if (n->data == (void *)0xdeadbeef) {
       n->data = nullptr;
-      return PLL_SUCCESS;
+      return CORAX_SUCCESS;
     }
-    return PLL_FAILURE;
+    return CORAX_FAILURE;
   };
 
-  pll_utree_traverse(_tree->vroot,
-                     PLL_TREE_TRAVERSE_POSTORDER,
-                     update_root_callback,
-                     trav_buf.data(),
-                     &trav_size);
+  corax_utree_traverse(_tree->vroot,
+                       CORAX_TREE_TRAVERSE_POSTORDER,
+                       update_root_callback,
+                       trav_buf.data(),
+                       &trav_size);
   trav_buf.resize(trav_size);
 
-  std::vector<pll_operation_t> ops(trav_buf.size());
-  std::vector<unsigned int>    pmatrix_indices(trav_buf.size());
-  std::vector<double>          branch_lengths(trav_buf.size());
+  std::vector<corax_operation_t> ops(trav_buf.size());
+  std::vector<unsigned int>      pmatrix_indices(trav_buf.size());
+  std::vector<double>            branch_lengths(trav_buf.size());
 
   assert_string(trav_buf.size() != 0,
                 "traversal buffer when updating the root had size zero");
@@ -616,13 +617,13 @@ rooted_tree_t::generate_root_update_operations(
   unsigned int op_count     = 0;
   unsigned int matrix_count = 0;
 
-  pll_utree_create_operations(trav_buf.data(),
-                              static_cast<unsigned int>(trav_buf.size() - 1),
-                              branch_lengths.data(),
-                              pmatrix_indices.data(),
-                              ops.data(),
-                              &matrix_count,
-                              &op_count);
+  corax_utree_create_operations(trav_buf.data(),
+                                static_cast<unsigned int>(trav_buf.size() - 1),
+                                branch_lengths.data(),
+                                pmatrix_indices.data(),
+                                ops.data(),
+                                &matrix_count,
+                                &op_count);
 
   ops.resize(op_count);
   pmatrix_indices.resize(matrix_count);
@@ -632,8 +633,8 @@ rooted_tree_t::generate_root_update_operations(
   pmatrix_indices.resize(matrix_count);
   branch_lengths.resize(matrix_count);
 
-  auto         root_op_it         = ops.end() - 1;
-  pll_unode_t *root_node          = _tree->vroot;
+  auto           root_op_it       = ops.end() - 1;
+  corax_unode_t *root_node        = _tree->vroot;
   root_op_it->parent_clv_index    = root_node->clv_index;
   root_op_it->parent_scaler_index = root_node->scaler_index;
 
@@ -662,15 +663,15 @@ void rooted_tree_t::clear_traversal_data() {
   for (unsigned int i = _tree->tip_count;
        i < _tree->tip_count + _tree->inner_count;
        ++i) {
-    pll_unode_t *start = _tree->nodes[i];
-    pll_unode_t *node  = start;
+    corax_unode_t *start = _tree->nodes[i];
+    corax_unode_t *node  = start;
     do {
       node->data = nullptr;
       node       = node->next;
     } while (node && node != start);
   }
-  pll_unode_t *start = _tree->vroot;
-  pll_unode_t *node  = start;
+  corax_unode_t *start = _tree->vroot;
+  corax_unode_t *node  = start;
   do {
     node->data = nullptr;
     node       = node->next;
@@ -694,12 +695,12 @@ void rooted_tree_t::annotate_node(size_t             node_id,
 }
 
 void rooted_tree_t::annotate_node(const root_location_t &node_index,
-                                  const std::string &    key,
-                                  const std::string &    value) {
+                                  const std::string     &key,
+                                  const std::string     &value) {
   annotate_node(node_index.edge, key, value);
 }
 
-void rooted_tree_t::annotate_node(pll_unode_t *      node_id,
+void rooted_tree_t::annotate_node(corax_unode_t     *node_id,
                                   const std::string &key,
                                   const std::string &value) {
   _root_annotations[node_id].emplace_back(key, value);
@@ -730,19 +731,19 @@ void rooted_tree_t::annotate_branch(size_t             node_id,
 }
 
 void rooted_tree_t::annotate_branch(const root_location_t &rl,
-                                    const std::string &    key,
-                                    const std::string &    value) {
+                                    const std::string     &key,
+                                    const std::string     &value) {
   annotate_branch(rl, key, value, value);
 }
 
 void rooted_tree_t::annotate_branch(const root_location_t &rl,
-                                    const std::string &    key,
-                                    const std::string &    left_value,
-                                    const std::string &    right_value) {
+                                    const std::string     &key,
+                                    const std::string     &left_value,
+                                    const std::string     &right_value) {
   annotate_node(rl.edge, key, left_value);
-  size_t       node_count = 0;
-  pll_unode_t *start      = rl.edge->back;
-  pll_unode_t *cur        = start;
+  size_t         node_count = 0;
+  corax_unode_t *start      = rl.edge->back;
+  corax_unode_t *cur        = start;
 
   if (cur->next) {
     do {
@@ -760,10 +761,10 @@ void rooted_tree_t::annotate_branch(const root_location_t &rl,
   }
 }
 
-std::unordered_map<pll_unode_t *, pll_unode_t *>
+std::unordered_map<corax_unode_t *, corax_unode_t *>
 rooted_tree_t::make_node_bijection(const rooted_tree_t &other) {
-  std::unordered_map<pll_unode_t *, pll_unode_t *> bijection;
-  auto                                             our_nodes = full_traverse();
+  std::unordered_map<corax_unode_t *, corax_unode_t *> bijection;
+  auto our_nodes   = full_traverse();
   auto their_nodes = other.full_traverse();
 
   if (our_nodes.size() != their_nodes.size()) {
@@ -772,8 +773,8 @@ rooted_tree_t::make_node_bijection(const rooted_tree_t &other) {
   }
 
   for (size_t i = 0; i < our_nodes.size(); ++i) {
-    pll_unode_t *our_cur_node   = our_nodes[i];
-    pll_unode_t *their_cur_node = their_nodes[i];
+    corax_unode_t *our_cur_node   = our_nodes[i];
+    corax_unode_t *their_cur_node = their_nodes[i];
     do {
       bijection[their_cur_node] = our_cur_node;
       our_cur_node              = our_cur_node->next;
@@ -800,7 +801,7 @@ void rooted_tree_t::copy_annotations(const rooted_tree_t &other) {
   }
 }
 
-void get_children_distance_recurse(pll_unode_t *        cur,
+void get_children_distance_recurse(corax_unode_t       *cur,
                                    double               depth,
                                    std::vector<double> &dists) {
   depth += cur->length;
@@ -816,7 +817,7 @@ void get_children_distance_recurse(pll_unode_t *        cur,
 }
 
 std::vector<double>
-rooted_tree_t::get_forward_children_distance(pll_unode_t *rl) const {
+rooted_tree_t::get_forward_children_distance(corax_unode_t *rl) const {
 
   if (rl->next == nullptr) { return {0.0}; }
 
@@ -830,7 +831,7 @@ rooted_tree_t::get_forward_children_distance(pll_unode_t *rl) const {
 }
 
 std::vector<double>
-rooted_tree_t::get_backward_children_distance(pll_unode_t *rl) const {
+rooted_tree_t::get_backward_children_distance(corax_unode_t *rl) const {
 
   std::vector<double> dists;
   get_children_distance_recurse(rl->back, -rl->length, dists);
@@ -840,7 +841,7 @@ rooted_tree_t::get_backward_children_distance(pll_unode_t *rl) const {
 
 std::vector<std::pair<root_location_t, double>>
 rooted_tree_t::apply_foreach_branch_map_reduce(
-    const std::function<double(double, double, double)> &     map_func,
+    const std::function<double(double, double, double)>      &map_func,
     const std::function<double(const std::vector<double> &)> &reduce_func)
     const {
   std::vector<std::pair<root_location_t, double>> ret;

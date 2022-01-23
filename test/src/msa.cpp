@@ -1,5 +1,5 @@
 extern "C" {
-#include <libpll/pll.h>
+#include <corax/corax.h>
 }
 #include "data.hpp"
 #include <catch2/catch.hpp>
@@ -10,14 +10,14 @@ TEST_CASE("msa_t parse msa", "[msa_t]") {
     auto &ds = kv.second;
     msa_t msa{ds.first};
     REQUIRE(msa.states() == 4);
-    REQUIRE(msa.map() == pll_map_nt);
+    REQUIRE(msa.map() == corax_map_nt);
   }
 }
 
 TEST_CASE("msa_t parse partition line", "[msa_t]") {
   SECTION("no errors") {
     std::string line{"DNA, PART_0 = 123-4123"};
-    auto pi = parse_partition_info(line);
+    auto        pi = parse_partition_info(line);
     CHECK("DNA" == pi.model_name);
     CHECK("PART_0" == pi.partition_name);
     CHECK(123 == pi.parts[0].first);
@@ -25,7 +25,7 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
   }
   SECTION("no spaces") {
     std::string line{"DNA,PART_0=123-4123"};
-    auto pi = parse_partition_info(line);
+    auto        pi = parse_partition_info(line);
     CHECK("DNA" == pi.model_name);
     CHECK("PART_0" == pi.partition_name);
     CHECK(123 == pi.parts[0].first);
@@ -33,7 +33,7 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
   }
   SECTION("multiple ranges") {
     std::string line{"DNA,PART_0=123-4123, 5122-12411"};
-    auto pi = parse_partition_info(line);
+    auto        pi = parse_partition_info(line);
     CHECK("DNA" == pi.model_name);
     CHECK("PART_0" == pi.partition_name);
     CHECK(123 == pi.parts[0].first);
@@ -45,7 +45,7 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
     SECTION("Frequency only") {
       SECTION("emperical") {
         std::string line{"DNA+F,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+F" == pi.model_name);
         CHECK("DNA" == pi.model.subst_str);
         CHECK("PART_0" == pi.partition_name);
@@ -57,7 +57,7 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
       }
       SECTION("estimate") {
         std::string line{"DNA+FO,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+FO" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -68,7 +68,7 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
       }
       SECTION("equal") {
         std::string line{"DNA+FE,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+FE" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -92,10 +92,10 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         }
       }
     }
-    SECTION("Invar Only"){
-      SECTION("estimate"){
+    SECTION("Invar Only") {
+      SECTION("estimate") {
         std::string line{"DNA+I,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+I" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -104,9 +104,9 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(12411 == pi.parts[1].second);
         CHECK(pi.model.invar_opts.type == param_type::estimate);
       }
-      SECTION("emperical"){
+      SECTION("emperical") {
         std::string line{"DNA+IC,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+IC" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -115,9 +115,9 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(12411 == pi.parts[1].second);
         CHECK(pi.model.invar_opts.type == param_type::emperical);
       }
-      SECTION("user"){
+      SECTION("user") {
         std::string line{"DNA+IU{0.25},PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+IU{0.25}" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -128,10 +128,10 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.invar_opts.user_prop == 0.25);
       }
     }
-    SECTION("RateHet Only"){
-      SECTION("emperical"){
+    SECTION("RateHet Only") {
+      SECTION("emperical") {
         std::string line{"DNA+G,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+G" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -141,9 +141,9 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.ratehet_opts.type == param_type::estimate);
         CHECK(pi.model.ratehet_opts.rate_cats == 4);
       }
-      SECTION("emperical, with n"){
+      SECTION("emperical, with n") {
         std::string line{"DNA+G2,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+G2" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -153,9 +153,9 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.ratehet_opts.type == param_type::estimate);
         CHECK(pi.model.ratehet_opts.rate_cats == 2);
       }
-      SECTION("user"){
+      SECTION("user") {
         std::string line{"DNA+G2{0.25},PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+G2{0.25}" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -166,9 +166,9 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.ratehet_opts.rate_cats == 2);
         CHECK(pi.model.ratehet_opts.alpha == 0.25);
       }
-      SECTION("median"){
+      SECTION("median") {
         std::string line{"DNA+GA,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+GA" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -178,9 +178,9 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.ratehet_opts.type == param_type::estimate);
         CHECK(pi.model.ratehet_opts.rate_cats == 4);
       }
-      SECTION("free, ml specified"){
+      SECTION("free, ml specified") {
         std::string line{"DNA+R4,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
+        auto        pi = parse_partition_info(line);
         CHECK("DNA+R4" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
         CHECK(123 == pi.parts[0].first);
@@ -191,8 +191,9 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.ratehet_opts.rate_cats == 4);
         CHECK(pi.model.ratehet_opts.rate_category_type == rate_category::FREE);
       }
-      SECTION("free, rates specified"){
-        std::string line{"DNA+R2{0.2/0.2}{0.1/0.1},PART_0=123-4123, 5122-12411"};
+      SECTION("free, rates specified") {
+        std::string line{
+            "DNA+R2{0.2/0.2}{0.1/0.1},PART_0=123-4123, 5122-12411"};
         auto pi = parse_partition_info(line);
         CHECK("DNA+R2{0.2/0.2}{0.1/0.1}" == pi.model_name);
         CHECK("PART_0" == pi.partition_name);
@@ -205,20 +206,20 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
         CHECK(pi.model.ratehet_opts.rate_category_type == rate_category::FREE);
       }
     }
-    SECTION("All together"){
-        std::string line{"DNA+G2{0.25}+F+I,PART_0=123-4123, 5122-12411"};
-        auto pi = parse_partition_info(line);
-        CHECK("DNA+G2{0.25}+F+I" == pi.model_name);
-        CHECK("PART_0" == pi.partition_name);
-        CHECK(123 == pi.parts[0].first);
-        CHECK(4123 == pi.parts[0].second);
-        CHECK(5122 == pi.parts[1].first);
-        CHECK(12411 == pi.parts[1].second);
-        CHECK(pi.model.ratehet_opts.type == param_type::user);
-        CHECK(pi.model.ratehet_opts.rate_cats == 2);
-        CHECK(pi.model.ratehet_opts.alpha == 0.25);
-        CHECK(pi.model.invar_opts.type == param_type::estimate);
-        CHECK(pi.model.freq_opts.type == param_type::emperical);
+    SECTION("All together") {
+      std::string line{"DNA+G2{0.25}+F+I,PART_0=123-4123, 5122-12411"};
+      auto        pi = parse_partition_info(line);
+      CHECK("DNA+G2{0.25}+F+I" == pi.model_name);
+      CHECK("PART_0" == pi.partition_name);
+      CHECK(123 == pi.parts[0].first);
+      CHECK(4123 == pi.parts[0].second);
+      CHECK(5122 == pi.parts[1].first);
+      CHECK(12411 == pi.parts[1].second);
+      CHECK(pi.model.ratehet_opts.type == param_type::user);
+      CHECK(pi.model.ratehet_opts.rate_cats == 2);
+      CHECK(pi.model.ratehet_opts.alpha == 0.25);
+      CHECK(pi.model.invar_opts.type == param_type::estimate);
+      CHECK(pi.model.freq_opts.type == param_type::emperical);
     }
   }
   SECTION("error: missing comma") {
@@ -246,14 +247,14 @@ TEST_CASE("msa_t parse partition line", "[msa_t]") {
 TEST_CASE("msa_t partition datafile", "[msa_t]") {
   auto ds = data_files_dna["101.phy"];
   SECTION("single partition, one range") {
-    msa_t msa{ds.first};
+    msa_t            msa{ds.first};
     msa_partitions_t parts{parse_partition_info("DNA, PART_0 = 1-100")};
-    auto parted_msa = msa.partition(parts);
+    auto             parted_msa = msa.partition(parts);
     CHECK(parted_msa.size() == parts.size());
     CHECK(parted_msa[0].length() == 100);
   }
   SECTION("single partition, two ranges") {
-    msa_t msa{ds.first};
+    msa_t            msa{ds.first};
     msa_partitions_t parts{
         parse_partition_info("DNA, PART_0 = 1-100, 200-300")};
     auto parted_msa = msa.partition(parts);
@@ -261,16 +262,16 @@ TEST_CASE("msa_t partition datafile", "[msa_t]") {
     CHECK(parted_msa[0].length() == 201);
   }
   SECTION("multiple partitions, one range") {
-    msa_t msa{ds.first};
+    msa_t            msa{ds.first};
     msa_partitions_t parts{parse_partition_info("DNA, PART_0 = 1-100"),
                            parse_partition_info("DNA, PART_1 = 200-300")};
-    auto parted_msa = msa.partition(parts);
+    auto             parted_msa = msa.partition(parts);
     CHECK(parted_msa.size() == parts.size());
     CHECK(parted_msa[0].length() == 100);
     CHECK(parted_msa[1].length() == 101);
   }
   SECTION("multiple partitions, multiple ranges") {
-    msa_t msa{ds.first};
+    msa_t            msa{ds.first};
     msa_partitions_t parts{
         parse_partition_info("DNA, PART_0 = 1-100, 500-520"),
         parse_partition_info("DNA, PART_1 = 200-300, 400-500")};

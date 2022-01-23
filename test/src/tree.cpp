@@ -1,5 +1,5 @@
 extern "C" {
-#include <libpll/pll.h>
+#include <corax/corax.h>
 }
 #include "data.hpp"
 #include <catch2/catch.hpp>
@@ -17,7 +17,7 @@ root_location_t find_node(const rooted_tree_t &tree, const std::string &label) {
 
 TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
   for (auto &kv : data_files_dna) {
-    auto &        ds = kv.second;
+    auto         &ds = kv.second;
     rooted_tree_t tree{ds.second};
     CHECK(tree.root_count() > 0);
     for (size_t i = 0; i < tree.root_count(); ++i) {
@@ -27,7 +27,7 @@ TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
   }
   SECTION("testing two different constructions are consistent") {
     SECTION("dataset single") {
-      auto &        ds = data_files_dna["single"];
+      auto         &ds = data_files_dna["single"];
       rooted_tree_t t1{ds.second};
       rooted_tree_t t2{ds.second};
       CHECK(t1.root_count() == t2.root_count());
@@ -40,7 +40,7 @@ TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
       }
     }
     SECTION("dataset 10.fasta") {
-      auto &        ds = data_files_dna["10.fasta"];
+      auto         &ds = data_files_dna["10.fasta"];
       rooted_tree_t t1{ds.second};
       rooted_tree_t t2{ds.second};
       CHECK(t1.root_count() == t2.root_count());
@@ -52,7 +52,7 @@ TEST_CASE("rooted_tree_t string constructor", "[rooted_tree_t]") {
       }
     }
     SECTION("dataset 101.phy") {
-      auto &        ds = data_files_dna["101.phy"];
+      auto         &ds = data_files_dna["101.phy"];
       rooted_tree_t t1{ds.second};
       rooted_tree_t t2{ds.second};
       CHECK(t1.root_count() == t2.root_count());
@@ -72,7 +72,7 @@ TEST_CASE("rooted_tree string constructor no file", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree copy constructor", "[rooted_tree_t]") {
   for (auto &kv : data_files_dna) {
-    auto &        ds = kv.second;
+    auto         &ds = kv.second;
     rooted_tree_t tree1{ds.second};
     rooted_tree_t tree2{tree1};
     CHECK(tree1.branch_count() == tree2.branch_count());
@@ -82,7 +82,7 @@ TEST_CASE("rooted_tree copy constructor", "[rooted_tree_t]") {
   }
   SECTION("testing root ids") {
     SECTION("dataset single") {
-      auto &        ds = data_files_dna["single"];
+      auto         &ds = data_files_dna["single"];
       rooted_tree_t t1{ds.second};
     }
   }
@@ -90,7 +90,7 @@ TEST_CASE("rooted_tree copy constructor", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree copy asignment constructor", "[rooted_tree_t]") {
   for (auto &kv : data_files_dna) {
-    auto &        ds = kv.second;
+    auto         &ds = kv.second;
     rooted_tree_t tree1{ds.second};
     rooted_tree_t tree2 = tree1;
     CHECK(tree1.branch_count() == tree2.branch_count());
@@ -101,7 +101,7 @@ TEST_CASE("rooted_tree copy asignment constructor", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree move asignment constructor", "[rooted_tree_t]") {
   for (auto &kv : data_files_dna) {
-    auto &        ds = kv.second;
+    auto         &ds = kv.second;
     rooted_tree_t tree1{ds.second};
     rooted_tree_t tree2 = std::move(tree1);
     CHECK(tree2.branch_count() > 0);
@@ -112,7 +112,7 @@ TEST_CASE("rooted_tree move asignment constructor", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree_t label map", "[rooted_tree_t]") {
   for (auto &kv : data_files_dna) {
-    auto &        ds = kv.second;
+    auto         &ds = kv.second;
     rooted_tree_t tree{ds.second};
     auto          lm = tree.label_map();
     CHECK(lm.size() == tree.tip_count());
@@ -122,11 +122,11 @@ TEST_CASE("rooted_tree_t label map", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree_t generate operations", "[rooted_tree_t]") {
   for (auto &kv : data_files_dna) {
-    auto &                       ds = kv.second;
-    rooted_tree_t                tree{ds.second};
-    std::vector<pll_operation_t> ops;
-    std::vector<unsigned int>    pmatrices;
-    std::vector<double>          branches;
+    auto                          &ds = kv.second;
+    rooted_tree_t                  tree{ds.second};
+    std::vector<corax_operation_t> ops;
+    std::vector<unsigned int>      pmatrices;
+    std::vector<double>            branches;
 
     for (size_t i = 0; i < tree.root_count(); ++i) {
       GENERATE_AND_UNPACK_OPS(
@@ -141,10 +141,10 @@ TEST_CASE("rooted_tree_t generate operations", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree_t generate operations, known tree",
           "[rooted_tree_t][regression]") {
-  rooted_tree_t                tree{data_files_dna["single"].second};
-  std::vector<pll_operation_t> ops;
-  std::vector<unsigned int>    pmatrices;
-  std::vector<double>          branches;
+  rooted_tree_t                  tree{data_files_dna["single"].second};
+  std::vector<corax_operation_t> ops;
+  std::vector<unsigned int>      pmatrices;
+  std::vector<double>            branches;
 
   auto root_location = find_node(tree, "n2");
 
@@ -181,7 +181,7 @@ TEST_CASE("rooted_tree_t generate operations, known tree",
 
 TEST_CASE("rooted_tree_t generate root operations", "[rooted_tree_t]") {
   rooted_tree_t             tree{data_files_dna["single"].second};
-  pll_operation_t           op;
+  corax_operation_t         op;
   std::vector<unsigned int> pmatrices;
   std::vector<double>       branches;
 
@@ -213,7 +213,7 @@ TEST_CASE("rooted_tree_t generate root operations", "[rooted_tree_t]") {
 
 TEST_CASE("rooted_tree_t root operations", "[rooted_tree_t][root_by]") {
   for (auto &kv : data_files_dna) {
-    auto &        ds = kv.second;
+    auto         &ds = kv.second;
     rooted_tree_t tree{ds.second};
     for (size_t i = 0; i < tree.root_count(); ++i) {
       tree.root_by(tree.root_location(i));
@@ -229,65 +229,65 @@ TEST_CASE("rooted_tree_t newick", "[rooted_tree_t]") {
   rl1.brlen_ratio = 0.25;
   tree.root_by(rl1);
   CHECK("(b:0.025000,((c:0.100000,d:0.100000)n2:0.550000,a:0.100000)n1:0."
-        "075000):0.0;"
+        "075000);"
         == tree.newick());
 
   rl1.brlen_ratio = 0.75;
   tree.root_by(rl1);
   CHECK("(b:0.075000,((c:0.100000,d:0.100000)n2:0.550000,a:0.100000)n1:0."
-        "025000):0.0;"
+        "025000);"
         == tree.newick());
 
   auto rl2        = find_node(tree, "a");
   rl2.brlen_ratio = 0.25;
   tree.root_by(rl2);
   CHECK("(a:0.025000,(b:0.100000,(c:0.100000,d:0.100000)n2:0.550000)n1:0."
-        "075000):0.0;"
+        "075000);"
         == tree.newick());
 
   rl2.brlen_ratio = 0.75;
   tree.root_by(rl2);
   CHECK("(a:0.075000,(b:0.100000,(c:0.100000,d:0.100000)n2:0.550000)n1:0."
-        "025000):0.0;"
+        "025000);"
         == tree.newick());
 
   auto rl3        = find_node(tree, "n2");
   rl3.brlen_ratio = 0.25;
   tree.root_by(rl3);
   CHECK("((c:0.100000,d:0.100000)n2:0.137500,(a:0.100000,b:0.100000)n1:0."
-        "412500):0.0;"
+        "412500);"
         == tree.newick());
 
   rl3.brlen_ratio = 0.75;
   tree.root_by(rl3);
   CHECK("((c:0.100000,d:0.100000)n2:0.412500,(a:0.100000,b:0.100000)n1:0."
-        "137500):0.0;"
+        "137500);"
         == tree.newick());
 
   auto rl4        = find_node(tree, "c");
   rl4.brlen_ratio = 0.25;
   tree.root_by(rl4);
   CHECK("(c:0.025000,(d:0.100000,(a:0.100000,b:0.100000)n1:0.550000)n2:0."
-        "075000):0.0;"
+        "075000);"
         == tree.newick());
 
   rl4.brlen_ratio = 0.75;
   tree.root_by(rl4);
   CHECK("(c:0.075000,(d:0.100000,(a:0.100000,b:0.100000)n1:0.550000)n2:0."
-        "025000):0.0;"
+        "025000);"
         == tree.newick());
 
   auto rl5        = find_node(tree, "d");
   rl5.brlen_ratio = 0.25;
   tree.root_by(rl5);
   CHECK("(d:0.025000,((a:0.100000,b:0.100000)n1:0.550000,c:0.100000)n2:0."
-        "075000):0.0;"
+        "075000);"
         == tree.newick());
 
   rl5.brlen_ratio = 0.75;
   tree.root_by(rl5);
   CHECK("(d:0.075000,((a:0.100000,b:0.100000)n1:0.550000,c:0.100000)n2:0."
-        "025000):0.0;"
+        "025000);"
         == tree.newick());
 }
 
@@ -299,15 +299,15 @@ TEST_CASE("rooted_tree_t check derivative vs regular operations",
           "[rooted_tree_t]") {
   rooted_tree_t tree{data_files_dna["single"].second};
   for (size_t i = 0; i < tree.root_count(); ++i) {
-    auto                         root_location = tree.root_location(i);
-    std::vector<pll_operation_t> ops_regular;
-    std::vector<unsigned int>    pmatrices_regular;
-    std::vector<double>          branches_regular;
+    auto                           root_location = tree.root_location(i);
+    std::vector<corax_operation_t> ops_regular;
+    std::vector<unsigned int>      pmatrices_regular;
+    std::vector<double>            branches_regular;
 
     GENERATE_AND_UNPACK_OPS(
         tree, root_location, ops_regular, pmatrices_regular, branches_regular);
 
-    pll_operation_t           op_root;
+    corax_operation_t         op_root;
     std::vector<unsigned int> pmatrices_root;
     std::vector<double>       branches_root;
 
@@ -360,7 +360,7 @@ TEST_CASE("rooted_tree_t annotations, basic", "[rooted_tree_t]") {
            "buzz],((i:0.569700[&&NHX:foo=bar:fizz=buzz],e:0.366600[&&NHX:foo="
            "bar:fizz=buzz]):0.602800[&&NHX:foo=bar:fizz=buzz],b:0.445900[&&NHX:"
            "foo=bar:fizz=buzz]):0.099300[&&NHX:foo=bar:fizz=buzz],d:0.639600[&&"
-           "NHX:foo=bar:fizz=buzz]):0.0;");
+           "NHX:foo=bar:fizz=buzz]);");
 }
 
 TEST_CASE("rooted_tree_t annotations, moving root", "[!hide][rooted_tree_t]") {
@@ -382,7 +382,7 @@ TEST_CASE("rooted_tree_t annotations, moving root", "[!hide][rooted_tree_t]") {
            "bar:fizz=buzz],g:0.487400[&&NHX:foo=bar:fizz=buzz]):0.825200[&&NHX:"
            "foo=bar:fizz=buzz]):0.099300[&&NHX:foo=bar:fizz=buzz],(i:0.569700[&"
            "&NHX:foo=bar:fizz=buzz],e:0.366600[&&NHX:foo=bar:fizz=buzz]):0."
-           "602800[&&NHX:foo=bar:fizz=buzz]):0.0;");
+           "602800[&&NHX:foo=bar:fizz=buzz]);");
 }
 
 TEST_CASE("rooted_tree_t annotations, all roots", "[rooted_tree_t]") {
@@ -404,7 +404,7 @@ TEST_CASE("rooted_tree_t annotations, all roots", "[rooted_tree_t]") {
            "buzz]):0.825200[&&NHX:foo=bar:fizz=buzz]):0.446100[&&NHX:foo=bar:"
            "fizz=buzz],j:0.854700[&&NHX:foo=bar:fizz=buzz]):0.614100[&&NHX:foo="
            "bar:fizz=buzz]):0.416200[&&NHX:foo=bar:fizz=buzz],h:0.983500[&&NHX:"
-           "foo=bar:fizz=buzz]):0.0;");
+           "foo=bar:fizz=buzz]);");
 }
 
 TEST_CASE("rooted_tree_t generate update root operations", "[rooted_tree_t]") {
@@ -438,6 +438,6 @@ TEST_CASE("rooted_tree_t midpoint rooting", "[rooted_tree_t]") {
   std::string correct_string =
       "((j:0.854700,((h:0.983500,a:0.224900):0.416200,(c:0.540900,f:0.422200):"
       "0.785300):0.614100):0.223050,(g:0.487400,(((i:0.569700,e:0.366600):0."
-      "602800,b:0.445900):0.099300,d:0.639600):0.825200):0.223050):0.0;";
+      "602800,b:0.445900):0.099300,d:0.639600):0.825200):0.223050);";
   CHECK(t1.newick(false) == correct_string);
 }

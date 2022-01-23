@@ -1,6 +1,5 @@
 #include "debug.h"
 #include "msa.hpp"
-#include "pll.h"
 #include <cctype>
 #include <fstream>
 #include <functional>
@@ -11,29 +10,30 @@
 #include <vector>
 
 extern "C" {
-#include <libpll/pll_msa.h>
+#include <corax/corax.h>
 }
 
 typedef std::string::const_iterator string_iter_t;
 
-pll_msa_t *parse_msa_file(const std::string &msa_filename) {
+corax_msa_t *parse_msa_file(const std::string &msa_filename) {
 
   debug_print(
       EMIT_LEVEL_DEBUG, "attempting to open msa: %s", msa_filename.c_str());
-  if (pll_phylip_t *fd =
-          pll_phylip_open(msa_filename.c_str(), pll_map_generic)) {
-    pll_msa_t *pll_msa = nullptr;
-    if ((pll_msa = pll_phylip_parse_interleaved(fd))
-        || ((pll_phylip_rewind(fd) == PLL_SUCCESS)
-            && (pll_msa = pll_phylip_parse_sequential(fd)))) {
-      pll_phylip_close(fd);
-      return pll_msa;
+  if (corax_phylip_t *fd =
+          corax_phylip_open(msa_filename.c_str(), corax_map_generic)) {
+    corax_msa_t *corax_msa = nullptr;
+    if ((corax_msa = corax_phylip_parse_interleaved(fd))
+        || ((corax_phylip_rewind(fd) == CORAX_SUCCESS)
+            && (corax_msa = corax_phylip_parse_sequential(fd)))) {
+      corax_phylip_close(fd);
+      return corax_msa;
     } else {
-      pll_phylip_close(fd);
+      corax_phylip_close(fd);
     }
   }
 
-  if (pll_fasta_t *fd = pll_fasta_open(msa_filename.c_str(), pll_map_fasta)) {
+  if (corax_fasta_t *fd =
+          corax_fasta_open(msa_filename.c_str(), corax_map_fasta)) {
     char *label                    = nullptr;
     char *sequence                 = nullptr;
     long  sequence_len             = 0;
@@ -44,7 +44,7 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
     std::vector<char *> sequences;
     std::vector<char *> labels;
 
-    while (pll_fasta_getnext(
+    while (corax_fasta_getnext(
         fd, &label, &header_len, &sequence, &sequence_len, &sequence_number)) {
       if (expected_sequence_length == 0) {
         expected_sequence_length = sequence_len;
@@ -54,8 +54,8 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
       sequences.push_back(sequence);
       labels.push_back(label);
     }
-    pll_fasta_close(fd);
-    pll_msa_t *pll_msa = (pll_msa_t *)malloc(sizeof(pll_msa_t));
+    corax_fasta_close(fd);
+    corax_msa_t *corax_msa = (corax_msa_t *)malloc(sizeof(corax_msa_t));
 
     if (sequences.size()
         > static_cast<size_t>(std::numeric_limits<int>::max())) {
@@ -69,20 +69,20 @@ pll_msa_t *parse_msa_file(const std::string &msa_filename) {
           "The expected size of the sequence is too large to cast safely");
     }
 
-    pll_msa->count  = static_cast<int>(sequences.size());
-    pll_msa->length = static_cast<int>(expected_sequence_length);
-    if (pll_msa->count < 0) {
+    corax_msa->count  = static_cast<int>(sequences.size());
+    corax_msa->length = static_cast<int>(expected_sequence_length);
+    if (corax_msa->count < 0) {
       throw std::runtime_error("The MSA had a negative count (overflow?)");
     }
-    pll_msa->sequence = (char **)malloc(
-        sizeof(char *) * static_cast<unsigned int>(pll_msa->count));
-    pll_msa->label = (char **)malloc(
-        sizeof(char *) * static_cast<unsigned int>(pll_msa->count));
+    corax_msa->sequence = (char **)malloc(
+        sizeof(char *) * static_cast<unsigned int>(corax_msa->count));
+    corax_msa->label = (char **)malloc(
+        sizeof(char *) * static_cast<unsigned int>(corax_msa->count));
     for (size_t i = 0; i < sequences.size(); ++i) {
-      pll_msa->sequence[i] = sequences[i];
-      pll_msa->label[i]    = labels[i];
+      corax_msa->sequence[i] = sequences[i];
+      corax_msa->label[i]    = labels[i];
     }
-    return pll_msa;
+    return corax_msa;
   }
   throw std::invalid_argument("Could not parse msa file");
 }
@@ -515,7 +515,7 @@ msa_partitions_t parse_partition_file(const std::string &filename) {
 }
 
 msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
-  _msa         = (pll_msa_t *)malloc(sizeof(pll_msa_t));
+  _msa         = (corax_msa_t *)malloc(sizeof(corax_msa_t));
   _msa->count  = other.count();
   _msa->length = 0;
   for (auto range : partition.parts) {
@@ -550,7 +550,7 @@ msa_t::msa_t(const msa_t &other, const partition_info_t &partition) {
     _msa->sequence[i]     = (char *)malloc(static_cast<size_t>(sizeof(char))
                                        * static_cast<size_t>(_msa->length + 1));
     size_t cur_idx        = 0;
-    char * other_sequence = other.sequence(i);
+    char  *other_sequence = other.sequence(i);
     for (auto range : partition.parts) {
       if (range.first == 0) {
         throw std::runtime_error(
@@ -601,7 +601,7 @@ unsigned int msa_t::total_weight() const {
   return total;
 }
 
-const pll_state_t *msa_t::map() const { return _map; }
+const corax_state_t *msa_t::map() const { return _map; }
 
 unsigned int msa_t::states() const { return _states; }
 
@@ -614,11 +614,12 @@ unsigned int msa_t::length() const {
 void msa_t::compress() {
   if (_weights != nullptr) { free(_weights); }
   int new_length = _msa->length;
-  _weights       = pll_compress_site_patterns(
+  _weights       = corax_compress_site_patterns(
       _msa->sequence, _map, _msa->count, &new_length);
   if (!_weights) {
-    throw std::runtime_error(std::string("PLL ERR: ")
-                             + std::to_string(pll_errno) + " " + pll_errmsg);
+    throw std::runtime_error(std::string("CORAX ERR: ")
+                             + std::to_string(corax_errno) + " "
+                             + corax_errmsg);
   }
   _msa->length = new_length;
 }
@@ -678,6 +679,6 @@ void msa_t::valid_data() const {
 }
 
 msa_t::~msa_t() {
-  if (_msa) pll_msa_destroy(_msa);
+  if (_msa) corax_msa_destroy(_msa);
   if (_weights) free(_weights);
 }

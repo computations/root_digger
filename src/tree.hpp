@@ -2,7 +2,7 @@
 #define RD_TREE_HPP_
 
 extern "C" {
-#include <libpll/pll.h>
+#include <corax/corax.h>
 }
 #include "debug.h"
 #include <functional>
@@ -22,10 +22,10 @@ extern "C" {
   }
 
 struct root_location_t {
-  pll_unode_t *edge;
-  size_t       id;
-  double       saved_brlen;
-  double       brlen_ratio;
+  corax_unode_t *edge;
+  size_t         id;
+  double         saved_brlen;
+  double         brlen_ratio;
 
   constexpr inline double brlen() const { return saved_brlen * brlen_ratio; }
   constexpr inline double brlen_compliment() const {
@@ -49,7 +49,7 @@ struct root_location_t {
   }
 };
 
-pll_utree_t *parse_tree_file(const std::string &tree_filename);
+corax_utree_t *parse_tree_file(const std::string &tree_filename);
 
 class rooted_tree_t {
 public:
@@ -105,15 +105,15 @@ public:
   std::unordered_map<std::string, unsigned int> label_map() const;
   std::unordered_set<std::string>               label_set() const;
 
-  std::tuple<std::vector<pll_operation_t>,
+  std::tuple<std::vector<corax_operation_t>,
              std::vector<unsigned int>,
              std::vector<double>>
   generate_operations(const root_location_t &);
 
-  std::tuple<pll_operation_t, std::vector<unsigned int>, std::vector<double>>
+  std::tuple<corax_operation_t, std::vector<unsigned int>, std::vector<double>>
   generate_derivative_operations(const root_location_t &root);
 
-  std::tuple<std::vector<pll_operation_t>,
+  std::tuple<std::vector<corax_operation_t>,
              std::vector<unsigned int>,
              std::vector<double>>
   generate_root_update_operations(const root_location_t &new_root);
@@ -133,8 +133,8 @@ public:
   void show_tree() const;
 
   void annotate_node(const root_location_t &rl,
-                     const std::string &    key,
-                     const std::string &    value);
+                     const std::string     &key,
+                     const std::string     &value);
   void annotate_node(size_t             node_id,
                      const std::string &key,
                      const std::string &value);
@@ -143,12 +143,12 @@ public:
                        const std::string &key,
                        const std::string &value);
   void annotate_branch(const root_location_t &rl,
-                       const std::string &    key,
-                       const std::string &    value);
+                       const std::string     &key,
+                       const std::string     &value);
   void annotate_branch(const root_location_t &rl,
-                       const std::string &    key,
-                       const std::string &    left_value,
-                       const std::string &    right_value);
+                       const std::string     &key,
+                       const std::string     &left_value,
+                       const std::string     &right_value);
 
   void annotate_lh(size_t node_index, double lh);
   void annotate_lh(const root_location_t &node_index, double lh);
@@ -156,11 +156,11 @@ public:
   void annotate_ratio(size_t node_id, double ratio);
   void annotate_ratio(const root_location_t &node_index, double ratio);
 
-  std::vector<double> get_children_distance(pll_unode_t *rl);
+  std::vector<double> get_children_distance(corax_unode_t *rl);
 
   std::vector<std::pair<root_location_t, double>>
   apply_foreach_branch_map_reduce(
-      const std::function<double(double, double, double)> &     map_func,
+      const std::function<double(double, double, double)>      &map_func,
       const std::function<double(const std::vector<double> &)> &reduce_func)
       const;
 
@@ -170,31 +170,31 @@ private:
   void copy_root_locations(const rooted_tree_t &);
   void add_root_space();
 
-  std::vector<pll_unode_t *> full_traverse() const;
-  std::vector<pll_unode_t *> edge_traverse() const;
+  std::vector<corax_unode_t *> full_traverse() const;
+  std::vector<corax_unode_t *> edge_traverse() const;
 
-  void find_path(pll_unode_t *n1, pll_unode_t *n2);
-  bool find_path_recurse(pll_unode_t *n1, pll_unode_t *n2);
+  void find_path(corax_unode_t *n1, corax_unode_t *n2);
+  bool find_path_recurse(corax_unode_t *n1, corax_unode_t *n2);
 
   void clear_traversal_data();
-  void clear_traversal_data(pll_unode_t *);
+  void clear_traversal_data(corax_unode_t *);
 
-  void annotate_node(pll_unode_t *      node_id,
+  void annotate_node(corax_unode_t     *node_id,
                      const std::string &key,
                      const std::string &value);
 
   void copy_annotations(const rooted_tree_t &other);
 
-  std::unordered_map<pll_unode_t *, pll_unode_t *>
+  std::unordered_map<corax_unode_t *, corax_unode_t *>
   make_node_bijection(const rooted_tree_t &other);
 
-  std::vector<double> get_forward_children_distance(pll_unode_t *rl) const;
-  std::vector<double> get_backward_children_distance(pll_unode_t *rl) const;
+  std::vector<double> get_forward_children_distance(corax_unode_t *rl) const;
+  std::vector<double> get_backward_children_distance(corax_unode_t *rl) const;
 
-  pll_utree_t *                _tree;
+  corax_utree_t               *_tree;
   root_location_t              _current_rl;
   std::vector<root_location_t> _roots;
-  std::unordered_map<pll_unode_t *,
+  std::unordered_map<corax_unode_t *,
                      std::vector<std::pair<std::string, std::string>>>
        _root_annotations;
   bool _rooted;

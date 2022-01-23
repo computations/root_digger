@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <numeric>
 extern "C" {
-#include <libpll/pll.h>
+#include <corax/corax.h>
 }
 #include <cctype>
 #include <chrono>
@@ -462,7 +462,7 @@ int wrapped_main(int argv, char **argc) {
         && cli_options.early_stop.convert_with_default(
             !cli_options.exhaustive)) {}
 
-    constexpr const pll_state_t *map = pll_map_nt;
+    constexpr const corax_state_t *map = corax_map_nt;
 
     /* Parse the model */
     if (!cli_options.model_string.empty()) {

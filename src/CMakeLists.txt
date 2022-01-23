@@ -15,9 +15,7 @@ set_target_properties(rd PROPERTIES
 
 set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
-# We duplicate the libararies here to solve a dumb link time error
-set(LINK_LIBS ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES} ${PLLMODULES_LIBRARIES}
-    ${GSL_LIBS} lbfgs_lib )
+set(LINK_LIBS corax_obj ${GSL_LIBS} lbfgs_lib)
 
 if(STATIC_BUILD)
     #target_link_options(rd PRIVATE -static -pie)
@@ -43,3 +41,4 @@ target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     #-fsanitize=address -fno-omit-frame-pointer)
 target_compile_definitions(rd PRIVATE
     ${RD_COMPILE_DEFS})
+target_include_directories(rd PRIVATE ${CMAKE_SOURCE_DIR}/lib/lbfgsb)
