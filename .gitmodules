@@ -1,6 +1,3 @@
 [submodule "test/lib/catch2"]
 	path = test/lib/catch2
 	url = https://github.com/catchorg/Catch2.git
-[submodule "lib/pll-modules"]
-	path = lib/pll-modules
-	url = https://github.com/computations/pll-modules
