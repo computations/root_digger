@@ -1,5 +1,6 @@
 set(CMAKE_BUILD_TYPE Debug)
 add_executable(rd_test
+    EXCLUDE_FROM_ALL
     main.cpp
     data.cpp
     msa.cpp

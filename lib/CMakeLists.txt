@@ -1,5 +1,3 @@
-
-
 find_package(GSL)
 if(GSL_FOUND AND NOT STATIC_GSL)
     set(GSL_LIBS gsl gslcblas PARENT_SCOPE)
