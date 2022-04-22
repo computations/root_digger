@@ -54,7 +54,6 @@ endif()
 
 string(TIMESTAMP RD_BUILD_DATE "%Y-%m-%d %H:%M:%S")
 
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 add_subdirectory(src)
 if(STATIC_BUILD)
