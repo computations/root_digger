@@ -9,7 +9,9 @@
 #include <mpi.h>
 #endif
 #include "util.hpp"
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <sys/stat.h>
 
 #ifdef _OPENMP
