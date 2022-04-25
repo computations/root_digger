@@ -42,7 +42,7 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(rd PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-target_link_libraries(rd PRIVATE ${LINK_LIBS} OpenMP::OpenMP_CXX)
+target_link_libraries(rd PRIVATE ${LINK_LIBS})
 #target_link_options(rd PRIVATE -fno-omit-frame-pointer -fsanitize=address)
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
