@@ -12,7 +12,7 @@ add_executable(rd_test
     ${RD_SOURCES}
 )
 
-set(TEST_LINK_LIBS corax_obj Catch2::Catch2 ${GSL_LIBS} lbfgs_lib)
+set(TEST_LINK_LIBS corax_obj Catch2::Catch2 lbfgs_lib lapacke)
 target_compile_definitions(rd_test PRIVATE
     DATA_DIRECTORY_DNA_ABS=${CMAKE_CURRENT_SOURCE_DIR}/../data/dna/
     DATA_DIRECTORY_TREE_ABS=${CMAKE_CURRENT_SOURCE_DIR}/../data/tree/)

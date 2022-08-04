@@ -32,11 +32,6 @@ if(GIT_FOUND)
     endif()
 endif()
 
-if(STATIC_BUILD)
-    set(STATIC_GSL ON)
-endif()
-
-
 if(NOT (RD_BUILD_VERSION AND RD_BUILD_COMMIT))
     set(RD_BUILD_VERSION "1.7.0")
     set(RD_BUILD_COMMIT "From Release")

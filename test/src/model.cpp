@@ -428,8 +428,8 @@ TEST_CASE("model_t test no invariant sites", "[model_t]") {
     auto final_rl = tmp.first;
     auto final_lh = tmp.second;
     CHECK(final_lh >= initial_rl.second);
-    CHECK(model.compute_lh_root(final_rl) == Approx(final_lh));
     CHECK(model.compute_lh(final_rl) == Approx(final_lh));
+    CHECK(model.compute_lh_root(final_rl) == Approx(final_lh));
   }
 
   SECTION("3 min roots") {
