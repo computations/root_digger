@@ -35,7 +35,7 @@ template <typename T>
 std::pair<uint32_t, uint32_t>
 compute_checksum_components(const T &val, uint32_t a = 1, uint32_t b = 0) {
   constexpr const uint32_t MOD_ADLER = 65521;
-  const uint8_t *          data      = reinterpret_cast<const uint8_t *>(&val);
+  const uint8_t           *data      = reinterpret_cast<const uint8_t *>(&val);
   constexpr size_t         data_len  = sizeof(T) / sizeof(uint8_t);
 
   for (size_t i = 0; i < data_len; ++i) {
@@ -251,8 +251,8 @@ public:
   }
 
 private:
-  int   _file_descriptor;
-  flock _file_lock;
+  int          _file_descriptor;
+  struct flock _file_lock;
 };
 
 class checkpoint_t {

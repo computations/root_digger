@@ -11,7 +11,9 @@ extern "C" {
 #include <getopt.h>
 #include <iomanip>
 #include <iostream>
+#ifdef _OPENMP
 #include <omp.h>
+#endif //  _OPENMP
 #include <sstream>
 #ifdef MPI_BUILD
 #include <mpi.h>

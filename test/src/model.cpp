@@ -69,6 +69,8 @@ TEST_CASE("model_t compute lh", "[model_t]") {
     double lh = model.compute_lh(tree.root_location(i));
     CHECK(std::isfinite(lh));
     CHECK(lh < 0.0);
+    double second_lh = model.compute_lh(tree.root_location(i));
+    CHECK(lh == second_lh);
   }
 }
 

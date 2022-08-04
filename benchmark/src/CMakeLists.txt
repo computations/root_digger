@@ -1,4 +1,5 @@
 add_executable(rd_bench
+    EXCLUDE_FROM_ALL
     ${RD_SOURCES}
     main.cpp
     model.cpp

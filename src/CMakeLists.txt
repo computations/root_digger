@@ -33,12 +33,17 @@ if(MPI_BUILD)
     set(LINK_LIBS ${LINK_LIBS} MPI::MPI_CXX)
 endif()
 
-target_link_libraries(rd ${LINK_LIBS})
+find_package(Threads)
+find_package(OpenMP)
+
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(rd PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+target_link_libraries(rd PRIVATE ${LINK_LIBS})
 #target_link_options(rd PRIVATE -fno-omit-frame-pointer -fsanitize=address)
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
     -pedantic -Wsign-conversion -Wnarrowing)
     #-fsanitize=address -fno-omit-frame-pointer)
-target_compile_definitions(rd PRIVATE
-    ${RD_COMPILE_DEFS})
 target_include_directories(rd PRIVATE ${CMAKE_SOURCE_DIR}/lib/lbfgsb)

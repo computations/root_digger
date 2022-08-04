@@ -3,6 +3,7 @@
 #include <fstream>
 #include <functional>
 #include <iomanip>
+#include <iostream>
 #include <limits>
 #include <random>
 #include <sstream>
@@ -349,22 +350,6 @@ void model_t::set_freqs_all_free(size_t p_index, model_params_t freqs) {
   set_freqs(p_index, freqs);
 }
 
-bool model_t::update_eigen_partition(size_t partition_index) {
-  bool updated = false;
-  auto part    = _partitions[partition_index];
-  for (size_t i = 0; i < part->rate_cats; ++i) {
-    if (!part->eigen_decomp_valid[i]) {
-      int result =
-          corax_update_eigen(part, _param_indicies[partition_index][i]);
-      updated = true;
-      if (result == CORAX_FAILURE) {
-        throw std::runtime_error{"Failed to update the eigen decomposition"};
-      }
-    }
-  }
-  return updated;
-}
-
 void model_t::update_pmatrix_partition(
     size_t                           partition_index,
     const std::vector<unsigned int> &pmatrix_indices,
@@ -384,10 +369,7 @@ std::vector<bool>
 model_t::update_pmatrices(const std::vector<unsigned int> &pmatrix_indices,
                           const std::vector<double>       &branch_lengths) {
   /* Update the eigen decompositions first */
-  std::vector<bool> updated(_partitions.size(), false);
-  for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
-    updated[part_index] = update_eigen_partition(part_index);
-  }
+  std::vector<bool> updated(_partitions.size(), true);
 
   for (size_t part_index = 0; part_index < _partitions.size(); ++part_index) {
     update_pmatrix_partition(part_index, pmatrix_indices, branch_lengths);
@@ -457,7 +439,6 @@ double model_t::compute_lh_root(const root_location_t &root) {
                                            _tree.root_scaler_index(),
                                            _param_indicies[i].data(),
                                            nullptr);
-    //* _partition_weights[i];
   }
   if (std::isnan(lh)) {
     throw std::runtime_error("lh at root is not a number: "
@@ -471,13 +452,11 @@ model_t::compute_lh_partition(size_t partition_index,
                               const std::vector<corax_operation_t> &ops,
                               const std::vector<unsigned int> &pmatrix_indices,
                               const std::vector<double>       &branch_lengths) {
-  bool update_partials = update_eigen_partition(partition_index);
-  if (update_partials) {
-    update_pmatrix_partition(partition_index, pmatrix_indices, branch_lengths);
-    corax_update_clvs(_partitions[partition_index],
-                      ops.data(),
-                      static_cast<unsigned int>(ops.size()));
-  }
+
+  update_pmatrix_partition(partition_index, pmatrix_indices, branch_lengths);
+  corax_update_clvs(_partitions[partition_index],
+                    ops.data(),
+                    static_cast<unsigned int>(ops.size()));
 
   double lh =
       corax_compute_root_loglikelihood(_partitions[partition_index],
@@ -1759,7 +1738,7 @@ std::vector<double> model_t::compute_all_root_lh() {
   root_lh.reserve(_tree.roots().size());
   for (auto rl : _tree.roots()) {
     move_root(rl);
-    root_lh.push_back(compute_lh_root(rl));
+    root_lh.push_back(compute_lh(rl));
   }
   return root_lh;
 }
