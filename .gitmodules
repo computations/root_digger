@@ -3,4 +3,4 @@
 	url = https://github.com/catchorg/Catch2.git
 [submodule "lib/coraxlib"]
 	path = lib/coraxlib
-	url = git@codeberg.org:Exelixis-Lab/coraxlib.git
+	url = https://codeberg.org/Exelixis-Lab/coraxlib.git
