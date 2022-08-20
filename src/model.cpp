@@ -125,11 +125,11 @@ model_t::model_t(rooted_tree_t                      tree,
   }
 
   unsigned int attributes = 0;
-  if (CORAX_STAT(avx2_present)) {
+  if (CORAX_HAS_CPU_FEATURE(avx2_present)) {
     attributes |= CORAX_ATTRIB_ARCH_AVX2;
-  } else if (CORAX_STAT(avx_present)) {
+  } else if (CORAX_HAS_CPU_FEATURE(avx_present)) {
     attributes |= CORAX_ATTRIB_ARCH_AVX;
-  } else if (CORAX_STAT(sse42_present)) {
+  } else if (CORAX_HAS_CPU_FEATURE(sse42_present)) {
     attributes |= CORAX_ATTRIB_ARCH_SSE;
   }
 
