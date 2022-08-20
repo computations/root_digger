@@ -8,6 +8,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer " CACHE INTERNAL "")
 set(CMAKE_C_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
 find_package(Git)
 if(GIT_FOUND)
     if(EXISTS ${CMAKE_SOURCE_DIR})
@@ -49,7 +51,6 @@ set(LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
 add_subdirectory(lib)
 include_directories(${LOCALDEPS_DIR}/include)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 find_library(ASAN_FOUND asan)
 if(ASAN_FOUND AND NOT MPI_BUILD)
