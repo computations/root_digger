@@ -14,15 +14,8 @@ cloning the repository
 
     git clone --recursive https://github.com/computations/root_digger
 
-This will obtain all the required dependencies including a modified `libpll`.
-Furthermore, the particular variant of `libpll` that is used by RootDigger
-requires the GNU Scientific Library (GSL). Most distributions have packages
-available, so installing it should be done through your package manager. In the
-case that GSL is not found though, the build process will automatically download
-GSL and build it.
-
-Compilation of `libpll` requires the dependencies Flex and Bison, both of which
-can also be obtained through a package manager.
+This will obtain all the required dependencies including `coraxlib`, as of `v1.8.0`.  Previously, coraxlib required a
+modified version of `libpll` and the library GSL.
 
 Root digger requires `cmake` to build. There is a `makefile` provided which will
 set up the build directory and build the software automatically. Once the
