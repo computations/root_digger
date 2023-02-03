@@ -15,7 +15,7 @@ set_target_properties(rd PROPERTIES
 
 set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
-set(LINK_LIBS corax_obj lbfgs_lib lapacke)
+set(LINK_LIBS corax lbfgs_lib)
 
 if(STATIC_BUILD)
     #target_link_options(rd PRIVATE -static -pie)

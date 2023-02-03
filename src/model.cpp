@@ -125,11 +125,11 @@ model_t::model_t(rooted_tree_t                      tree,
   }
 
   unsigned int attributes = 0;
-  if (CORAX_STAT(avx2_present)) {
+  if (CORAX_HAS_CPU_FEATURE(avx2_present)) {
     attributes |= CORAX_ATTRIB_ARCH_AVX2;
-  } else if (CORAX_STAT(avx_present)) {
+  } else if (CORAX_HAS_CPU_FEATURE(avx_present)) {
     attributes |= CORAX_ATTRIB_ARCH_AVX;
-  } else if (CORAX_STAT(sse42_present)) {
+  } else if (CORAX_HAS_CPU_FEATURE(sse42_present)) {
     attributes |= CORAX_ATTRIB_ARCH_SSE;
   }
 
@@ -665,9 +665,7 @@ std::pair<root_location_t, double> model_t::brents(root_location_t beg,
     beg   = end;
     d_beg = d_end;
     if (fabs(d) > tol) end.brlen_ratio += d;
-    else {
-      end.brlen_ratio += e_tol >= 0.0 ? tol : -tol;
-    }
+    else { end.brlen_ratio += e_tol >= 0.0 ? tol : -tol; }
     d_end = compute_dlh(end);
   }
   throw std::runtime_error("Brents method failed to converge");

@@ -167,14 +167,15 @@ cli_options_t parse_options(int argv, char **argc) {
       {"rate-cats", required_argument, 0, 0},             /* 17 */
       {"rate-cats-type", required_argument, 0, 0},        /* 18 */
       {"invariant-sites", no_argument, 0, 0},             /* 19 */
-      {"initial-root-strategy", required_argument, 0, 0}, /* 20 */
-      {"threads", required_argument, 0, 0},               /* 21 */
-      {"version", no_argument, 0, 0},                     /* 22 */
-      {"debug", no_argument, 0, 0},                       /* 23 */
-      {"mpi-debug", no_argument, 0, 0},                   /* 24 */
-      {"clean", no_argument, 0, 0},                       /* 25 */
-      {"echo", no_argument, 0, 0},                        /* 26 */
-      {"help", no_argument, 0, 0},                        /* 27 */
+      {"states", required_argument, 0, 0},                /* 20 */
+      {"initial-root-strategy", required_argument, 0, 0}, /* 21 */
+      {"threads", required_argument, 0, 0},               /* 22 */
+      {"version", no_argument, 0, 0},                     /* 23 */
+      {"debug", no_argument, 0, 0},                       /* 24 */
+      {"mpi-debug", no_argument, 0, 0},                   /* 25 */
+      {"clean", no_argument, 0, 0},                       /* 26 */
+      {"echo", no_argument, 0, 0},                        /* 27 */
+      {"help", no_argument, 0, 0},                        /* 28 */
       {0, 0, 0, 0},
   };
 
@@ -254,7 +255,10 @@ cli_options_t parse_options(int argv, char **argc) {
     case 19: // invariant-sites
       cli_options.invariant_sites = true;
       break;
-    case 20: // initial-root-strategy
+    case 20:
+      cli_options.states = atol(optarg);
+      break;
+    case 21: // initial-root-strategy
       if (strcmp(optarg, "random") == 0) {
         cli_options.initial_root_strategy = {initial_root_strategy_t::random};
       } else if (strcmp(optarg, "midpoint") == 0) {
@@ -268,25 +272,25 @@ cli_options_t parse_options(int argv, char **argc) {
       }
 
       break;
-    case 21: // threads
+    case 22: // threads
       cli_options.threads = {(size_t)atol(optarg)};
       break;
-    case 22: // version
+    case 23: // version
       print_version();
       std::exit(0);
-    case 23: // debug
+    case 24: // debug
       __VERBOSE__ = EMIT_LEVEL_DEBUG;
       break;
-    case 24: // mpi-debug
+    case 25: // mpi-debug
       __VERBOSE__ = EMIT_LEVEL_MPI_DEBUG;
       break;
-    case 25: // clean
+    case 26: // clean
       cli_options.clean = true;
       break;
-    case 26: // echo
+    case 27: // echo
       cli_options.echo = true;
       break;
-    case 27: // help
+    case 28: // help
       print_usage();
       std::exit(0);
       break;
