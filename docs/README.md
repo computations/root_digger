@@ -116,11 +116,31 @@ Application Options:
            level further.
 ```
 
+# Docker file
+
+There is a Docker file in the case that building the software natively is too difficult. In this case, the software can
+be built with 
+
+```
+docker build -t my_rd .
+```
+
+and run with
+
+```
+docker run my_rd:latest
+```
+
+In order to get files into the container, volumes should be used. An example where the files are in a local directory is
+
+```
+docker run -v $(pwd):/data/ my_rd:latest --msa /data/<MSA FILE> --tree /data/<TREE FILE>
+```
+
 # TL;DR
 
 **Dependencies**: 
 
-- GSL
 - Cmake 3.0
 - C++14 compatible compiler
 

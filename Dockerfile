@@ -8,4 +8,5 @@ COPY lib/ root_digger/lib/
 COPY src/ root_digger/src/
 COPY .git/ root_digger/.git/
 RUN cd root_digger && make && cp bin/rd /usr/local/bin/
-CMD ["rd","--help"]
+CMD ["--help"]
+ENTRYPOINT ["rd"]
