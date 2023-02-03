@@ -42,6 +42,7 @@ endif()
 
 target_link_libraries(rd PRIVATE ${LINK_LIBS})
 #target_link_options(rd PRIVATE -fno-omit-frame-pointer -fsanitize=address)
+target_compile_definitions(rd PRIVATE ${RD_COMPILE_DEFS})
 target_compile_options(rd PRIVATE -Wall -Wextra -Wshadow
     -Wdouble-promotion -Wmissing-include-dirs -Wtrampolines
     -pedantic -Wsign-conversion -Wnarrowing)

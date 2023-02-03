@@ -10,7 +10,7 @@ set(CMAKE_C_FLAGS_RELEASE "-O3" CACHE INTERNAL "")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
-find_package(Git)
+find_package(Git REQUIRED)
 if(GIT_FOUND)
     if(EXISTS ${CMAKE_SOURCE_DIR})
         execute_process(
