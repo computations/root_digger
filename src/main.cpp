@@ -468,7 +468,11 @@ int wrapped_main(int argv, char **argc) {
         && cli_options.early_stop.convert_with_default(
             !cli_options.exhaustive)) {}
 
-    constexpr const corax_state_t *map = corax_map_nt;
+    const corax_state_t *map =
+        cli_options.states == 2 ? corax_map_bin : corax_map_nt;
+    if (cli_options.states == 2) {
+      debug_string(EMIT_LEVEL_INFO, "Using a binary model");
+    }
 
     /* Parse the model */
     if (!cli_options.model_string.empty()) {
