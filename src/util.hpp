@@ -1,6 +1,7 @@
 #ifndef RD_UTIL_H
 #define RD_UTIL_H
 
+#include <filesystem>
 #include <random>
 
 /* The following functions are taken from RAxML-NG. I did some of the initial
@@ -146,12 +147,13 @@ private:
 };
 
 struct cli_options_t {
-  std::string                 msa_filename;
-  std::string                 tree_filename;
-  std::string                 prefix;
+  std::filesystem::path       msa_filename;
+  std::filesystem::path       tree_filename;
+  std::filesystem::path       prefix;
+  std::filesystem::path       prefix_dir;
   std::string                 model_filename;
   std::string                 freqs_filename;
-  std::string                 partition_filename;
+  std::filesystem::path       partition_filename;
   std::string                 data_type;
   std::string                 model_string;
   std::vector<ratehet_opts_t> rate_cats       = {1};

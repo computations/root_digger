@@ -44,11 +44,23 @@ template <> size_t read(int fd, std::string &str) {
   return total_read;
 }
 
+template <> size_t write(int fd, const std::filesystem::path &path) {
+  auto path_string = path.string();
+  return write(fd, path_string);
+}
+
+template <> size_t read(int fd, std::filesystem::path &str) {
+  std::string path_string;
+  str = path_string;
+  return read(fd, path_string);
+}
+
 template <> size_t write(int fd, const cli_options_t &options) {
   size_t total_written = 0;
   total_written += write(fd, options.msa_filename);
   total_written += write(fd, options.tree_filename);
   total_written += write(fd, options.prefix);
+  total_written += write(fd, options.prefix_dir);
   total_written += write(fd, options.model_filename);
   total_written += write(fd, options.freqs_filename);
   total_written += write(fd, options.partition_filename);
@@ -80,6 +92,7 @@ template <> size_t read(int fd, cli_options_t &options) {
   total_read += read(fd, options.msa_filename);
   total_read += read(fd, options.tree_filename);
   total_read += read(fd, options.prefix);
+  total_read += read(fd, options.prefix_dir);
   total_read += read(fd, options.model_filename);
   total_read += read(fd, options.freqs_filename);
   total_read += read(fd, options.partition_filename);

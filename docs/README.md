@@ -66,54 +66,71 @@ print detailed information about all the options.
 
 ```
 Application Options:
-    --msa [FILE]
-           File containing the alignment.
-    --tree [FILE]
-           File containing the tree, with branch lengths.
-    --partition [FILE]
-           Optional file containing the partition specification.
-           Format is the same as RAxML-NG partition file.
-    --exhaustive
-           Enable exhaustive mode. This will attempt to root a tree
-           at every branch, and then report the results using LWR.
-    --early-stop
-           Enable early stopping. This will cause cause the search
-           to terminate when the root placement is sufficently
-           close for 2 consecutive iterations. How close they need
-           to be is controled by brtol. Is enabled by default for
-           search mode and disabled by default for exhaustive mode.
-    --no-early-stop
-           Force disable early stop.
-    --seed [NUMBER]
-           Random seed to use. Optional
-    --rate-cats [NUMBER]
-           Number of rate categories to use for the model. Default
-           is 1.
-    --invariant-sites
-           Enable invariant sites. Default is off.
-    --min-roots [NUMBER]
-           Minimum number of roots to start from. Optional,
-           Default is 1.
-    --root-ratio [NUMBER]
-           Proportion of potential starting roots to attempt
-           Default is 0.01
-    --atol [NUMBER]
-           Root optmization stopping tolerance. Increase this to 
-           improve results.Default is 1e-4
-    --brtol [NUMBER]
-           When early stop mode is enabled, this controls the
-           distance required to trigger. Default is 1e-12
-    --bfgstol [NUMBER]
-           Tolerance for the BFGS steps. Default is 1e-7
-    --factor [NUMBER]
-           Factor for the BFGS steps. Default is 1e4
-    --threads [NUMBER]
-           Number of threads to use
-    --silent
-           Suppress output except for the final tree
-    --verbose
-           Increase the verbosity level. Can be repeated to
-           level further.
+--msa [FILE]
+     File containing the alignment.
+--tree [FILE]
+     File containing the tree, with branch lengths.
+--partition [FILE]
+     Optional file containing the partition specification.
+     Format is the same as RAxML-NG partition file.
+--prefix [STRING]
+     Prefix for the output files.
+--exhaustive
+     Enable exhaustive mode. This will attempt to root a tree
+     at every branch, and then report the results using LWR.
+--early-stop
+     Enable early stopping. This will cause cause the search
+     to terminate when the root placement is sufficently
+     close for 2 consecutive iterations. How close they need
+     to be can be controled by brtol. Is enabled by default for
+     search mode and disabled by default for exhaustive mode.
+--no-early-stop
+     Force disable early stop.
+--seed [NUMBER]
+     Random seed to use. Optional
+--rate-cats [NUMBER]
+     Number of rate categories to use for the model. Default
+     is 1.
+--invariant-sites
+     Enable invariant sites. Default is off.
+--min-roots [NUMBER]
+     Minimum number of roots to start from. Optional,
+     Default is 1.
+--root-ratio [NUMBER]
+     Proportion of potential starting roots to attempt
+     Default is 0.01
+--atol [NUMBER]
+     Root optmization stopping tolerance. Increase this to 
+     improve results.Default is 1e-4
+--brtol [NUMBER]
+     When early stop mode is enabled, this controls the
+     distance required to trigger. Default is 1e-12
+--bfgstol [NUMBER]
+     Tolerance for the BFGS steps. Default is 1e-7
+--factor [NUMBER]
+     Factor for the BFGS steps. Default is 1e2
+--initial-root-strategy {random, midpoint, modified-mad}
+     The strategy to pick the initial branches for rooting.
+     Random is the default, and simply picks the branches at
+     random. Midpoint uses the midpoint and similar branches to
+     start. Modified MAD will use a modified version of mad to
+     pick the starting branches. This can actually drive the
+     so care should be taken when selecting this option.
+     Default is random
+--threads [NUMBER]
+     Number of threads to use
+--silent
+     Suppress output except for the final tree
+--verbose
+     Increase the verbosity level. Can be repeated to
+     level further.
+--clean
+     Clean the checkpoint file and exit. Normally, this should
+     not be needed, but occasionally cleaining on a multi-node
+     system can take a lot of time. In that case, use this flag
+     on a single node, which will make RootDigger clean the
+     checkpoint file so that the job can be run quickly on
+     multi-node systems.
 ```
 
 # Docker file

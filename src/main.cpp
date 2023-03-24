@@ -19,6 +19,7 @@ extern "C" {
 #include <mpi.h>
 #endif
 #include <cstdlib>
+#include <filesystem>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -227,7 +228,19 @@ cli_options_t parse_options(int argv, char **argc) {
       cli_options.partition_filename = optarg;
       break;
     case 13: // prefix
-      cli_options.prefix = optarg;
+      cli_options.prefix     = optarg;
+      cli_options.prefix_dir = cli_options.prefix.parent_path();
+      if (cli_options.prefix.filename().empty()) {
+        throw std::runtime_error{
+            "Refusing to run with empty prefix filename. Please ensure there "
+            "is no trailing slash in the prefix."};
+      }
+      if (!std::filesystem::exists(cli_options.prefix_dir)) {
+        debug_print(EMIT_LEVEL_IMPORTANT,
+                    "Creating directory %s",
+                    cli_options.prefix_dir.c_str());
+        std::filesystem::create_directory(cli_options.prefix_dir);
+      }
       break;
     case 14: // exhaustive
       cli_options.exhaustive = true;
@@ -596,9 +609,11 @@ int wrapped_main(int argv, char **argc) {
                               checkpoint);
       if (__MPI_RANK__ == 0) {
         model.finalize();
-        final_rl = tmp.first;
-        final_lh = tmp.second;
-        std::ofstream outfile{cli_options.prefix + ".rooted.tree"};
+        final_rl                  = tmp.first;
+        final_lh                  = tmp.second;
+        auto rooted_tree_filename = cli_options.prefix;
+        rooted_tree_filename += ".rooted.tree";
+        std::ofstream outfile{rooted_tree_filename};
         final_tree_string = model.rooted_tree(final_rl).newick(false);
         outfile << final_tree_string;
       }
@@ -624,11 +639,15 @@ int wrapped_main(int argv, char **argc) {
         final_lh          = tmp.second;
         final_tree_string = model.virtual_rooted_tree(final_rl).newick();
         {
-          std::ofstream outfile{cli_options.prefix + ".lwr.tree"};
+          auto lwr_tree_filename = cli_options.prefix;
+          lwr_tree_filename += ".lwr.tree";
+          std::ofstream outfile{lwr_tree_filename};
           outfile << final_tree_string;
         }
         {
-          std::ofstream outfile{cli_options.prefix + ".rooted.tree"};
+          auto rooted_tree_filename = cli_options.prefix;
+          rooted_tree_filename += ".rooted.tree";
+          std::ofstream outfile{rooted_tree_filename};
           auto          tmp_tree = model.rooted_tree(final_rl);
           outfile << tmp_tree.newick(false);
         }
