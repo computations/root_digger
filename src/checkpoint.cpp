@@ -195,7 +195,9 @@ void checkpoint_t::save_options(const cli_options_t &options) {
 void checkpoint_t::load_options(cli_options_t &options) {
   if (_existing_results) {
     debug_string(EMIT_LEVEL_WARNING,
-                 "Loading options from the checkpoint file");
+                 "Loading options from the checkpoint file. Some cli options "
+                 "are ignored. If the program is not working, try deleting the "
+                 "checkpoint file");
     int read_fd = open(_checkpoint_filename.c_str(), O_RDONLY);
     read_with_success(read_fd, options);
     close(read_fd);
