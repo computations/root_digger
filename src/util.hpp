@@ -179,6 +179,7 @@ struct cli_options_t {
   bool operator==(const cli_options_t &other) const {
     return msa_filename == other.msa_filename
            && tree_filename == other.tree_filename && prefix == other.prefix
+           && prefix_dir == other.prefix_dir
            && model_filename == other.model_filename
            && freqs_filename == other.freqs_filename
            && partition_filename == other.partition_filename

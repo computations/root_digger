@@ -51,8 +51,11 @@ template <> size_t write(int fd, const std::filesystem::path &path) {
 
 template <> size_t read(int fd, std::filesystem::path &str) {
   std::string path_string;
+
+  auto read_amount = read(fd, path_string);
+
   str = path_string;
-  return read(fd, path_string);
+  return read_amount;
 }
 
 template <> size_t write(int fd, const cli_options_t &options) {
