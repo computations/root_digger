@@ -3,10 +3,7 @@ RUN apt-get update && \
 apt-get upgrade --assume-yes && \
 DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
 apt-get install --assume-yes build-essential git cmake libopenblas-dev liblapacke-dev && mkdir root_digger
-COPY CMakeLists.txt makefile root_digger/
-COPY lib/ root_digger/lib/
-COPY src/ root_digger/src/
-COPY .git/ root_digger/.git/
+RUN git clone https://github.com/computations/root_digger/ --depth=1 --recursive
 RUN cd root_digger && make && cp bin/rd /usr/local/bin/
 CMD ["--help"]
 ENTRYPOINT ["rd"]
