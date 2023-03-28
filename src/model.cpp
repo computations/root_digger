@@ -134,7 +134,7 @@ model_t::model_t(rooted_tree_t                      tree,
   }
 
   attributes |= CORAX_ATTRIB_NONREV;
-  attributes |= CORAX_ATTRIB_SITE_REPEATS;
+  // attributes |= CORAX_ATTRIB_SITE_REPEATS;
 
   size_t total_weight = 0;
   for (size_t partition_index = 0; partition_index < msas.size();
@@ -152,6 +152,9 @@ model_t::model_t(rooted_tree_t                      tree,
           "The length of the MSA is too large to safely cast");
     }
 
+    auto tmp_attribs = attributes;
+    if (msa.states() == 4) { tmp_attribs |= CORAX_ATTRIB_SITE_REPEATS; }
+
     _partitions.push_back(corax_partition_create(
         _tree.tip_count(),
         _tree.branch_count(),
@@ -161,7 +164,7 @@ model_t::model_t(rooted_tree_t                      tree,
         _tree.branch_count(),
         static_cast<unsigned int>(_rate_rates[partition_index].size()),
         _tree.branch_count(),
-        attributes));
+        tmp_attribs));
     _partition_weights.push_back(msa.total_weight());
 
     set_gamma_rates(partition_index);
