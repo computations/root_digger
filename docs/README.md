@@ -14,13 +14,22 @@ cloning the repository
 
     git clone --recursive https://github.com/computations/root_digger
 
-This will obtain all the required dependencies including `coraxlib`, as of `v1.8.0`.  Previously, coraxlib required a
-modified version of `libpll` and the library GSL.
+This will obtain all the required dependencies including (except for BLAS and LAPACKE, which are discussed below)
+`coraxlib`, as of `v1.8.0`. Previously, coraxlib required a modified version of `libpll` and the library GSL.
 
 Root digger requires `cmake` to build. There is a `makefile` provided which will
 set up the build directory and build the software automatically. Once the
 software is built, the binary `rd` is placed in the `bin` directory, along with
 `rd_test`, which is the test suite.
+
+## BLAS and LAPACKE
+
+RootDigger relies on `coraxlib` to compute the phylogenetic likelihood. `coraxlib` in turn relies on BLAS and LAPACKE to
+compute some fundamental linear algebra operations. This means that both BLAS and LAPACKE are requirements of
+RootDigger. Fortunately, BLAS and LAPACKE can be supplied by many sources. I recommend OpenBLAS for both, but Intel's MKL
+will also work. For both of these, I strongly recommend installing the libraries through your pacakage manager (e.g.
+`apt`, `apt-get`, `brew`, `yum`, or `pacman`) instead of installing them manually. If there is _any_ difficulty at all
+installing these libraries, the Docker image (discussed below) should be used instead).
 
 ## Parallelism
 
