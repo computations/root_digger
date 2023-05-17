@@ -464,10 +464,17 @@ partition_info_t parse_partition_info(const std::string &line) {
           + "'");
     }
 
+    /* If there is a comma next, then next part has only one site */
+    if (*itr == ',') {
+      end = begin;
+      pi.parts.emplace_back(begin, end);
+      continue;
+    }
+
     /* check for - */
     itr = expect_next(itr, '-');
 
-    /* parse begin */
+    /* parse end */
     start = itr;
     while (std::isdigit(*itr)) { itr++; }
     try {
