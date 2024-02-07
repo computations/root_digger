@@ -2,7 +2,7 @@
 #include <sstream>
 #include <thread>
 #include <unordered_set>
-#if (defined(_WIN32) && !defined(__aarch64__))
+#if (!defined(__aarch64__))
 #include <cpuid.h>
 #endif
 #ifdef MPI_BUILD
@@ -33,8 +33,6 @@ std::string build_path(size_t cpu_number) {
 void get_cpuid(int32_t out[4], int32_t x) {
 #ifdef _WIN32
   __cpuid(out, x);
-#elif defined(__aarch64__)
-  //no supported
 #else
   __cpuid_count(x, 0, out[0], out[1], out[2], out[3]);
 #endif
