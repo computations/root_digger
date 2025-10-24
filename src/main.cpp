@@ -239,7 +239,9 @@ cli_options_t parse_options(int argv, char **argc) {
         debug_print(EMIT_LEVEL_IMPORTANT,
                     "Creating directory %s",
                     cli_options.prefix_dir.c_str());
-        std::filesystem::create_directory(cli_options.prefix_dir);
+        if (!cli_options.prefix_dir.empty()) {
+          std::filesystem::create_directory(cli_options.prefix_dir);
+        }
       }
       break;
     case 14: // exhaustive

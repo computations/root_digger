@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.00)
+cmake_minimum_required(VERSION 3.5)
 project(root_digger)
 
 option(MPI_BUILD "Build with MPI" OFF)
